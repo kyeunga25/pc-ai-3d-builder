@@ -16,6 +16,9 @@ describe("withPublicSecurityHeaders", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("x-frame-options")).toBe("DENY");
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("strict-transport-security")).toBe(
+      "max-age=31536000; includeSubDomains",
+    );
     expect(response.headers.get("content-security-policy")).toContain(
       "frame-ancestors 'none'",
     );

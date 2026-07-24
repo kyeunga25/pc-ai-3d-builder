@@ -20,6 +20,7 @@ const PUBLIC_SECURITY_HEADERS = {
   "permissions-policy":
     "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "x-robots-tag": "noindex, nofollow",
