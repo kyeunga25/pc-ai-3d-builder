@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Public template only. Deployment uses a Git-ignored local config.
+  "name": "replace-with-worker-name",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2026-07-23",
+  "compatibility_flags": ["nodejs_compat", "disallow_importable_env"],
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false,
+  },
+  "secrets": {
+    "required": ["TEAM_DOMAIN", "POLICY_AUD"],
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  // Bindings are intentionally identifier-free in the public template.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "migrations_dir": "./migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PRIVATE_ASSETS",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "PILOT_RATE_LIMITER",
+      // Documentation-only namespace. Replace in the local deployment config.
+      "namespace_id": "1",
+      "simple": {
+        "limit": 60,
+        "period": 60,
+      },
+    },
+  ],
+  "workflows": [
+    {
+      "binding": "ASSET_GENERATION",
+      "name": "replace-with-workflow-name",
+      "class_name": "AssetGenerationWorkflow",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": false,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05,
+    },
+  },
+}

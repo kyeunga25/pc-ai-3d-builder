@@ -1,0 +1,41 @@
+# Security policy
+
+## Supported code
+
+Security fixes apply to the latest code on the default branch.
+
+The current application is invite-only. Production use requires a Cloudflare Access application, valid Worker secrets, a migrated D1 database and an explicitly created workspace membership. The repository does not contain production account identifiers, resource names, user records or private assets.
+
+The browser preview uses synthetic data only. Do not enter real merchant, customer, payment or private asset data into a local or preview environment.
+
+## Security controls
+
+- Access JWT signature, issuer, audience, expiry and subject are verified in the Worker.
+- Protected records are resolved through active D1 workspace memberships.
+- First-login identity binding rejects conflicting concurrent subjects.
+- Protected API requests are rate-limited by verified Access subject.
+- Session reads do not create database writes.
+- API responses use `no-store`; static and API responses receive restrictive security headers.
+- Unexpected exceptions are logged with a stable code rather than raw error text.
+- Production source maps and Wrangler telemetry are disabled.
+- Provider keys, Access values and Cloudflare identifiers must stay outside Git.
+
+## Dependencies
+
+The supported branch uses React Router 8 and does not use React Server Components. Run the following before release:
+
+```bash
+npm audit --audit-level=high
+npm run check
+npm run test
+npm run build
+npm run cf:dry-run
+```
+
+Do not merge or deploy while a reachable high-severity advisory remains unresolved.
+
+## Reporting a vulnerability
+
+Use the repository Security tab to submit a private report. Do not open a public issue containing credentials, personal data, private object URLs, deployment identifiers or reproduction data from a real account.
+
+Include the affected route or file, minimal reproduction steps, expected impact and redacted logs. Never include live tokens, JWTs, account identifiers, database identifiers or provider secrets.

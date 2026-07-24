@@ -1,0 +1,139 @@
+import { authenticateAccessRequest } from "./auth/access";
+import { resolveRequestContext } from "./auth/workspace";
+import { ApiError, apiErrorResponse } from "./lib/api-error";
+import { logRecord } from "./lib/log";
+import { enforcePilotRateLimit } from "./lib/rate-limit";
+import { withPublicSecurityHeaders } from "./lib/security-headers";
+import { healthResponse } from "./routes/health";
+import { sessionResponse, workspacesResponse } from "./routes/session";
+
+export { AssetGenerationWorkflow } from "./workflows/asset-generation";
+
+function apiNotFound(requestId: string): Response {
+  return Response.json(
+    {
+      error: {
+        code: "NOT_FOUND",
+        message: "所要求的 API 路徑不存在。",
+        requestId,
+      },
+    },
+    { status: 404, headers: { "cache-control": "no-store" } },
+  );
+}
+
+async function routeRequest(
+  request: Request,
+  env: Env,
+  requestId: string,
+): Promise<Response> {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/api/health") {
+    if (request.method !== "GET") {
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET", "cache-control": "no-store" },
+      });
+    }
+
+    return healthResponse(requestId);
+  }
+
+  if (url.pathname.startsWith("/api/")) {
+    const identity = await authenticateAccessRequest(request, env);
+    await enforcePilotRateLimit(env.PILOT_RATE_LIMITER, identity.subject);
+    const context = await resolveRequestContext(
+      env.DB,
+      identity,
+      request.headers.get("x-rigstage-workspace-id"),
+    );
+
+    if (url.pathname === "/api/session") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+
+      return sessionResponse(context);
+    }
+
+    if (url.pathname === "/api/workspaces") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+
+      return workspacesResponse(context);
+    }
+
+    return apiNotFound(requestId);
+  }
+
+  return env.ASSETS.fetch(request);
+}
+
+export default {
+  async fetch(request, env): Promise<Response> {
+    const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const url = new URL(request.url);
+
+    try {
+      const response = withPublicSecurityHeaders(
+        await routeRequest(request, env, requestId),
+      );
+      logRecord("info", {
+        event: "request.complete",
+        requestId,
+        method: request.method,
+        path: url.pathname,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+      });
+      return response;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const response = withPublicSecurityHeaders(
+          apiErrorResponse(error, requestId),
+        );
+        logRecord("info", {
+          event: "request.denied",
+          requestId,
+          method: request.method,
+          path: url.pathname,
+          status: response.status,
+          durationMs: Date.now() - startedAt,
+          error: error.code,
+        });
+        return response;
+      }
+
+      logRecord("error", {
+        event: "request.failed",
+        requestId,
+        method: request.method,
+        path: url.pathname,
+        status: 500,
+        durationMs: Date.now() - startedAt,
+        error: "UNEXPECTED_ERROR",
+      });
+      return withPublicSecurityHeaders(
+        Response.json(
+          {
+            error: {
+              code: "INTERNAL_ERROR",
+              message: "無法完成要求。",
+              requestId,
+            },
+          },
+          { status: 500, headers: { "cache-control": "no-store" } },
+        ),
+      );
+    }
+  },
+} satisfies ExportedHandler<Env>;

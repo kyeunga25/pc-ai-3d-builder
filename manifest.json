@@ -1,0 +1,22 @@
+{
+  "project": "PC AI 3D Builder MVP",
+  "application": "RigStage",
+  "documents": [
+    "AGENTS.md",
+    "README.md",
+    "SECURITY.md",
+    "docs/API_SPEC.md",
+    "docs/ARCHITECTURE.md",
+    "docs/ASSET_PIPELINE.md",
+    "docs/CONTRIBUTING.md",
+    "docs/DEVELOPMENT_GUIDE.md",
+    "docs/COMPATIBILITY_ENGINE.md",
+    "docs/DATA_MODEL.md",
+    "docs/DECISIONS.md",
+    "docs/INTEGRATION_CONTRACT.md",
+    "docs/PRODUCT_SPEC.md",
+    "docs/TEST_PLAN.md",
+    "docs/RELEASE_STATUS.md",
+    "docs/UI_UX_SPEC.md"
+  ]
+}

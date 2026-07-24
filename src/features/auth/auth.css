@@ -1,0 +1,66 @@
+.auth-gate {
+  display: grid;
+  min-height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: 32px;
+  padding: 28px;
+  background:
+    linear-gradient(rgba(6, 8, 13, 0.76), rgba(6, 8, 13, 0.94)),
+    radial-gradient(circle at 50% 0%, rgba(0, 217, 255, 0.16), transparent 48%),
+    var(--bg-0);
+}
+
+.auth-gate__panel {
+  display: grid;
+  width: min(100%, 520px);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  border: 1px solid var(--border-strong);
+  padding: 28px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-panel);
+}
+
+.auth-gate__panel > svg {
+  width: 24px;
+  height: 24px;
+  color: var(--warning);
+}
+
+.auth-gate__panel h1 {
+  margin: 4px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.035em;
+}
+
+.auth-gate__panel p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.auth-gate__panel .button {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.auth-gate__eyebrow {
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .auth-gate__panel {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .auth-gate__panel .button {
+    grid-column: 1;
+  }
+}

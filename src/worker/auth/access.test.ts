@@ -1,0 +1,78 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { authenticateAccessRequest } from "./access";
+
+const env = {
+  TEAM_DOMAIN: "https://rigstage-test.cloudflareaccess.com",
+  POLICY_AUD: "test-audience",
+};
+
+describe("Cloudflare Access identity", () => {
+  it("rejects requests without the signed Access assertion", async () => {
+    await expect(
+      authenticateAccessRequest(
+        new Request("https://rigstage.test/api/session"),
+        env,
+      ),
+    ).rejects.toMatchObject({
+      status: 401,
+      code: "ACCESS_TOKEN_REQUIRED",
+    });
+  });
+
+  it("normalises verified identity claims", async () => {
+    const verify = vi.fn().mockResolvedValue({
+      sub: "access-user-1",
+      email: "  PILOT@EXAMPLE.COM ",
+      name: " 試行用戶 ",
+    });
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "signed-token" },
+    });
+
+    await expect(
+      authenticateAccessRequest(request, env, verify),
+    ).resolves.toEqual({
+      subject: "access-user-1",
+      email: "pilot@example.com",
+      displayName: "試行用戶",
+    });
+    expect(verify).toHaveBeenCalledWith("signed-token", {
+      issuer: env.TEAM_DOMAIN,
+      audience: env.POLICY_AUD,
+    });
+  });
+
+  it("fails closed when token verification fails", async () => {
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "invalid-token" },
+    });
+    const verify = vi.fn().mockRejectedValue(new Error("signature mismatch"));
+
+    await expect(
+      authenticateAccessRequest(request, env, verify),
+    ).rejects.toMatchObject({
+      status: 401,
+      code: "ACCESS_TOKEN_INVALID",
+    });
+  });
+
+  it("fails closed when required Access configuration is missing", async () => {
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "signed-token" },
+    });
+    const verify = vi.fn();
+
+    await expect(
+      authenticateAccessRequest(
+        request,
+        { TEAM_DOMAIN: "", POLICY_AUD: "" },
+        verify,
+      ),
+    ).rejects.toMatchObject({
+      status: 503,
+      code: "AUTH_CONFIGURATION_MISSING",
+    });
+    expect(verify).not.toHaveBeenCalled();
+  });
+});

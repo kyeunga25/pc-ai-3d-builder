@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+worker-configuration.d.ts
+AGENTS.md
+README.md
+docs/
+manifest.json

@@ -1,0 +1,231 @@
+.merchant-shell {
+  display: grid;
+  min-height: 100dvh;
+  grid-template:
+    "header header" 64px
+    "nav content" minmax(0, 1fr) / 230px minmax(0, 1fr);
+  background: var(--bg-0);
+}
+
+.merchant-header {
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  grid-area: header;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 22px;
+  background: rgba(6, 8, 13, 0.94);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.workspace-switcher {
+  display: inline-flex;
+  min-height: 42px;
+  min-width: 232px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 5px 11px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.workspace-switcher span {
+  display: grid;
+  min-width: 0;
+}
+
+.workspace-switcher small {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-switcher select {
+  min-width: 0;
+  max-width: 190px;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+}
+
+.workspace-switcher select:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.merchant-header__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.merchant-nav {
+  position: sticky;
+  top: 64px;
+  display: flex;
+  min-height: calc(100dvh - 64px);
+  flex-direction: column;
+  grid-area: nav;
+  border-right: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(0, 217, 255, 0.035), transparent 24%),
+    var(--bg-1);
+}
+
+.merchant-nav__title {
+  padding: 26px 22px 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.merchant-nav nav {
+  display: grid;
+  gap: 3px;
+  padding: 0 10px;
+}
+
+.merchant-nav__link {
+  position: relative;
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 580;
+}
+
+.merchant-nav__link:hover {
+  border-color: var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.merchant-nav__link.is-active {
+  border-color: var(--border-strong);
+  background: var(--accent-cyan-soft);
+  color: var(--text-primary);
+}
+
+.merchant-nav__link.is-active::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: -1px;
+  width: 2px;
+  background: var(--accent-cyan);
+  content: "";
+}
+
+.merchant-nav__link.is-active svg {
+  color: var(--accent-cyan);
+}
+
+.merchant-nav__footer {
+  display: grid;
+  gap: 8px;
+  margin: auto 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 18px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.merchant-nav__footer strong {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.merchant-content {
+  min-width: 0;
+  grid-area: content;
+  overflow: auto;
+}
+
+@media (max-width: 880px) {
+  .merchant-shell {
+    grid-template:
+      "header" 60px
+      "nav" 58px
+      "content" minmax(0, 1fr) / minmax(0, 1fr);
+  }
+
+  .merchant-header {
+    gap: 12px;
+    padding: 0 14px;
+  }
+
+  .merchant-header .brand-mark__word {
+    display: none;
+  }
+
+  .workspace-switcher {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .merchant-header__status {
+    display: none;
+  }
+
+  .merchant-nav {
+    position: sticky;
+    top: 60px;
+    z-index: 9;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    overflow-x: auto;
+  }
+
+  .merchant-nav__title,
+  .merchant-nav__footer {
+    display: none;
+  }
+
+  .merchant-nav nav {
+    display: flex;
+    min-width: max-content;
+    height: 100%;
+    align-items: stretch;
+    padding: 5px 10px;
+  }
+
+  .merchant-nav__link {
+    min-height: 46px;
+    padding: 0 14px;
+  }
+
+  .merchant-nav__link.is-active::before {
+    top: auto;
+    right: 10px;
+    bottom: -1px;
+    left: 10px;
+    width: auto;
+    height: 2px;
+  }
+}
