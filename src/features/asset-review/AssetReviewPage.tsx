@@ -161,7 +161,7 @@ export function AssetReviewPage() {
             <dl className="technical-list">
               <div>
                 <dt>供應商</dt>
-                <dd>Tripo 示意</dd>
+                <dd>模擬服務</dd>
               </div>
               <div>
                 <dt>品質</dt>

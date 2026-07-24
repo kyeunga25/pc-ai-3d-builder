@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  // Public template only. Deployment uses a Git-ignored local config.
-  "name": "replace-with-worker-name",
+  // Public service name. Account and storage identifiers stay outside Git.
+  "name": "rigstage-app",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-07-23",
   "compatibility_flags": ["nodejs_compat", "disallow_importable_env"],

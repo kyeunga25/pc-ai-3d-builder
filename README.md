@@ -43,7 +43,17 @@ npm audit --audit-level=high
 
 ## 部署設定
 
-版本庫內的 `wrangler.jsonc` 只是一份不含實際 Cloudflare 識別資料的範本。部署時應使用 Git 忽略的本地設定，並把 Access 值存入 Wrangler secrets。不要提交 account ID、database ID、實際資源名稱、token、私有物件 URL 或商戶身份資料。
+版本庫內的 `wrangler.jsonc` 記錄公開 Worker 名稱及不含識別資料的 binding 範本。`main` 分支由 Cloudflare Workers Builds 執行 `npm run build` 及 `npm run deploy:ci`；部署指令會以 Cloudflare build secrets 產生 Git 忽略的臨時設定。Account ID、D1 ID、儲存資源名稱、token、私有物件 URL 及商戶身份資料不會進入 Git。
+
+Cloudflare build 環境需要以下 secret 名稱，值只儲存在 Cloudflare：
+
+- `RIGSTAGE_D1_DATABASE_ID`
+- `RIGSTAGE_D1_DATABASE_NAME`
+- `RIGSTAGE_R2_BUCKET_NAME`
+- `RIGSTAGE_WORKFLOW_NAME`
+- `RIGSTAGE_RATE_NAMESPACE_ID`
+
+Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets。
 
 身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。公開安全政策見 [SECURITY.md](SECURITY.md)。
 

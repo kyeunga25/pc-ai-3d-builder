@@ -20,7 +20,18 @@ npx wrangler secret put TEAM_DOMAIN --config <ignored-config>
 npx wrangler secret put POLICY_AUD --config <ignored-config>
 ```
 
-版本庫內的 `.env.example` 只有空值或文件用 placeholder。
+版本庫內的 `.env.example` 只有空值或文件用 placeholder。Workers Builds 使用 `npm run deploy:ci`，從 Cloudflare build secrets 產生 `.wrangler/deploy.jsonc`；該檔案不會被 Git 追蹤。
+
+## 自動部署
+
+Cloudflare Workers Builds 連接 GitHub `main` 分支：
+
+- Build command：`npm run build`
+- Deploy command：`npm run deploy:ci`
+- Root directory：`/`
+- Production branch：`main`
+
+儲存 binding 的 ID 及名稱只存入 Cloudflare build secrets。更新部署設定後，先推送一個經檢查的 commit，再於 Cloudflare Builds 及 GitHub check run 核對結果。
 
 ## D1 migration
 

@@ -1,4 +1,4 @@
-# Codex agent instructions for RigStage
+# Contribution guidance for RigStage
 
 ## Safety and repository discipline
 
