@@ -2,6 +2,8 @@
 
 This repository contains only public product documentation, source code and synthetic fixtures.
 
+This workflow is for authorized collaborators. Unsolicited code contributions are not accepted unless a separate written agreement is already in place. The repository is governed by the proprietary notice in [`LICENSE`](../LICENSE).
+
 Before changing code:
 
 1. Read `AGENTS.md`, `README.md` and `SECURITY.md`.
@@ -21,3 +23,5 @@ npm audit --audit-level=high
 ```
 
 Review the staged diff explicitly. Do not stage local deployment configuration, Wrangler metadata, database files, generated models, logs or source maps.
+
+Use the repository issue forms for public-safe bug reports and feature suggestions. Use the Security tab for vulnerabilities. Never place credentials, personal data, production records, actual resource names, private URLs or confidential business information in issues or pull requests.

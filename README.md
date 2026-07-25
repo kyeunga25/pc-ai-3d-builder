@@ -4,6 +4,10 @@ RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。現�
 
 最新公開版本：`v0.2.0`。
 
+## English summary
+
+RigStage is an invite-only PC catalogue, asset-review and 3D assembly workspace built with React and Cloudflare Workers. The current release provides workspace-scoped catalogue reads and human review decisions while keeping local fixtures synthetic and private storage inaccessible from public routes.
+
 ## 現有功能
 
 - 香港繁體中文介面及港幣格式。
@@ -73,3 +77,10 @@ Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬�
 - Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。
 - 限流鍵使用已驗證 Access subject，不記錄 JWT 或電郵。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
+
+## 專案協作與授權
+
+- 參與修改前請閱讀 [Contribution workflow](docs/CONTRIBUTING.md)。
+- 一般問題及安全回報渠道見 [Support](SUPPORT.md) 與 [Security Policy](SECURITY.md)。
+- 此版本庫是 source-visible proprietary software，保留全部權利；詳情見 [LICENSE](LICENSE)。
+- 程式碼 PR 只供已獲授權的協作者；一般使用者仍可透過 issue forms 回報錯誤或提出建議。

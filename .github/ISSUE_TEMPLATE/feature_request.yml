@@ -1,0 +1,31 @@
+name: Feature request
+description: 建議具體且公開安全的改善 / Suggest a bounded, public-safe improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用情境 / Use case
+      description: Describe the user problem without private business plans, customer data, or deployment details.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 建議結果 / Proposed outcome
+      description: Describe the smallest useful public outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 可接受替代方案 / Acceptable alternatives
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: 邊界確認 / Boundary confirmation
+      options:
+        - label: This request contains no personal data, confidential business information, deployment identifiers, actual resource names, or production records.
+          required: true
