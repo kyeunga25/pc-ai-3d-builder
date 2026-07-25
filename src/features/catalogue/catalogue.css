@@ -194,6 +194,13 @@
   font-weight: 650;
 }
 
+.catalogue-table__more {
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--border-subtle);
+  padding: 14px;
+}
+
 @media (max-width: 1180px) {
   .catalogue-toolbar__notice,
   .catalogue-row__category,

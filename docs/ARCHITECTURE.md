@@ -24,7 +24,15 @@ A requested workspace header never grants access by itself. The selected workspa
 
 ## Storage bindings
 
-D1 stores current identity and workspace metadata. The R2 binding is private and has no public object-serving route in this release. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
+D1 stores identity, workspace metadata, workspace-scoped catalogue records, current asset review state and append-only review events. Asset mutations use an expected review version and write the asset transition, review event and audit event through one D1 batch.
+
+The R2 binding is private and has no public object-serving route in this release. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
+
+## Catalogue and asset review
+
+Catalogue reads are bounded to 100 rows per request and use an ID cursor. The client-provided workspace header never becomes a database scope directly; the verified request context supplies the workspace predicate.
+
+The review queue returns only draft or in-review assets in the active workspace. Viewer roles are read-only, staff may save drafts, and owner or admin roles may approve or reject. Approval requires the complete fixed checklist and three positive, bounded dimensions. Visual geometry remains non-authoritative for compatibility.
 
 ## Privacy and observability
 

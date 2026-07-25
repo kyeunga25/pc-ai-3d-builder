@@ -40,6 +40,11 @@ export const catalogPartSchema = z.object({
   verified: z.boolean(),
 });
 
+export const catalogueResponseSchema = z.object({
+  items: z.array(catalogPartSchema),
+  nextCursor: z.string().min(1).nullable(),
+});
+
 export const mockBuildSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -51,5 +56,6 @@ export const mockBuildSchema = z.object({
 });
 
 export type CatalogPart = z.infer<typeof catalogPartSchema>;
+export type CatalogueResponse = z.infer<typeof catalogueResponseSchema>;
 export type ComponentCategory = z.infer<typeof componentCategorySchema>;
 export type MockBuild = z.infer<typeof mockBuildSchema>;

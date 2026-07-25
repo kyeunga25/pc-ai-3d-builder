@@ -1,6 +1,8 @@
 # Asset handling boundary
 
-The current public release does not upload product images, call a 3D provider, download models or expose private R2 objects. The review screen uses synthetic records only.
+The current public release does not upload product images, call a 3D provider, download models or expose private R2 objects. Local development uses a synthetic review record. Production can read workspace-scoped D1 review records and persist authorized draft, approval or rejection transitions without exposing an object location.
+
+Review mutations use a fixed checklist, bounded human-verified dimensions, role checks and an expected version. Asset state, review history and the minimal audit event are committed together. Approval remains a visual-asset decision only and never establishes compatibility.
 
 Any implementation that activates this boundary must preserve these rules:
 

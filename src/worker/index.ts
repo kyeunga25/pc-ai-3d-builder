@@ -4,6 +4,11 @@ import { ApiError, apiErrorResponse } from "./lib/api-error";
 import { logRecord } from "./lib/log";
 import { enforcePilotRateLimit } from "./lib/rate-limit";
 import { withPublicSecurityHeaders } from "./lib/security-headers";
+import {
+  assetReviewMutationResponse,
+  assetReviewQueueResponse,
+} from "./routes/assets";
+import { catalogueResponse } from "./routes/catalogue";
 import { healthResponse } from "./routes/health";
 import { sessionResponse, workspacesResponse } from "./routes/session";
 
@@ -69,6 +74,48 @@ async function routeRequest(
       }
 
       return workspacesResponse(context);
+    }
+
+    if (url.pathname === "/api/catalogue") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+
+      return catalogueResponse(env.DB, context, url);
+    }
+
+    if (url.pathname === "/api/assets/review-queue") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+
+      return assetReviewQueueResponse(env.DB, context);
+    }
+
+    const assetReviewMatch = /^\/api\/assets\/([^/]+)\/review$/u.exec(
+      url.pathname,
+    );
+    if (assetReviewMatch) {
+      if (request.method !== "PATCH") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "PATCH", "cache-control": "no-store" },
+        });
+      }
+
+      return assetReviewMutationResponse(
+        request,
+        env.DB,
+        context,
+        assetReviewMatch[1]!,
+        requestId,
+      );
     }
 
     return apiNotFound(requestId);

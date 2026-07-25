@@ -1,4 +1,4 @@
-# Public release status
+# Public release status — v0.2.0
 
 This file records only the capabilities present in the current public branch.
 
@@ -11,13 +11,17 @@ This file records only the capabilities present in the current public branch.
 - [x] Cloudflare Access verification and D1 workspace membership enforcement.
 - [x] Concurrent identity-binding protection.
 - [x] Subject-keyed API rate limiting.
+- [x] Bounded workspace-scoped catalogue API and production UI states.
+- [x] D1 asset-review queue with role checks and optimistic concurrency.
+- [x] Atomic asset, review-history and audit-event mutation batches.
 - [x] D1 migrations and synthetic unit fixtures.
 - [x] Placeholder-only private R2 and Workflow bindings.
 - [x] Local check, test, build and deployment dry-run commands.
+- [x] Production deploy command applies pending D1 migrations before Worker upload.
 
 ## Demonstration-only
 
-The catalogue records, prices, stock, compatibility results and 3D scene are synthetic UI fixtures. They are not live merchant data and are not presented as completed backend workflows.
+Local catalogue records, prices, stock, review assets, compatibility results and the 3D scene are synthetic UI fixtures. Production catalogue and review routes read D1 records, but the repository contains no merchant records and does not provide catalogue onboarding. Private uploads, provider generation, compatibility decisions and exports remain inactive.
 
 ## Release checks
 

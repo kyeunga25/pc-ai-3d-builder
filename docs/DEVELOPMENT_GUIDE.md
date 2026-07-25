@@ -7,9 +7,10 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - React/Vite browser application with feature-oriented routes.
 - Cloudflare Worker serving Static Assets and a small API.
 - Cloudflare Access identity verification.
-- D1 workspace membership and audit schema.
+- D1 workspace membership, catalogue, asset-review history and audit schema.
+- Workspace-scoped catalogue and asset-review APIs with bounded reads and mutation bodies.
 - Private R2 and Workflow bindings reserved for approved asset workflows.
-- Synthetic UI fixtures for catalogue, review and builder demonstrations.
+- Synthetic local UI fixtures for catalogue, review and builder demonstrations.
 
 ## Invariants
 
@@ -18,6 +19,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Provider keys and Cloudflare deployment identifiers never reach the browser or Git.
 - Original images, generated models and render outputs remain private.
 - Generated meshes remain drafts until explicit human approval.
+- Asset-review writes require an authorized role and the current review version.
 - Compatibility is determined from structured, verified specifications, never inferred from a visual mesh.
 - Long-running work must be asynchronous and idempotent.
 - Read-only requests must not create unbounded database writes.
@@ -35,3 +37,5 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 ## Completion checks
 
 A change is complete when its error and loading states are represented, workspace access is enforced where required, relevant tests pass, production assets build, Wrangler dry-run succeeds, and the staged diff contains no secrets, real identities, deployment identifiers or generated private assets.
+
+Production deployment prepares an ignored Wrangler configuration, applies pending D1 migrations, and uploads the Worker only after migration success.

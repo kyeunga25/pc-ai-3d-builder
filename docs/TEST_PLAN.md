@@ -20,11 +20,15 @@ Current unit tests cover:
 - subject-keyed API rate limiting;
 - read-only session responses;
 - audit helper serialization;
-- health response and public security headers.
+- health response and public security headers;
+- bounded, workspace-scoped catalogue pagination and filters;
+- bounded JSON mutation bodies;
+- asset-review role checks, complete-approval requirements and stale-version rejection;
+- atomic review and audit statement construction without identity data in metadata.
 
 ## Migration check
 
-Apply both migrations to an empty temporary SQLite database and confirm `PRAGMA foreign_key_check` returns no rows. Never use a local copy of production data.
+Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `4` and no rows from `PRAGMA foreign_key_check`. Insert only synthetic workspace, catalogue and asset fixtures when checking relational constraints. Never use a local copy of production data.
 
 ## Browser check
 
@@ -36,6 +40,8 @@ Test the built application at desktop and tablet widths. Confirm:
 - no horizontal overflow obscures primary actions;
 - reduced-motion preferences disable non-essential animation;
 - UI fixtures remain visibly synthetic.
+- catalogue search filters the rendered synthetic records;
+- completing the final asset checklist item enables approval, and approval locks the reviewed fields.
 
 ## Deployment check
 
