@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  // Public service name. Account and storage identifiers stay outside Git.
-  "name": "rigstage-app",
+  // Placeholder only. The deployment name is injected outside Git.
+  "name": "replace-with-worker-name",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-07-23",
   "compatibility_flags": ["nodejs_compat", "disallow_importable_env"],

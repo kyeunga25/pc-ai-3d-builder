@@ -22,6 +22,18 @@ Links users to workspaces with an explicit role and status. Server routes select
 
 Reserved for meaningful state transitions. Read-only session resolution does not create audit rows. Metadata must be small, structured and free of JWTs, email addresses, provider keys, prompts and private object URLs.
 
+## `catalog_parts`
+
+Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. No production catalogue rows are included in migrations.
+
+## `product_assets`
+
+Stores one current visual-asset review record per workspace catalogue part. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from any private object location.
+
+## `asset_review_events`
+
+Append-only review history for draft saves, approvals and rejections. Each asset version may appear once. The matching asset update, review event and minimal audit event are executed in one D1 batch.
+
 ## Migration rules
 
 - Add schema changes through numbered migration files.
@@ -29,3 +41,4 @@ Reserved for meaningful state transitions. Read-only session resolution does not
 - Use bound parameters for request-influenced values.
 - Do not add production records, account identifiers or resource names to migrations.
 - Test migrations against an empty temporary database and run `PRAGMA foreign_key_check`.
+- Keep every catalogue, asset and review relation explicitly workspace-scoped.

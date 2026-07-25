@@ -8,6 +8,8 @@ Cloudflare Access protects the application boundary. The Worker independently ve
 
 Generated visual material remains a draft until an authorized user approves it. The application must not present inferred geometry as verified product or engineering data.
 
+Staff roles may save review drafts. Approval and rejection require an owner or admin role, the current optimistic review version and an atomic asset, review-history and audit-event batch. Approval also requires every fixed checklist item and three positive human-verified dimensions.
+
 ## Compatibility from structured data
 
 Compatibility decisions use verified specifications and deterministic rules. A visual mesh is never an authority for sockets, power, clearance or connectors.

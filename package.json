@@ -1,7 +1,7 @@
 {
   "name": "rigstage",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -17,7 +17,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "cf:dry-run": "WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy --dry-run",
     "prepare:deploy": "node scripts/create-cloudflare-config.mjs",
-    "deploy:ci": "npm run prepare:deploy && wrangler deploy --config .wrangler/deploy.jsonc"
+    "db:migrate:ci": "wrangler d1 migrations apply DB --remote --config .wrangler/deploy.jsonc",
+    "deploy:ci": "npm run prepare:deploy && npm run db:migrate:ci && wrangler deploy --config .wrangler/deploy.jsonc"
   },
   "dependencies": {
     "jose": "6.2.4",

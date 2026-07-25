@@ -1,3 +1,4 @@
+import type { AssetReviewItem } from "./assets";
 import type { CatalogPart, ComponentCategory, MockBuild } from "./schemas";
 
 export const componentSteps: Array<{
@@ -165,4 +166,31 @@ export const currentBuild: MockBuild = {
   hardErrorCount: 0,
   estimatedWatts: 482,
   totalPriceMinor: 1_284_000,
+};
+
+export const reviewAsset: AssetReviewItem = {
+  id: "asset_review_fixture",
+  part: {
+    id: "part_cooler_ak620",
+    sku: "R-AK620-BKNNMT-G",
+    manufacturer: "DeepCool",
+    model: "AK620 Digital",
+  },
+  status: "in_review",
+  quality: "draft",
+  sourceKind: "synthetic",
+  completedChecks: [
+    "model_identity",
+    "variant_identity",
+    "standard_orientation",
+    "verified_dimensions",
+    "source_rights",
+  ],
+  sourceRightsConfirmed: true,
+  dimensionsMm: {
+    width: 129,
+    height: 162,
+    depth: 138,
+  },
+  version: 0,
 };

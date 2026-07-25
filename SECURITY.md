@@ -14,7 +14,10 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
 - Protected API requests are rate-limited by verified Access subject.
-- Session reads do not create database writes.
+- Session and workspace reads do not append audit events; first identity binding and an explicit workspace switch may update bounded user metadata.
+- Catalogue and asset queries include the resolved workspace in every database predicate.
+- Asset review mutations use bounded JSON bodies, role checks and optimistic version conditions.
+- Asset state, review history and the minimal audit event are committed in one D1 batch.
 - API responses use `no-store`; static and API responses receive restrictive security headers.
 - Unexpected exceptions are logged with a stable code rather than raw error text.
 - Production source maps and Wrangler telemetry are disabled.

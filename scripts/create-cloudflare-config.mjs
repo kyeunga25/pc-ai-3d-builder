@@ -25,6 +25,10 @@ const values = Object.fromEntries(
   requiredBuildValues.map((name) => [name, requireBuildValue(name)]),
 );
 
+const workerName =
+  process.env.WRANGLER_CI_OVERRIDE_NAME?.trim() ||
+  requireBuildValue("RIGSTAGE_WORKER_NAME");
+
 if (!/^\d+$/.test(values.RIGSTAGE_RATE_NAMESPACE_ID)) {
   throw new Error("RIGSTAGE_RATE_NAMESPACE_ID must contain digits only");
 }
@@ -32,6 +36,7 @@ if (!/^\d+$/.test(values.RIGSTAGE_RATE_NAMESPACE_ID)) {
 const source = parse(await readFile("wrangler.jsonc", "utf8"));
 
 source.$schema = "../node_modules/wrangler/config-schema.json";
+source.name = workerName;
 source.main = "../src/worker/index.ts";
 source.assets = { ...source.assets, directory: "../dist" };
 
