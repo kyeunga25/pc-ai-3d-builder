@@ -20,6 +20,7 @@ export type CatalogueRow = {
   stock_count: number | null;
   specifications_json: string;
   specification_status: string;
+  status: string;
   record_version: number;
   asset_id: string | null;
   asset_quality: string | null;
@@ -104,6 +105,7 @@ export function mapCatalogueRow(row: CatalogueRow): CatalogPart {
     stockCount: row.stock_count,
     specifications,
     specificationStatus: row.specification_status,
+    catalogueStatus: row.status,
     assetId: row.asset_id,
     assetQuality: row.asset_quality ?? "unreviewed",
     assetStatus: mapAssetStatus(row.asset_review_status),
@@ -117,6 +119,7 @@ export const catalogueSelect = `SELECT p.id, p.sku, p.category,
                                        p.stock_status, p.stock_count,
                                        p.specifications_json,
                                        p.specification_status,
+                                       p.status,
                                        p.record_version,
                                        a.id AS asset_id,
                                        a.quality AS asset_quality,

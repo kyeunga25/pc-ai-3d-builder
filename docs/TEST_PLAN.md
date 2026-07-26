@@ -30,10 +30,13 @@ Current unit tests cover:
 - bounded JSON mutation bodies;
 - asset-review role checks, complete-approval requirements and stale-version rejection;
 - atomic review and audit statement construction without identity data in metadata.
+- deterministic build compatibility pass, warning, error and unknown outcomes;
+- workspace-scoped build list, role checks, guarded optimistic mutations and portable export;
+- export exclusion of build/workspace identity, price, stock and private-asset fields.
 
 ## Migration check
 
-Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `6`, the catalogue record-version column, private asset-file metadata columns and no rows from `PRAGMA foreign_key_check`. Insert only synthetic workspace, catalogue and asset fixtures when checking relational constraints. Never use a local copy of production data.
+Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `7`, the catalogue record-version column, private asset-file metadata columns, `builds` and `build_items`, and no rows from `PRAGMA foreign_key_check`. Insert only synthetic workspace, catalogue, asset and build fixtures when checking relational constraints. Never use a local copy of production data.
 
 ## Browser check
 
@@ -52,6 +55,11 @@ Test the built application at desktop and tablet widths. Confirm:
 - a synthetic GLB unlocks the manual Three.js preview and remains required for approval;
 - desktop and 390 px layouts show source and model controls without page-level horizontal overflow;
 - completing the final asset checklist item enables approval, and approval locks the reviewed fields.
+- a verified 9-category build reports six passing rules and enables export;
+- changing a GPU to one above the selected PSU recommendation produces a warning;
+- unsaved changes disable export, saving increments the local version and re-enables export;
+- an explicitly created empty build produces unknown results and blocks export;
+- the 390 px builder layout has no page-level horizontal overflow and exposes the inspector drawer.
 
 ## Deployment check
 

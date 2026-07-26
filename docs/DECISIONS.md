@@ -14,6 +14,14 @@ Staff roles may save review drafts. Approval and rejection require an owner or a
 
 Compatibility decisions use verified specifications and deterministic rules. A visual mesh is never an authority for sockets, power, clearance or connectors.
 
+The active rules cover CPU socket, memory type, motherboard form factor, GPU length, cooler height and the GPU vendor's recorded PSU recommendation. A missing selection, unverified record or missing required field produces `unknown`. Hard errors and unknown results block portable export; a PSU recommendation shortfall remains an explicit warning rather than an invented electrical calculation.
+
+## Persistent builds and portable export
+
+A build selects at most one active catalogue part per component category. Reads are bounded and do not auto-create a draft. Explicit writes use an optimistic record version plus a server-only mutation token to gate the complete D1 selection batch.
+
+Portable JSON includes component identity, verified specifications and bilingual compatibility evidence. It deliberately omits build and workspace identifiers, users, price, stock, private files, checksums and deployment values.
+
 ## Catalogue onboarding is bounded and transactional
 
 Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV imports validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch.

@@ -74,16 +74,62 @@
 }
 
 .command-build {
+  width: min(100%, 360px);
+  align-items: center;
+  gap: 2px 7px;
+  grid-template-columns: minmax(0, 1fr) auto;
   justify-self: center;
-  text-align: center;
+  text-align: left;
 }
 
-.command-build strong {
+.command-build label {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.command-build label > svg {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  width: 12px;
+  pointer-events: none;
+}
+
+.command-build select,
+.command-build input {
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.command-build select {
+  padding-right: 16px;
+  font-family: var(--font-display);
+  font-size: 12px;
+}
+
+.command-build input {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 2px 0;
   overflow: hidden;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.command-build input:focus-visible {
+  border-color: var(--accent-cyan);
+}
+
+.command-new-build {
+  width: 28px;
+  height: 28px;
 }
 
 .command-save-state {
@@ -259,6 +305,21 @@
   transform: rotate(45deg);
 }
 
+.component-step__state--error {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.component-step__state--unknown {
+  border-color: var(--warning);
+  background: transparent;
+}
+
+.component-step__state--pending {
+  border-color: var(--text-muted);
+  background: transparent;
+}
+
 .component-step__state--selected {
   border-color: var(--accent-cyan);
   background: var(--accent-cyan);
@@ -297,7 +358,11 @@
   border: 1px solid var(--border-subtle);
   padding: 9px 7px;
   background: var(--surface-1);
+  color: var(--text-secondary);
+  font: inherit;
   grid-template-columns: 30px minmax(0, 1fr);
+  text-align: left;
+  width: 100%;
 }
 
 .candidate-part + .candidate-part {
@@ -310,9 +375,13 @@
   box-shadow: inset 2px 0 var(--accent-cyan);
 }
 
-.candidate-part.is-incompatible {
+.candidate-part.is-unavailable {
   border-color: rgba(255, 93, 108, 0.5);
   opacity: 0.72;
+}
+
+.candidate-part:disabled {
+  cursor: default;
 }
 
 .candidate-part__visual {
@@ -329,7 +398,7 @@
   width: 17px;
 }
 
-.candidate-part > div {
+.candidate-part > span:last-child {
   display: grid;
   min-width: 0;
   align-content: start;
@@ -354,7 +423,7 @@
   font-size: 9px;
 }
 
-.candidate-part.is-incompatible small {
+.candidate-part.is-unavailable small {
   color: var(--danger);
 }
 
@@ -843,6 +912,33 @@
     var(--bg-1);
 }
 
+.build-inspector--empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 9px;
+  padding: 28px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.build-inspector--empty > svg {
+  width: 32px;
+  height: 32px;
+  color: var(--accent-cyan);
+}
+
+.build-inspector--empty h2,
+.build-inspector--empty p {
+  margin: 0;
+}
+
+.build-inspector--empty p {
+  max-width: 250px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .build-inspector__header {
   display: grid;
   gap: 12px;
@@ -985,7 +1081,7 @@
   padding: 7px 8px;
   background: var(--surface-1);
   color: var(--text-secondary);
-  grid-template-columns: 19px minmax(0, 1fr) 14px;
+  grid-template-columns: 19px minmax(0, 1fr) auto;
   text-align: left;
 }
 
@@ -1022,6 +1118,30 @@
 
 .finding-row--warning > svg:first-child {
   color: var(--warning);
+}
+
+.finding-row--error > svg:first-child {
+  color: var(--danger);
+}
+
+.finding-row--unknown > svg:first-child {
+  color: var(--warning);
+}
+
+.compatibility-evidence {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  padding: 10px;
+  background: var(--surface-1);
+}
+
+.compatibility-evidence strong {
+  font-size: 11px;
+}
+
+.compatibility-evidence .inspector-specs {
+  margin: 0;
 }
 
 .inspector-appearance {
@@ -1177,6 +1297,20 @@
 .build-status-actions .button {
   min-width: 112px;
   flex: 1;
+}
+
+.builder-page--state {
+  min-height: 100dvh;
+  height: auto;
+  overflow: auto;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  grid-template-rows: auto;
+}
+
+.builder-empty-action {
+  justify-self: center;
 }
 
 .inspector-drawer-layer {

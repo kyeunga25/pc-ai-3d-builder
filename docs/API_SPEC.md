@@ -48,6 +48,26 @@ Updates or archives one active catalogue part in the resolved workspace. Viewer 
 
 The conditional catalogue update and minimal audit event are submitted in one D1 batch.
 
+## `GET /api/builds`
+
+Returns at most 50 active draft summaries from the resolved workspace, ordered by the latest update. A read never creates a build or appends an audit event.
+
+## `POST /api/builds`
+
+Explicitly creates one workspace-scoped draft. Viewer roles cannot mutate. The bounded JSON body contains a name and at most nine unique active catalogue part IDs, with no more than one part per component category. The build, selections and minimal audit event are submitted in one D1 batch.
+
+## `GET /api/builds/:buildId`
+
+Returns one draft with its selected catalogue records, current total price, deterministic compatibility findings, summary counts and non-negative version. The response never exposes the server mutation token.
+
+## `PATCH /api/builds/:buildId`
+
+Updates the name and complete selected-part set, or logically archives the draft. Viewer roles cannot mutate. Both actions require `expectedVersion`. Update statements use a new server-only mutation token to gate deletion, replacement selections and the minimal audit event in one D1 batch. A stale version cannot replace a newer selection.
+
+## `GET /api/builds/:buildId/export`
+
+Returns a portable JSON attachment only when every fixed compatibility rule has neither an `error` nor an `unknown` result. Warnings remain visible. The response omits users, workspace and internal build IDs, price, stock, asset metadata, object keys, checksums and deployment data.
+
 ## `GET /api/assets/review-queue`
 
 Returns at most 50 draft or in-review assets from the resolved workspace, with their catalogue identity, fixed checklist identifiers, source-rights flag, human-verified dimensions, review version and safe file metadata. It never returns private object keys, checksums or provider responses.
@@ -90,6 +110,6 @@ The conditional asset update, review event and audit event are submitted in one 
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.

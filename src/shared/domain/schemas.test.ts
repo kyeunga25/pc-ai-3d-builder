@@ -14,7 +14,8 @@ describe("domain fixtures", () => {
     const build = mockBuildSchema.parse(currentBuild);
 
     expect(build.hardErrorCount).toBe(0);
-    expect(build.warningCount).toBe(1);
+    expect(build.warningCount).toBe(0);
+    expect(build.selectedPartIds).toHaveLength(9);
     expect(build.totalPriceMinor).toBeGreaterThan(0);
   });
 });

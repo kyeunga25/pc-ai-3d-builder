@@ -20,6 +20,13 @@ import {
   catalogueImportResponse,
   catalogueMutationResponse,
 } from "./routes/catalogue-write";
+import {
+  buildCreateResponse,
+  buildDetailResponse,
+  buildExportResponse,
+  buildListResponse,
+  buildMutationResponse,
+} from "./routes/builds";
 import { healthResponse } from "./routes/health";
 import { sessionResponse, workspacesResponse } from "./routes/session";
 
@@ -111,6 +118,52 @@ async function routeRequest(
       }
 
       return catalogueImportResponse(request, env.DB, context, requestId);
+    }
+
+    if (url.pathname === "/api/builds") {
+      if (request.method === "GET") {
+        return buildListResponse(env.DB, context);
+      }
+      if (request.method === "POST") {
+        return buildCreateResponse(request, env.DB, context, requestId);
+      }
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET, POST", "cache-control": "no-store" },
+      });
+    }
+
+    const buildExportMatch = /^\/api\/builds\/([^/]+)\/export$/u.exec(
+      url.pathname,
+    );
+    if (buildExportMatch) {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+      return buildExportResponse(env.DB, context, buildExportMatch[1]!);
+    }
+
+    const buildDetailMatch = /^\/api\/builds\/([^/]+)$/u.exec(url.pathname);
+    if (buildDetailMatch) {
+      if (request.method === "GET") {
+        return buildDetailResponse(env.DB, context, buildDetailMatch[1]!);
+      }
+      if (request.method === "PATCH") {
+        return buildMutationResponse(
+          request,
+          env.DB,
+          context,
+          buildDetailMatch[1]!,
+          requestId,
+        );
+      }
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET, PATCH", "cache-control": "no-store" },
+      });
     }
 
     const cataloguePartMatch = /^\/api\/catalogue\/([^/]+)$/u.exec(

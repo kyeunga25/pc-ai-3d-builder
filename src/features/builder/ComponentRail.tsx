@@ -12,8 +12,12 @@ import {
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
-import { catalogParts, componentSteps } from "../../shared/domain/mockData";
-import type { ComponentCategory } from "../../shared/domain/schemas";
+import { componentSteps } from "../../shared/domain/mockData";
+import type { CompatibilityFinding } from "../../shared/domain/builds";
+import type {
+  CatalogPart,
+  ComponentCategory,
+} from "../../shared/domain/schemas";
 import { formatHkd } from "../../shared/i18n/locale";
 
 type StepId = ComponentCategory | "summary";
@@ -31,18 +35,72 @@ const iconByStep: Record<StepId, ComponentType<SVGProps<SVGSVGElement>>> = {
   summary: ClipboardCheck,
 };
 
+function stepState(
+  step: StepId,
+  selectedParts: CatalogPart[],
+  findings: CompatibilityFinding[],
+) {
+  if (step === "summary") {
+    if (findings.some((finding) => finding.severity === "error")) {
+      return { label: "有錯誤", tone: "error" };
+    }
+    if (findings.some((finding) => finding.severity === "unknown")) {
+      return { label: "待核實", tone: "unknown" };
+    }
+    if (findings.some((finding) => finding.severity === "warning")) {
+      return { label: "有警告", tone: "warning" };
+    }
+    return { label: "可匯出", tone: "complete" };
+  }
+  const related = findings.filter((finding) =>
+    finding.categories.includes(step),
+  );
+  if (related.some((finding) => finding.severity === "error")) {
+    return { label: "錯誤", tone: "error" };
+  }
+  if (!selectedParts.some((part) => part.category === step)) {
+    return { label: "未選", tone: "pending" };
+  }
+  if (related.some((finding) => finding.severity === "unknown")) {
+    return { label: "待核實", tone: "unknown" };
+  }
+  if (related.some((finding) => finding.severity === "warning")) {
+    return { label: "警告", tone: "warning" };
+  }
+  return { label: "已選", tone: "complete" };
+}
+
 export function ComponentRail({
   selected,
+  catalogueParts,
+  selectedParts,
+  findings,
+  canWrite,
   onSelect,
+  onChoosePart,
 }: {
   selected: StepId;
+  catalogueParts: CatalogPart[];
+  selectedParts: CatalogPart[];
+  findings: CompatibilityFinding[];
+  canWrite: boolean;
   onSelect: (step: StepId) => void;
+  onChoosePart: (part: CatalogPart) => void;
 }) {
+  const selectedPart =
+    selected === "summary"
+      ? null
+      : (selectedParts.find((part) => part.category === selected) ?? null);
+  const candidates =
+    selected === "summary"
+      ? []
+      : catalogueParts.filter((part) => part.category === selected);
+
   return (
     <aside className="component-rail" aria-label="組裝組件">
       <div className="component-rail__heading">
         <span>組件</span>
-        <strong>已選 8 / 9 項</strong>
+        <strong>已選 {selectedParts.length} / 9 項</strong>
       </div>
 
       <div className="component-rail__body">
@@ -50,6 +108,7 @@ export function ComponentRail({
           {componentSteps.map((step, index) => {
             const Icon = iconByStep[step.id];
             const isSelected = selected === step.id;
+            const state = stepState(step.id, selectedParts, findings);
             return (
               <button
                 className={`component-step${isSelected ? " is-selected" : ""}`}
@@ -69,74 +128,86 @@ export function ComponentRail({
                   <strong className="component-step__short-label">
                     {step.shortLabel}
                   </strong>
-                  <small>
-                    {step.id === "gpu"
-                      ? "警告"
-                      : step.state === "complete"
-                        ? "已選"
-                        : "待審"}
-                  </small>
+                  <small>{state.label}</small>
                 </span>
                 <span
-                  className={`component-step__state component-step__state--${step.id === "gpu" ? "warning" : step.state}`}
-                  aria-label={
-                    step.id === "gpu"
-                      ? "一項警告"
-                      : step.state === "complete"
-                        ? "已完成"
-                        : "待處理"
-                  }
+                  className={`component-step__state component-step__state--${state.tone}`}
+                  aria-label={state.label}
                 />
               </button>
             );
           })}
         </div>
 
-        <div className="component-candidates" aria-label="顯示卡候選項目">
+        <div className="component-candidates" aria-label="產品候選項目">
           <div className="component-candidates__heading">
-            <span>顯示卡選項</span>
-            <strong>顯示 3 項</strong>
+            <span>
+              {selected === "summary"
+                ? "組裝總覽"
+                : `${componentSteps.find((step) => step.id === selected)?.label}選項`}
+            </span>
+            <strong>{candidates.length} 項</strong>
           </div>
-          {catalogParts
-            .filter((part) => part.category === "gpu")
-            .map((part, index) => (
-              <article
-                className={`candidate-part${index === 0 ? " is-selected" : ""}${
-                  part.stockStatus === "out_of_stock" ? " is-incompatible" : ""
+          {candidates.map((part) => {
+            const isSelected = selectedPart?.id === part.id;
+            return (
+              <button
+                className={`candidate-part${isSelected ? " is-selected" : ""}${
+                  part.stockStatus === "out_of_stock" ? " is-unavailable" : ""
                 }`}
                 key={part.id}
+                type="button"
+                aria-pressed={isSelected}
+                disabled={!canWrite}
+                onClick={() => onChoosePart(part)}
               >
                 <span className="candidate-part__visual" aria-hidden="true">
-                  <Gauge />
+                  {(() => {
+                    const Icon = iconByStep[part.category];
+                    return <Icon />;
+                  })()}
                 </span>
-                <div>
+                <span>
                   <strong>{part.model}</strong>
                   <span className="mono">{formatHkd(part.priceMinor)}</span>
                   <small>
                     {part.stockStatus === "out_of_stock"
-                      ? "不相容"
-                      : `${part.stockCount ?? 0} 件現貨`}
+                      ? "目前缺貨"
+                      : part.stockCount === null
+                        ? "庫存未提供"
+                        : `${part.stockCount} 件現貨`}
                   </small>
-                </div>
-              </article>
-            ))}
-          <div className="candidate-note">
-            只使用已核實的示範目錄資料；目前選擇不會寫入資料庫。
-          </div>
+                </span>
+              </button>
+            );
+          })}
+          {candidates.length === 0 ? (
+            <div className="candidate-note">
+              {selected === "summary"
+                ? "總覽會列出可解釋的規則結果；相容性不會由 3D 外觀推斷。"
+                : "目錄內暫時沒有此類別的可選產品。"}
+            </div>
+          ) : (
+            <div className="candidate-note">
+              只會使用目前工作空間的目錄記錄；選擇要按「儲存」才會寫入 D1。
+            </div>
+          )}
         </div>
       </div>
 
       <div className="component-rail__selection">
-        <span>已選組件</span>
+        <span>{selected === "summary" ? "目前組裝" : "已選組件"}</span>
         <strong>
-          {selected === "gpu"
-            ? "ASUS ProArt RTX 4070 SUPER"
-            : componentSteps.find((step) => step.id === selected)?.label}
+          {selected === "summary"
+            ? `${selectedParts.length} 個類別`
+            : selectedPart
+              ? `${selectedPart.manufacturer} ${selectedPart.model}`
+              : "尚未選擇"}
         </strong>
         <small>
-          {selected === "gpu"
-            ? `${formatHkd(549_900)} · 5 件現貨`
-            : "模擬組件狀態"}
+          {selectedPart
+            ? `${formatHkd(selectedPart.priceMinor)} · ${selectedPart.sku}`
+            : "從上方目錄候選項目選擇"}
         </small>
       </div>
     </aside>

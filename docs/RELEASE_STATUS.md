@@ -1,4 +1,4 @@
-# Public release status — v0.4.0
+# Public release status — v0.5.0
 
 This file records only the capabilities present in the current public branch.
 
@@ -20,6 +20,11 @@ This file records only the capabilities present in the current public branch.
 - [x] Lazy-loaded Three.js GLB preview with manual camera controls.
 - [x] File replacement resets review evidence and removes one superseded object.
 - [x] Atomic asset, review-history and audit-event mutation batches.
+- [x] Explicit workspace-scoped build creation, switching and optimistic persistence.
+- [x] One selected catalogue part per component category, bounded to nine categories.
+- [x] Six deterministic compatibility rules with bilingual evidence and fail-closed unknown states.
+- [x] Portable JSON export without identity, workspace, pricing, stock, private-asset or deployment fields.
+- [x] Export gate for hard errors, unknown rules and unsaved browser changes.
 - [x] D1 migrations and synthetic unit fixtures.
 - [x] Active private R2 binding and placeholder-only Workflow binding.
 - [x] Local check, test, build and deployment dry-run commands.
@@ -27,7 +32,7 @@ This file records only the capabilities present in the current public branch.
 
 ## Demonstration-only
 
-Local catalogue records, prices, stock, review assets, compatibility results and the builder scene are synthetic UI fixtures. Production catalogue, private-file and review routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Provider generation, compatibility decisions and exports remain inactive.
+Local catalogue records, prices, stock, review assets and the builder scene are synthetic UI fixtures. Production catalogue, private-file, review and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility and portable export are active; external provider generation and multi-model 3D scene composition remain inactive.
 
 ## Release checks
 

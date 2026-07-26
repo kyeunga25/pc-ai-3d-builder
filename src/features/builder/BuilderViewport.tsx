@@ -10,7 +10,10 @@ import {
 import type { Dispatch, SetStateAction } from "react";
 
 import { componentSteps } from "../../shared/domain/mockData";
-import type { ComponentCategory } from "../../shared/domain/schemas";
+import type {
+  CatalogPart,
+  ComponentCategory,
+} from "../../shared/domain/schemas";
 import { formatHkd } from "../../shared/i18n/locale";
 
 type StepId = ComponentCategory | "summary";
@@ -23,12 +26,14 @@ export function BuilderViewport({
   setCamera,
   displayMode,
   setDisplayMode,
+  selectedPart,
 }: {
   selectedCategory: StepId;
   camera: string;
   setCamera: Dispatch<SetStateAction<string>>;
   displayMode: string;
   setDisplayMode: Dispatch<SetStateAction<string>>;
+  selectedPart: CatalogPart | null;
 }) {
   return (
     <section className="builder-viewport" aria-label="3D 視窗示意">
@@ -92,12 +97,12 @@ export function BuilderViewport({
               <i />
             </div>
             <div className="pc-gpu">
-              <span>PROART</span>
+              <span>GPU</span>
               <i />
               <i />
               <i />
             </div>
-            <div className="pc-psu">850W</div>
+            <div className="pc-psu">PSU</div>
             <div className="pc-fans">
               <i />
               <i />
@@ -129,21 +134,35 @@ export function BuilderViewport({
             <Box aria-hidden="true" />
           </div>
           <div>
-            <span>已選顯示卡</span>
-            <strong>ASUS ProArt RTX 4070 SUPER</strong>
+            <span>目前類別組件</span>
+            <strong>
+              {selectedPart
+                ? `${selectedPart.manufacturer} ${selectedPart.model}`
+                : "尚未選擇"}
+            </strong>
           </div>
-          <strong>{formatHkd(549_900)}</strong>
-          <span className="stock-inline">
-            <i aria-hidden="true" /> 有現貨
-          </span>
-          <span className="mono">300 × 120 × 50 mm</span>
+          <strong>
+            {selectedPart ? formatHkd(selectedPart.priceMinor) : "—"}
+          </strong>
+          {selectedPart ? (
+            <>
+              <span className="stock-inline">
+                <i aria-hidden="true" />
+                {selectedPart.stockStatus === "out_of_stock"
+                  ? "缺貨"
+                  : "可選目錄記錄"}
+              </span>
+              <span className="mono">{selectedPart.sku}</span>
+            </>
+          ) : null}
         </div>
 
         <span className="selected-category-readout">
           <Rotate3D aria-hidden="true" />
           正在編輯{" "}
           <strong>
-            {componentSteps.find((step) => step.id === selectedCategory)?.label}
+            {componentSteps.find((step) => step.id === selectedCategory)
+              ?.label ?? "總覽"}
           </strong>
         </span>
       </div>

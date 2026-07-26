@@ -43,6 +43,7 @@ const catalogueRow = {
   stock_count: 6,
   specifications_json: '{"formFactor":"ATX"}',
   specification_status: "verified",
+  status: "active",
   record_version: 0,
   asset_id: null,
   asset_quality: null,

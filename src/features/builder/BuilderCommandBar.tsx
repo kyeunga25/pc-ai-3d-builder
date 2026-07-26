@@ -1,15 +1,36 @@
-import { ChevronDown, CircleCheck, Eye, PanelRightOpen } from "lucide-react";
+import {
+  ChevronDown,
+  CircleCheck,
+  Eye,
+  PanelRightOpen,
+  Plus,
+} from "lucide-react";
 import { Link } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import { BrandMark } from "../../shared/components/BrandMark";
+import type { BuildListItem } from "../../shared/domain/builds";
 import { accountInitials } from "../../shared/domain/session";
 
 export function BuilderCommandBar({
   saveState,
+  buildName,
+  buildId,
+  builds,
+  canWrite,
+  onBuildNameChange,
+  onBuildSelect,
+  onCreateBuild,
   onOpenInspector,
 }: {
   saveState: string;
+  buildName: string;
+  buildId: string;
+  builds: BuildListItem[];
+  canWrite: boolean;
+  onBuildNameChange: (name: string) => void;
+  onBuildSelect: (buildId: string) => void;
+  onCreateBuild: () => void;
   onOpenInspector: () => void;
 }) {
   const { currentWorkspace, user } = useAuthenticatedSession();
@@ -29,8 +50,38 @@ export function BuilderCommandBar({
       </button>
 
       <div className="command-build">
-        <small>目前組裝</small>
-        <strong>1440p 純黑主機</strong>
+        <label>
+          <small>目前組裝</small>
+          <select
+            aria-label="切換組裝"
+            value={buildId}
+            onChange={(event) => onBuildSelect(event.target.value)}
+          >
+            {builds.map((build) => (
+              <option key={build.id} value={build.id}>
+                {build.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown aria-hidden="true" />
+        </label>
+        <input
+          aria-label="組裝名稱"
+          value={buildName}
+          maxLength={120}
+          disabled={!canWrite}
+          onChange={(event) => onBuildNameChange(event.target.value)}
+        />
+        {canWrite ? (
+          <button
+            className="icon-button command-new-build"
+            type="button"
+            aria-label="建立新組裝"
+            onClick={onCreateBuild}
+          >
+            <Plus aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
 
       <span className="command-save-state" aria-live="polite">

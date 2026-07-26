@@ -242,6 +242,7 @@ export function CataloguePage() {
         ? {
             id: `part_local_${crypto.randomUUID()}`,
             ...input,
+            catalogueStatus: "active" as const,
             assetId: null,
             assetQuality: "unreviewed" as const,
             assetStatus: "proxy" as const,
@@ -348,6 +349,7 @@ export function CataloguePage() {
       const created = inputs.map((input) => ({
         id: `part_local_${crypto.randomUUID()}`,
         ...input,
+        catalogueStatus: "active" as const,
         assetId: null,
         assetQuality: "unreviewed" as const,
         assetStatus: "proxy" as const,
