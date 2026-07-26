@@ -27,6 +27,7 @@ export const assetQualitySchema = z.enum([
 ]);
 
 export const specificationStatusSchema = z.enum(["unverified", "verified"]);
+export const catalogueStatusSchema = z.enum(["active", "archived"]);
 
 const catalogueTextSchema = z
   .string()
@@ -73,6 +74,7 @@ export const catalogPartSchema = z.object({
   stockCount: z.number().int().nonnegative().nullable(),
   specifications: catalogueSpecificationsSchema,
   specificationStatus: specificationStatusSchema,
+  catalogueStatus: catalogueStatusSchema,
   assetId: z.string().min(1).nullable(),
   assetQuality: assetQualitySchema,
   assetStatus: z.enum(["approved", "needs_review", "draft", "proxy"]),

@@ -36,6 +36,14 @@ Private file columns store opaque R2 object keys, validated content types, bound
 
 Append-only review history for draft saves, approvals and rejections. Each asset version may appear once. The matching asset update, review event and minimal audit event are executed in one D1 batch.
 
+## `builds`
+
+Stores workspace-scoped draft identity, logical status, optimistic record version and a server-only mutation token. The token gates every selection statement in an update batch and is never returned by the API or written to audit metadata.
+
+## `build_items`
+
+Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. Archived catalogue parts remain referentially intact for existing builds but cannot be newly selected.
+
 ## Migration rules
 
 - Add schema changes through numbered migration files.
@@ -43,6 +51,7 @@ Append-only review history for draft saves, approvals and rejections. Each asset
 - Use bound parameters for request-influenced values.
 - Do not add production records, account identifiers or resource names to migrations.
 - Test migrations against an empty temporary database and run `PRAGMA foreign_key_check`.
-- Keep every catalogue, asset and review relation explicitly workspace-scoped.
+- Keep every catalogue, asset, review and build relation explicitly workspace-scoped.
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
+- Build selection updates must use an expected version and server-only mutation token in one D1 batch.

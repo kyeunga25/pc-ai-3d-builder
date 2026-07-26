@@ -24,7 +24,7 @@ A requested workspace header never grants access by itself. The selected workspa
 
 ## Storage bindings
 
-D1 stores identity, workspace metadata, workspace-scoped catalogue records, private-file metadata, current asset review state and append-only review events. Catalogue and asset mutations use expected versions and write their state transition and minimal audit event through D1 batches.
+D1 stores identity, workspace metadata, workspace-scoped catalogue records, private-file metadata, current asset review state, append-only review events and persistent build selections. Catalogue, asset and build mutations use expected versions and write their state transition and minimal audit event through D1 batches.
 
 The R2 binding stores validated source images and self-contained GLB models under opaque keys. Objects are readable only through Access- and workspace-protected Worker routes; no bucket or permanent object URL is public. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
 
@@ -36,6 +36,14 @@ The review queue returns only draft or in-review assets in the active workspace.
 
 Catalogue staff can create an asset by uploading a validated source image. File replacement uses an expected review version, stores a new R2 object, commits safe metadata and a minimal audit event, then removes the superseded object. Any replacement resets prior checklist and dimension evidence. Three.js and GLB parsing are lazy-loaded only when an authorized model blob is available.
 
+## Builds, compatibility and export
+
+Build list reads are bounded to 50 records and never create data. Staff, admin and owner roles may explicitly create or update a draft with at most one active catalogue part from each of nine categories. Updates use an expected record version and a random server-side mutation token so stale D1 batch statements cannot replace a newer selection.
+
+Compatibility is calculated at read time from current, verified structured specifications. Six fixed rules cover CPU socket, memory type, motherboard form factor, GPU clearance, cooler clearance and the recorded GPU power-supply recommendation. Missing selections, unverified specifications or absent required fields produce an `unknown` result rather than an inference.
+
+Portable export is a read-only response and is blocked while any rule is `error` or `unknown`. The JSON contains product identity, verified specifications and bilingual rule evidence only. It omits build and workspace IDs, users, pricing, stock, asset metadata, R2 locations and deployment configuration.
+
 ## Privacy and observability
 
 Logs contain request method, path, status, duration, request ID and stable error code only. They exclude JWTs, cookies, email addresses, prompts, provider responses and private object locations.
@@ -44,4 +52,4 @@ Tracked Wrangler configuration is a non-operational template. Actual deployment 
 
 ## Frontend
 
-The application uses feature-oriented React modules. The builder route is lazy-loaded so the general shell does not require its code before navigation. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.
+The application uses feature-oriented React modules. The builder route is lazy-loaded so the general shell does not require its code before navigation. Its production state loads bounded catalogue and build APIs; local development uses explicit synthetic fixtures. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.
