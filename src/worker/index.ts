@@ -27,6 +27,7 @@ import {
   buildListResponse,
   buildMutationResponse,
 } from "./routes/builds";
+import { dashboardResponse } from "./routes/dashboard";
 import { healthResponse } from "./routes/health";
 import { sessionResponse, workspacesResponse } from "./routes/session";
 
@@ -92,6 +93,17 @@ async function routeRequest(
       }
 
       return workspacesResponse(context);
+    }
+
+    if (url.pathname === "/api/dashboard") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+
+      return dashboardResponse(env.DB, context);
     }
 
     if (url.pathname === "/api/catalogue") {

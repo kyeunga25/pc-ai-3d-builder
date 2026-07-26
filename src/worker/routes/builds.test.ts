@@ -180,6 +180,45 @@ describe("persistent build routes", () => {
     ).toBe(true);
   });
 
+  it("logically archives a build and its audit event in one guarded batch", async () => {
+    const { calls, db } = createD1Stub();
+    const request = new Request(
+      "https://app.example/api/builds/build-fixture",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "archive",
+          expectedVersion: 0,
+        }),
+      },
+    );
+
+    const response = await buildMutationResponse(
+      request,
+      db,
+      context("staff"),
+      "build-fixture",
+      "request-fixture",
+    );
+
+    expect(response.status).toBe(204);
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("SET status = 'archived'") &&
+          call.sql.includes("record_version = ?5"),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("INSERT INTO audit_events") &&
+          call.values.includes("build.archive"),
+      ),
+    ).toBe(true);
+  });
+
   it("exports a ready build without operational or private fields", async () => {
     const selectedRows = catalogParts
       .filter((part) => currentBuild.selectedPartIds.includes(part.id))

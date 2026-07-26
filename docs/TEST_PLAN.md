@@ -29,10 +29,12 @@ Current unit tests cover:
 - GLB-required approval and review reset after file replacement;
 - bounded JSON mutation bodies;
 - asset-review role checks, complete-approval requirements and stale-version rejection;
-- atomic review and audit statement construction without identity data in metadata.
+- atomic review and audit statement construction without identity data in metadata;
 - deterministic build compatibility pass, warning, error and unknown outcomes;
 - workspace-scoped build list, role checks, guarded optimistic mutations and portable export;
-- export exclusion of build/workspace identity, price, stock and private-asset fields.
+- export exclusion of build/workspace identity, price, stock and private-asset fields;
+- read-only workspace dashboard aggregates, empty state and identity exclusion;
+- guarded logical archive for a build draft.
 
 ## Migration check
 
@@ -47,20 +49,24 @@ Test the built application at desktop and tablet widths. Confirm:
 - the builder route loads lazily;
 - no horizontal overflow obscures primary actions;
 - reduced-motion preferences disable non-essential animation;
-- UI fixtures remain visibly synthetic.
+- UI fixtures remain visibly synthetic;
 - catalogue search filters the rendered synthetic records;
 - catalogue create, edit and two-step archive actions update synthetic state;
 - a valid synthetic CSV document imports records, while malformed or duplicate data shows a bounded error;
 - a synthetic PNG creates a private asset draft from the catalogue;
 - a synthetic GLB unlocks the manual Three.js preview and remains required for approval;
 - desktop and 390 px layouts show source and model controls without page-level horizontal overflow;
-- completing the final asset checklist item enables approval, and approval locks the reviewed fields.
+- completing the final asset checklist item enables approval, and approval locks the reviewed fields;
 - a verified 9-category build reports six passing rules and enables export;
 - changing a GPU to one above the selected PSU recommendation produces a warning;
 - unsaved changes disable export, saving increments the local version and re-enables export;
 - an explicitly created empty build produces unknown results and blocks export;
-- the 390 px builder layout has no page-level horizontal overflow and exposes the inspector drawer.
+- the first archive action arms confirmation, the second produces the empty state, and explicit creation restores a draft;
+- camera, wireframe and fit controls are disabled when no approved GLB is available;
+- dashboard metrics and recent-work links use explicit synthetic local data without fixed operational claims;
+- dashboard and builder have no page-level horizontal overflow at 390 px;
+- the 390 px builder layout exposes the inspector drawer.
 
 ## Deployment check
 
-Use a Git-ignored deployment configuration. Verify the public health endpoint, static deep-link fallback, protected session rejection without Access, security headers and absence of source maps. Do not print or record deployment identifiers during validation.
+Use a Git-ignored deployment configuration. Verify the public health endpoint, static deep-link fallback, protected session, dashboard, build and private-file rejection without Access, security headers and absence of source maps. Do not print or record deployment identifiers during validation.

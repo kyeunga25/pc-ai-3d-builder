@@ -7,8 +7,16 @@ import {
   Move3D,
   Rotate3D,
 } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
+import { fetchAssetFileBlob } from "../asset-review/asset-review-api";
 import { componentSteps } from "../../shared/domain/mockData";
 import type {
   CatalogPart,
@@ -17,8 +25,13 @@ import type {
 import { formatHkd } from "../../shared/i18n/locale";
 
 type StepId = ComponentCategory | "summary";
+export type BuilderDisplayMode = "著色" | "線框" | "靜態預覽";
 
 const cameraPresets = ["等角", "正面", "左側", "頂部"];
+const AssetModelPreview = lazy(async () => {
+  const module = await import("../../shared/components/AssetModelPreview");
+  return { default: module.AssetModelPreview };
+});
 
 export function BuilderViewport({
   selectedCategory,
@@ -27,16 +40,86 @@ export function BuilderViewport({
   displayMode,
   setDisplayMode,
   selectedPart,
+  workspaceId,
+  isLocalPreview,
 }: {
   selectedCategory: StepId;
   camera: string;
   setCamera: Dispatch<SetStateAction<string>>;
-  displayMode: string;
-  setDisplayMode: Dispatch<SetStateAction<string>>;
+  displayMode: BuilderDisplayMode;
+  setDisplayMode: Dispatch<SetStateAction<BuilderDisplayMode>>;
   selectedPart: CatalogPart | null;
+  workspaceId: string;
+  isLocalPreview: boolean;
 }) {
+  const modelKey =
+    !isLocalPreview &&
+    selectedPart?.assetId &&
+    selectedPart.assetStatus === "approved"
+      ? `${workspaceId}:${selectedPart.assetId}`
+      : null;
+  const [modelResource, setModelResource] = useState<{
+    key: string;
+    state: "error" | "ready";
+    url: string | null;
+  } | null>(null);
+  const [resetToken, setResetToken] = useState(0);
+  const currentModelResource =
+    modelResource?.key === modelKey ? modelResource : null;
+  const modelUrl =
+    currentModelResource?.state === "ready" ? currentModelResource.url : null;
+  const modelState = modelKey
+    ? (currentModelResource?.state ?? "loading")
+    : "none";
+
+  useEffect(() => {
+    if (!modelKey || !selectedPart?.assetId) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let createdUrl: string | null = null;
+    void fetchAssetFileBlob(
+      controller.signal,
+      workspaceId,
+      selectedPart.assetId,
+      "model",
+    )
+      .then((blob) => {
+        createdUrl = URL.createObjectURL(blob);
+        setModelResource({
+          key: modelKey,
+          state: "ready",
+          url: createdUrl,
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setModelResource({
+            key: modelKey,
+            state: "error",
+            url: null,
+          });
+        }
+      });
+
+    return () => {
+      controller.abort();
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [modelKey, selectedPart?.assetId, workspaceId]);
+
+  const renderMode =
+    displayMode === "線框"
+      ? "wireframe"
+      : displayMode === "靜態預覽"
+        ? "static"
+        : "shaded";
+
   return (
-    <section className="builder-viewport" aria-label="3D 視窗示意">
+    <section className="builder-viewport" aria-label="3D 組件預覽視窗">
       <div className="builder-viewport__top">
         <div
           className="viewport-control-group"
@@ -53,6 +136,7 @@ export function BuilderViewport({
               key={preset}
               type="button"
               aria-pressed={camera === preset}
+              disabled={!modelUrl}
               onClick={() => setCamera(preset)}
             >
               {preset}
@@ -64,7 +148,10 @@ export function BuilderViewport({
           <span>顯示</span>
           <select
             value={displayMode}
-            onChange={(event) => setDisplayMode(event.target.value)}
+            disabled={!modelUrl}
+            onChange={(event) =>
+              setDisplayMode(event.target.value as BuilderDisplayMode)
+            }
           >
             <option>著色</option>
             <option>線框</option>
@@ -77,6 +164,11 @@ export function BuilderViewport({
           className="viewport-icon-button"
           type="button"
           aria-label="調整至合適視野"
+          disabled={!modelUrl}
+          onClick={() => {
+            setCamera("等角");
+            setResetToken((token) => token + 1);
+          }}
         >
           <Expand aria-hidden="true" />
         </button>
@@ -86,31 +178,59 @@ export function BuilderViewport({
         <div className="builder-stage__grid" aria-hidden="true" />
         <div className="builder-stage__glow" aria-hidden="true" />
 
-        <figure className="pc-case-placeholder">
-          <div className="pc-case-placeholder__glass">
-            <div className="pc-motherboard" />
-            <div className="pc-cooler">
-              <span />
+        {modelUrl ? (
+          <figure className="builder-private-model">
+            <Suspense
+              fallback={
+                <span className="builder-model-state">
+                  正在載入 3D 預覽元件…
+                </span>
+              }
+            >
+              <AssetModelPreview
+                cameraPreset={camera}
+                renderMode={renderMode}
+                resetToken={resetToken}
+                url={modelUrl}
+              />
+            </Suspense>
+            <figcaption>已核准私人 GLB · 只在目前瀏覽器工作階段解碼</figcaption>
+          </figure>
+        ) : (
+          <figure className="pc-case-placeholder">
+            <div className="pc-case-placeholder__glass">
+              <div className="pc-motherboard" />
+              <div className="pc-cooler">
+                <span />
+              </div>
+              <div className="pc-memory">
+                <i />
+                <i />
+              </div>
+              <div className="pc-gpu">
+                <span>GPU</span>
+                <i />
+                <i />
+                <i />
+              </div>
+              <div className="pc-psu">PSU</div>
+              <div className="pc-fans">
+                <i />
+                <i />
+                <i />
+              </div>
             </div>
-            <div className="pc-memory">
-              <i />
-              <i />
-            </div>
-            <div className="pc-gpu">
-              <span>GPU</span>
-              <i />
-              <i />
-              <i />
-            </div>
-            <div className="pc-psu">PSU</div>
-            <div className="pc-fans">
-              <i />
-              <i />
-              <i />
-            </div>
-          </div>
-          <figcaption>靜態電腦幾何模型示意；目前不會載入私人 GLB。</figcaption>
-        </figure>
+            <figcaption>
+              {modelState === "loading"
+                ? "正在透過授權 API 載入私人 GLB…"
+                : modelState === "error"
+                  ? "無法讀取已核准 GLB；已保留靜態後備預覽。"
+                  : selectedPart?.assetStatus === "approved" && isLocalPreview
+                    ? "本地預覽不讀取私人 GLB；顯示合成幾何後備。"
+                    : "此組件未有可用的已核准 GLB；顯示靜態幾何後備。"}
+            </figcaption>
+          </figure>
+        )}
 
         <div className="builder-axis" aria-hidden="true">
           <span>X</span>
@@ -170,7 +290,7 @@ export function BuilderViewport({
       <div className="builder-viewport__footer">
         <span>
           <Image aria-hidden="true" />
-          提供靜態後備預覽
+          {modelUrl ? "受保護的已核准組件預覽" : "提供靜態後備預覽"}
         </span>
         <span className="mono">場景 v1 · +Y 向上 · 單位：米</span>
       </div>

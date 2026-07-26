@@ -30,7 +30,7 @@ import {
 } from "./build-api";
 import { BuildInspector } from "./BuildInspector";
 import { BuilderCommandBar } from "./BuilderCommandBar";
-import { BuilderViewport } from "./BuilderViewport";
+import { BuilderViewport, type BuilderDisplayMode } from "./BuilderViewport";
 import { BuildStatusBar } from "./BuildStatusBar";
 import { ComponentRail } from "./ComponentRail";
 import "./builder.css";
@@ -98,7 +98,7 @@ export function BuilderPage() {
   const canWrite = currentWorkspace.role !== "viewer";
   const [selectedCategory, setSelectedCategory] = useState<StepId>("gpu");
   const [camera, setCamera] = useState("等角");
-  const [displayMode, setDisplayMode] = useState("著色");
+  const [displayMode, setDisplayMode] = useState<BuilderDisplayMode>("著色");
   const [saveState, setSaveState] = useState(
     isLocalPreview ? "本地合成組裝已載入" : "正在載入組裝",
   );
@@ -120,6 +120,7 @@ export function BuilderPage() {
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [archiveArmed, setArchiveArmed] = useState(false);
   const [loadState, setLoadState] = useState<"error" | "loading" | "ready">(
     isLocalPreview ? "ready" : "loading",
   );
@@ -147,6 +148,7 @@ export function BuilderPage() {
         setDraftName(initial?.name ?? "");
         setBuildCache(initial ? { [initial.id]: initial } : {});
         setDirty(false);
+        setArchiveArmed(false);
         setSaveState(
           initial
             ? `已載入版本 ${initial.version}`
@@ -188,6 +190,7 @@ export function BuilderPage() {
   );
 
   const markDirty = (message: string) => {
+    setArchiveArmed(false);
     setDirty(true);
     setSaveState(message);
   };
@@ -246,6 +249,7 @@ export function BuilderPage() {
       setBuilds((current) => replaceListItem(current, created));
       setBuildCache((current) => ({ ...current, [created.id]: created }));
       setDirty(false);
+      setArchiveArmed(false);
       setSelectedCategory("case");
       setSaveState(isLocalPreview ? "本地新組裝已建立" : "新組裝草稿已建立");
     } catch (error) {
@@ -263,6 +267,7 @@ export function BuilderPage() {
       setSaveState("請先儲存目前組裝，再切換另一個組裝");
       return;
     }
+    setArchiveArmed(false);
     const cached = buildCache[buildId];
     if (cached) {
       setBuild(cached);
@@ -319,6 +324,7 @@ export function BuilderPage() {
       setBuilds((current) => replaceListItem(current, updated));
       setBuildCache((current) => ({ ...current, [updated.id]: updated }));
       setDirty(false);
+      setArchiveArmed(false);
       setSaveState(
         isLocalPreview
           ? `本地版本 ${updated.version} 已儲存`
@@ -334,6 +340,77 @@ export function BuilderPage() {
             : "無法儲存組裝",
       );
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const archiveBuild = async () => {
+    if (!build || !canWrite || busy) {
+      return;
+    }
+    if (dirty) {
+      setSaveState("請先儲存目前變更，再封存組裝");
+      return;
+    }
+    if (!archiveArmed) {
+      setArchiveArmed(true);
+      setSaveState("再次按下封存按鈕以確認；資料不會被永久刪除");
+      return;
+    }
+
+    setBusy(true);
+    setSaveState("正在封存組裝…");
+    const controller = new AbortController();
+    try {
+      if (!isLocalPreview) {
+        await mutateBuild(currentWorkspace.id, build.id, {
+          action: "archive",
+          expectedVersion: build.version,
+        });
+      }
+      const remaining = builds.filter((item) => item.id !== build.id);
+      const nextSummary = remaining[0] ?? null;
+      const nextBuild = nextSummary
+        ? (buildCache[nextSummary.id] ??
+          (isLocalPreview
+            ? null
+            : await fetchBuild(
+                controller.signal,
+                currentWorkspace.id,
+                nextSummary.id,
+              )))
+        : null;
+
+      setBuilds(remaining);
+      setBuildCache((current) => {
+        const next = { ...current };
+        delete next[build.id];
+        if (nextBuild) {
+          next[nextBuild.id] = nextBuild;
+        }
+        return next;
+      });
+      setBuild(nextBuild);
+      setDraftName(nextBuild?.name ?? "");
+      setDirty(false);
+      setSelectedCategory(nextBuild?.selectedParts[0]?.category ?? "case");
+      setSaveState(
+        nextBuild
+          ? `已封存上一個組裝；已載入版本 ${nextBuild.version}`
+          : "組裝已封存；目前沒有其他草稿",
+      );
+    } catch (error) {
+      setSaveState(
+        error instanceof BuildRequestError &&
+          error.code === "BUILD_VERSION_CONFLICT"
+          ? "組裝版本已改變，請重新載入"
+          : error instanceof Error
+            ? error.message
+            : "無法封存組裝",
+      );
+    } finally {
+      controller.abort();
+      setArchiveArmed(false);
       setBusy(false);
     }
   };
@@ -422,9 +499,11 @@ export function BuilderPage() {
         buildId={build.id}
         builds={builds}
         canWrite={canWrite}
+        archiveArmed={archiveArmed}
         onBuildNameChange={changeBuildName}
         onBuildSelect={(buildId) => void selectBuild(buildId)}
         onCreateBuild={() => void createNewBuild()}
+        onArchiveBuild={() => void archiveBuild()}
         onOpenInspector={() => setInspectorOpen(true)}
       />
 
@@ -445,6 +524,8 @@ export function BuilderPage() {
           displayMode={displayMode}
           setDisplayMode={setDisplayMode}
           selectedPart={selectedPart}
+          workspaceId={currentWorkspace.id}
+          isLocalPreview={isLocalPreview}
         />
         <aside className="desktop-inspector" aria-label="組裝檢查器">
           <BuildInspector part={selectedPart} findings={visibleFindings} />

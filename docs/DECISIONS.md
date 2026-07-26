@@ -22,6 +22,8 @@ A build selects at most one active catalogue part per component category. Reads 
 
 Portable JSON includes component identity, verified specifications and bilingual compatibility evidence. It deliberately omits build and workspace identifiers, users, price, stock, private files, checksums and deployment values.
 
+Build archive is a logical state transition with the same optimistic version boundary. The interface requires a separate second action before submitting it.
+
 ## Catalogue onboarding is bounded and transactional
 
 Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV imports validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch.
@@ -32,13 +34,15 @@ Original images, uploaded GLB models and future render outputs use a private obj
 
 Uploads are bounded to 10 MiB for JPEG, PNG or WebP source images and 25 MiB for self-contained glTF 2.0 GLB models. Replacing a file increments the review version and resets all checklist and dimension evidence.
 
+The builder may decode only the selected component's approved GLB. It uses the protected file route and a revocable browser object URL; model geometry remains non-authoritative.
+
 ## Bounded asynchronous work
 
 Long-running jobs use a swappable provider boundary and an idempotent Workflow. The current Workflow is a placeholder and has no provider side effects.
 
 ## Read-only requests remain read-only
 
-Session and workspace reads do not append audit rows. Rate limiting is applied before protected database work, keyed by the verified Access subject.
+Session, workspace and dashboard reads do not append audit rows. Dashboard compatibility work is bounded to the latest 50 active drafts, and its recent-work response is capped at six items. Rate limiting is applied before protected database work, keyed by the verified Access subject.
 
 ## Public configuration is non-operational
 

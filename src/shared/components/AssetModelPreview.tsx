@@ -5,6 +5,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 type AssetModelPreviewProps = {
   cameraPreset: string;
+  renderMode?: "shaded" | "static" | "wireframe";
+  resetToken?: number;
   url: string;
 };
 
@@ -29,13 +31,33 @@ function disposeObject(root: THREE.Object3D): void {
   });
 }
 
+function setObjectWireframe(root: THREE.Object3D, wireframe: boolean): void {
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) {
+      return;
+    }
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+    for (const material of materials) {
+      if ("wireframe" in material) {
+        (material as THREE.MeshBasicMaterial).wireframe = wireframe;
+        material.needsUpdate = true;
+      }
+    }
+  });
+}
+
 export function AssetModelPreview({
   cameraPreset,
+  renderMode = "shaded",
+  resetToken = 0,
   url,
 }: AssetModelPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const modelRef = useRef<THREE.Object3D | null>(null);
   const radiusRef = useRef(1);
   const renderRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<"error" | "loading" | "ready">("loading");
@@ -106,6 +128,7 @@ export function AssetModelPreview({
           return;
         }
         model = gltf.scene;
+        modelRef.current = model;
         const box = new THREE.Box3().setFromObject(model);
         if (box.isEmpty()) {
           throw new Error("GLB contains no renderable bounds.");
@@ -145,6 +168,7 @@ export function AssetModelPreview({
       renderer.domElement.remove();
       cameraRef.current = null;
       controlsRef.current = null;
+      modelRef.current = null;
       renderRef.current = null;
     };
   }, [url]);
@@ -173,7 +197,18 @@ export function AssetModelPreview({
     camera.lookAt(controls.target);
     controls.update();
     renderRef.current?.();
-  }, [cameraPreset, state]);
+  }, [cameraPreset, resetToken, state]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const model = modelRef.current;
+    if (!controls || !model || state !== "ready") {
+      return;
+    }
+    controls.enabled = renderMode !== "static";
+    setObjectWireframe(model, renderMode === "wireframe");
+    renderRef.current?.();
+  }, [renderMode, state]);
 
   return (
     <div className="asset-model-preview" ref={containerRef}>

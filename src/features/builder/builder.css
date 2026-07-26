@@ -19,7 +19,7 @@
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
   grid-template-columns:
     auto minmax(170px, 0.65fr) minmax(180px, 1fr)
-    auto auto 42px;
+    minmax(122px, auto) 42px;
 }
 
 .builder-command-bar__brand {
@@ -27,8 +27,7 @@
   border-right: 1px solid var(--border-strong);
 }
 
-.command-workspace,
-.command-view {
+.command-workspace {
   display: flex;
   min-width: 0;
   min-height: 42px;
@@ -43,14 +42,12 @@
 }
 
 .command-workspace span,
-.command-view span,
 .command-build {
   display: grid;
   min-width: 0;
 }
 
 .command-workspace small,
-.command-view small,
 .command-build small {
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -68,16 +65,11 @@
   white-space: nowrap;
 }
 
-.command-workspace > svg,
-.command-view > svg:last-child {
-  width: 14px;
-}
-
 .command-build {
   width: min(100%, 360px);
   align-items: center;
   gap: 2px 7px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   justify-self: center;
   text-align: left;
 }
@@ -127,9 +119,16 @@
   border-color: var(--accent-cyan);
 }
 
-.command-new-build {
+.command-new-build,
+.command-archive-build {
   width: 28px;
   height: 28px;
+}
+
+.command-archive-build.is-armed {
+  border-color: var(--danger);
+  background: rgba(255, 93, 108, 0.12);
+  color: var(--danger);
 }
 
 .command-save-state {
@@ -145,26 +144,6 @@
 
 .command-save-state svg {
   width: 15px;
-}
-
-.command-view {
-  min-width: 138px;
-  border-left: 1px solid var(--border-strong);
-  padding-left: 16px;
-}
-
-.command-view > svg:first-child {
-  color: var(--accent-cyan);
-}
-
-.command-view select {
-  max-width: 100px;
-  appearance: none;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12px;
 }
 
 .command-inspector-button {
@@ -530,6 +509,14 @@
   background: var(--accent-cyan-soft);
 }
 
+.viewport-control-group button:disabled,
+.viewport-icon-button:disabled {
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .viewport-display-control {
   display: flex;
   min-width: 132px;
@@ -556,6 +543,11 @@
   background: transparent;
   color: var(--text-primary);
   font-size: 11px;
+}
+
+.viewport-display-control select:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .viewport-display-control svg {
@@ -618,6 +610,41 @@
   background: rgba(0, 217, 255, 0.09);
   filter: blur(34px);
   transform: translateY(180px);
+}
+
+.builder-private-model {
+  position: absolute;
+  z-index: 1;
+  width: min(76%, 820px);
+  height: min(76%, 720px);
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  background: rgba(6, 8, 13, 0.42);
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.38);
+}
+
+.builder-private-model figcaption {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 2;
+  border: 1px solid var(--border-subtle);
+  padding: 6px 8px;
+  background: rgba(6, 8, 13, 0.82);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.builder-model-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid var(--border-strong);
+  padding: 9px 11px;
+  background: rgba(6, 8, 13, 0.9);
+  color: var(--text-secondary);
+  font-size: 11px;
+  transform: translate(-50%, -50%);
 }
 
 .pc-case-placeholder {
@@ -1354,10 +1381,6 @@
   .builder-command-bar__brand .brand-mark__icon {
     width: 31px;
     height: 31px;
-  }
-
-  .command-view {
-    display: none;
   }
 
   .command-inspector-button {

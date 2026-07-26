@@ -1,16 +1,17 @@
 # Compatibility boundary
 
-The current builder displays synthetic compatibility states for interface testing. A production compatibility engine is not active in this release.
+RigStage v1.0 evaluates compatibility from current workspace catalogue records at build read time. Six deterministic rules are active for CPU socket, memory type, motherboard form factor, GPU clearance, cooler clearance and the recorded GPU power-supply recommendation.
 
-Stable rules for any future implementation:
+The complete field mapping, severities and export behavior are documented in [COMPATIBILITY_RULES.md](COMPATIBILITY_RULES.md).
 
-- Use structured, source-backed product specifications.
-- Mark AI-extracted values as unverified until a human confirms them.
+Stable boundaries:
+
+- Use only structured specifications marked `verified`.
 - Never infer sockets, connectors, wattage or physical clearance from a visual mesh.
-- Evaluate hard errors and warnings deterministically on the server.
-- Include the rule identifier and relevant input evidence in every result.
+- Return `unknown` when a required selection, verification state or field is missing.
+- Include a stable rule identifier and bilingual evidence in every evaluated result.
 - Reject cross-workspace catalogue or build references.
-- Keep UI hints separate from the server decision.
-- Test each rule with compatible, incompatible, missing-data and boundary-value fixtures.
+- Block portable export on `error` or `unknown`; retain explicit warnings.
+- Test compatible, incompatible, missing-data and boundary-value fixtures.
 
 The repository does not include private scoring weights, commercial ranking targets or unpublished catalogue data.
