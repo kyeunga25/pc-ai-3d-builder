@@ -1,6 +1,6 @@
 # Product behavior
 
-RigStage is an invite-only browser workspace for computer merchants. The current public build provides workspace-scoped catalogue reads and human asset-review decisions while retaining synthetic local fixtures and a synthetic PC assembly interface.
+RigStage is an invite-only browser workspace for computer merchants. The current public build provides workspace-scoped catalogue onboarding and human asset-review decisions while retaining synthetic local fixtures and a synthetic PC assembly interface.
 
 ## Implemented behavior
 
@@ -8,6 +8,8 @@ RigStage is an invite-only browser workspace for computer merchants. The current
 - Workspace-scoped session resolution through Cloudflare Access and D1.
 - Dashboard, catalogue, asset review and builder routes.
 - Bounded catalogue pagination and review-queue reads from the resolved workspace.
+- Role-protected catalogue creation, optimistic updates and logical archive.
+- Validated CSV template download and transactional import of at most 50 catalogue records.
 - Draft saves for staff, with approval and rejection reserved for owner or admin roles.
 - Optimistic asset versions and append-only review and audit events.
 - Synthetic compatibility and build status presentation.
@@ -20,7 +22,7 @@ RigStage is an invite-only browser workspace for computer merchants. The current
 - A visual mesh never establishes compatibility.
 - Prices, inventory and components shown in local development are fictional.
 - No public marketplace, payment flow or customer-data collection is enabled.
-- Private uploads and real provider generation are not enabled in this release.
+- Private uploads, real provider generation and complete build export are not enabled in this release.
 
 ## Data handling
 

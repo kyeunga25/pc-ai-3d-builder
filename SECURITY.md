@@ -16,6 +16,8 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Protected API requests are rate-limited by verified Access subject.
 - Session and workspace reads do not append audit events; first identity binding and an explicit workspace switch may update bounded user metadata.
 - Catalogue and asset queries include the resolved workspace in every database predicate.
+- Catalogue mutations use bounded bodies, role checks, optimistic versions and logical archive.
+- Catalogue CSV imports validate the complete document before one transactional D1 batch.
 - Asset review mutations use bounded JSON bodies, role checks and optimistic version conditions.
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
 - API responses use `no-store`; static and API responses receive restrictive security headers.

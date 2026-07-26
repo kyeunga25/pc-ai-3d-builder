@@ -1,13 +1,14 @@
 import {
   Box,
   ChevronDown,
+  FileDown,
   Filter,
   ListFilter,
   Plus,
   Search,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import {
@@ -16,26 +17,26 @@ import {
   LoadingState,
 } from "../../shared/components/AsyncState";
 import { StatusBadge } from "../../shared/components/StatusBadge";
+import {
+  catalogueCsvTemplate,
+  parseCatalogueCsvFile,
+} from "../../shared/domain/catalogue-csv";
 import { catalogParts } from "../../shared/domain/mockData";
 import type {
+  CataloguePartInput,
   CatalogPart,
   ComponentCategory,
 } from "../../shared/domain/schemas";
 import { formatHkd } from "../../shared/i18n/locale";
-import { fetchCataloguePage } from "./catalogue-api";
+import {
+  createCataloguePart,
+  fetchCataloguePage,
+  importCatalogueCsv,
+  mutateCataloguePart,
+} from "./catalogue-api";
+import { CatalogueEditorDialog } from "./CatalogueEditorDialog";
+import { categoryLabels } from "./catalogue-options";
 import "./catalogue.css";
-
-const categoryLabels: Record<ComponentCategory, string> = {
-  case: "機箱",
-  motherboard: "主機板",
-  cpu: "處理器（CPU）",
-  gpu: "顯示卡（GPU）",
-  memory: "記憶體",
-  cooling: "散熱器",
-  storage: "儲存裝置",
-  psu: "電源供應器（PSU）",
-  fans: "風扇",
-};
 
 function stockLabel(status: CatalogPart["stockStatus"]) {
   switch (status) {
@@ -79,8 +80,18 @@ function assetQualityLabel(quality: CatalogPart["assetQuality"]) {
 export function CataloguePage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const isLocalPreview = import.meta.env.DEV;
+  const canWrite = currentWorkspace.role !== "viewer";
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ComponentCategory | "all">("all");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [editorState, setEditorState] = useState<
+    { workspaceId: string; part: CatalogPart | null } | undefined
+  >();
+  const editorPart =
+    editorState?.workspaceId === currentWorkspace.id
+      ? editorState.part
+      : undefined;
+  const [importing, setImporting] = useState(false);
   const [parts, setParts] = useState<CatalogPart[]>(() =>
     isLocalPreview ? catalogParts : [],
   );
@@ -90,8 +101,10 @@ export function CataloguePage() {
   );
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(
     isLocalPreview ? currentWorkspace.id : null,
@@ -101,6 +114,17 @@ export function CataloguePage() {
       ? `${catalogParts.length} 件產品 · 合成示範資料`
       : "正在讀取工作空間目錄",
   );
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -181,19 +205,137 @@ export function CataloguePage() {
     }
   };
 
+  const savePart = async (input: CataloguePartInput) => {
+    if (editorPart) {
+      const updated = isLocalPreview
+        ? {
+            ...editorPart,
+            ...input,
+            assetQuality: editorPart.assetQuality,
+            assetStatus: editorPart.assetStatus,
+            verified: input.specificationStatus === "verified",
+            version: editorPart.version + 1,
+          }
+        : await mutateCataloguePart(currentWorkspace.id, editorPart.id, {
+            action: "update",
+            expectedVersion: editorPart.version,
+            ...input,
+          });
+      if (!updated) {
+        throw new Error("產品更新沒有回傳有效資料。");
+      }
+      setParts((current) =>
+        current.map((part) => (part.id === updated.id ? updated : part)),
+      );
+      setNotice(`已更新 ${updated.sku}`);
+    } else {
+      const created = isLocalPreview
+        ? {
+            id: `part_local_${crypto.randomUUID()}`,
+            ...input,
+            assetQuality: "unreviewed" as const,
+            assetStatus: "proxy" as const,
+            verified: input.specificationStatus === "verified",
+            version: 0,
+          }
+        : await createCataloguePart(currentWorkspace.id, input);
+      setParts((current) => [...current, created]);
+      setNotice(`已新增 ${created.sku}`);
+    }
+    setEditorState(undefined);
+  };
+
+  const archivePart = async () => {
+    if (!editorPart) {
+      return;
+    }
+    if (!isLocalPreview) {
+      await mutateCataloguePart(currentWorkspace.id, editorPart.id, {
+        action: "archive",
+        expectedVersion: editorPart.version,
+      });
+    }
+    setParts((current) => current.filter((part) => part.id !== editorPart.id));
+    setNotice(`已封存 ${editorPart.sku}`);
+    setEditorState(undefined);
+  };
+
+  const importCsvFile = async (file: File) => {
+    if (file.size > 256 * 1024) {
+      throw new Error("CSV 檔案不可超過 256 KiB。");
+    }
+
+    if (isLocalPreview) {
+      const inputs = parseCatalogueCsvFile(await file.text());
+      const existingSkus = new Set(parts.map((part) => part.sku.toLowerCase()));
+      if (inputs.some((input) => existingSkus.has(input.sku.toLowerCase()))) {
+        throw new Error("目前目錄已經存在 CSV 內的其中一個 SKU。");
+      }
+
+      const created = inputs.map((input) => ({
+        id: `part_local_${crypto.randomUUID()}`,
+        ...input,
+        assetQuality: "unreviewed" as const,
+        assetStatus: "proxy" as const,
+        verified: input.specificationStatus === "verified",
+        version: 0,
+      }));
+      setParts((current) => [...current, ...created]);
+      return created.length;
+    }
+
+    const response = await importCatalogueCsv(currentWorkspace.id, file);
+    setParts((current) => [...current, ...response.created]);
+    return response.created.length;
+  };
+
+  const handleCsvSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const inputElement = event.currentTarget;
+    const file = inputElement.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImporting(true);
+    setNotice("正在驗證 CSV 及工作空間資料");
+    try {
+      const createdCount = await importCsvFile(file);
+      setNotice(`已匯入 ${createdCount} 件產品`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "無法匯入 CSV 檔案。");
+    } finally {
+      inputElement.value = "";
+      setImporting(false);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const blob = new Blob([`${catalogueCsvTemplate}\n`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "rigstage-catalogue-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setNotice("已下載不含真實資料的 CSV 範本");
+  };
+
   const filteredParts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return parts.filter((part) => {
       const matchesCategory = category === "all" || part.category === category;
+      const matchesVerification = !verifiedOnly || part.verified;
       const matchesQuery =
         normalizedQuery.length === 0 ||
         `${part.manufacturer} ${part.model} ${part.sku}`
           .toLowerCase()
           .includes(normalizedQuery);
-      return matchesCategory && matchesQuery;
+      return matchesCategory && matchesVerification && matchesQuery;
     });
-  }, [category, parts, query]);
+  }, [category, parts, query, verifiedOnly]);
   const visibleLoadState =
     loadedWorkspaceId === currentWorkspace.id ? loadState : "loading";
 
@@ -206,20 +348,43 @@ export function CataloguePage() {
           <p>在組件加入組裝方案前，先檢查庫存、規格及經人工核准的 3D 素材。</p>
         </div>
         <div className="page-header__actions">
+          <input
+            ref={fileInputRef}
+            hidden
+            type="file"
+            accept=".csv,text/csv"
+            disabled={!canWrite || importing}
+            onChange={(event) => void handleCsvSelection(event)}
+          />
           <button
             className="button button--secondary"
             type="button"
-            disabled
-            title="目錄寫入流程尚未啟用"
+            onClick={downloadCsvTemplate}
+          >
+            <FileDown aria-hidden="true" />
+            CSV 範本
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={!canWrite || importing}
+            title={canWrite ? "匯入最多 50 項產品" : "目前角色只可查看產品目錄"}
+            onClick={() => fileInputRef.current?.click()}
           >
             <Upload aria-hidden="true" />
-            匯入 CSV
+            {importing ? "正在匯入…" : "匯入 CSV"}
           </button>
           <button
             className="button button--primary"
             type="button"
-            disabled
-            title="目錄寫入流程尚未啟用"
+            disabled={!canWrite}
+            title={canWrite ? "新增工作空間產品" : "目前角色只可查看產品目錄"}
+            onClick={() =>
+              setEditorState({
+                workspaceId: currentWorkspace.id,
+                part: null,
+              })
+            }
           >
             <Plus aria-hidden="true" />
             新增產品
@@ -238,6 +403,7 @@ export function CataloguePage() {
               <Search aria-hidden="true" />
               <span className="sr-only">搜尋產品目錄</span>
               <input
+                ref={searchInputRef}
                 type="search"
                 placeholder="搜尋 SKU、品牌或型號"
                 value={query}
@@ -266,11 +432,11 @@ export function CataloguePage() {
             <button
               className="button catalogue-filter-button"
               type="button"
-              disabled
-              title="進階篩選尚未啟用"
+              aria-pressed={verifiedOnly}
+              onClick={() => setVerifiedOnly((current) => !current)}
             >
               <Filter aria-hidden="true" />
-              更多篩選
+              {verifiedOnly ? "顯示全部規格" : "只顯示已核實"}
             </button>
             <span className="catalogue-toolbar__notice" aria-live="polite">
               {notice}
@@ -284,7 +450,7 @@ export function CataloguePage() {
               }
               message={
                 parts.length === 0
-                  ? "這個工作空間尚未加入產品；目錄寫入流程會在後續階段啟用。"
+                  ? "使用「新增產品」或 CSV 匯入，建立這個工作空間的第一項產品。"
                   : "請嘗試其他 SKU、品牌或組件分類。"
               }
             />
@@ -335,7 +501,12 @@ export function CataloguePage() {
                       className="catalogue-row__action"
                       type="button"
                       aria-label={`查看 ${part.manufacturer} ${part.model}`}
-                      onClick={() => setNotice(`已選擇 ${part.sku} 供查看`)}
+                      onClick={() =>
+                        setEditorState({
+                          workspaceId: currentWorkspace.id,
+                          part,
+                        })
+                      }
                     >
                       查看
                     </button>
@@ -358,6 +529,15 @@ export function CataloguePage() {
           )}
         </>
       )}
+      {editorPart !== undefined ? (
+        <CatalogueEditorDialog
+          part={editorPart}
+          readOnly={!canWrite}
+          onClose={() => setEditorState(undefined)}
+          onSave={savePart}
+          onArchive={editorPart ? archivePart : undefined}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  catalogueSpecificationsSchema,
   catalogueResponseSchema,
   catalogPartSchema,
   componentCategorySchema,
@@ -8,7 +9,7 @@ import {
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 
-type CatalogueRow = {
+export type CatalogueRow = {
   id: string;
   sku: string;
   category: string;
@@ -17,7 +18,9 @@ type CatalogueRow = {
   price_minor: number;
   stock_status: string;
   stock_count: number | null;
+  specifications_json: string;
   specification_status: string;
+  record_version: number;
   asset_quality: string | null;
   asset_review_status: string | null;
 };
@@ -28,7 +31,7 @@ type CatalogueOptions = {
   limit: number;
 };
 
-const recordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
+export const catalogueRecordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 
 function validationError(): ApiError {
   return new ApiError(400, "VALIDATION_ERROR", "產品目錄篩選條件無效。");
@@ -48,7 +51,7 @@ export function parseCatalogueOptions(url: URL): CatalogueOptions {
   }
 
   const rawCursor = url.searchParams.get("cursor");
-  if (rawCursor !== null && !recordIdPattern.test(rawCursor)) {
+  if (rawCursor !== null && !catalogueRecordIdPattern.test(rawCursor)) {
     throw validationError();
   }
 
@@ -84,7 +87,11 @@ function mapAssetStatus(status: string | null): CatalogPart["assetStatus"] {
   }
 }
 
-function mapCatalogueRow(row: CatalogueRow): CatalogPart {
+export function mapCatalogueRow(row: CatalogueRow): CatalogPart {
+  const specifications = catalogueSpecificationsSchema.parse(
+    JSON.parse(row.specifications_json) as unknown,
+  );
+
   return catalogPartSchema.parse({
     id: row.id,
     sku: row.sku,
@@ -94,10 +101,41 @@ function mapCatalogueRow(row: CatalogueRow): CatalogPart {
     priceMinor: row.price_minor,
     stockStatus: row.stock_status,
     stockCount: row.stock_count,
+    specifications,
+    specificationStatus: row.specification_status,
     assetQuality: row.asset_quality ?? "unreviewed",
     assetStatus: mapAssetStatus(row.asset_review_status),
     verified: row.specification_status === "verified",
+    version: row.record_version,
   });
+}
+
+export const catalogueSelect = `SELECT p.id, p.sku, p.category,
+                                       p.manufacturer, p.model, p.price_minor,
+                                       p.stock_status, p.stock_count,
+                                       p.specifications_json,
+                                       p.specification_status,
+                                       p.record_version,
+                                       a.quality AS asset_quality,
+                                       a.status AS asset_review_status
+                                FROM catalog_parts AS p
+                                LEFT JOIN product_assets AS a
+                                  ON a.workspace_id = p.workspace_id
+                                 AND a.catalog_part_id = p.id`;
+
+export async function findCataloguePart(
+  db: D1Database,
+  workspaceId: string,
+  partId: string,
+): Promise<CatalogueRow | null> {
+  return db
+    .prepare(
+      `${catalogueSelect}
+       WHERE p.workspace_id = ?1 AND p.id = ?2 AND p.status = 'active'
+       LIMIT 1`,
+    )
+    .bind(workspaceId, partId)
+    .first<CatalogueRow>();
 }
 
 export async function catalogueResponse(
@@ -123,14 +161,7 @@ export async function catalogueResponse(
 
   const result = await db
     .prepare(
-      `SELECT p.id, p.sku, p.category, p.manufacturer, p.model,
-              p.price_minor, p.stock_status, p.stock_count,
-              p.specification_status, a.quality AS asset_quality,
-              a.status AS asset_review_status
-       FROM catalog_parts AS p
-       LEFT JOIN product_assets AS a
-         ON a.workspace_id = p.workspace_id
-        AND a.catalog_part_id = p.id
+      `${catalogueSelect}
        WHERE ${clauses.join(" AND ")}
        ORDER BY p.id
        LIMIT ?`,
