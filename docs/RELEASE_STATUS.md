@@ -1,4 +1,4 @@
-# Public release status — v1.0.0
+# Public release status — v1.0.1
 
 This file records only the capabilities present in the current public branch.
 
@@ -32,6 +32,7 @@ This file records only the capabilities present in the current public branch.
 - [x] Active private R2 binding and placeholder-only Workflow binding.
 - [x] Local check, test, build and deployment dry-run commands.
 - [x] Production deploy command applies pending D1 migrations before Worker upload.
+- [x] Bilingual public issue forms, pull-request privacy checklist and support guidance.
 
 ## Explicit boundaries
 

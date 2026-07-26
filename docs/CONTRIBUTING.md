@@ -21,3 +21,5 @@ npm audit --audit-level=high
 ```
 
 Review the staged diff explicitly. Do not stage local deployment configuration, Wrangler metadata, database files, generated models, logs or source maps.
+
+Use the repository issue forms for public-safe bug reports and bounded feature suggestions. Use the Security tab for vulnerabilities. Never place credentials, personal data, production records, actual resource names, private URLs or confidential business information in issues or pull requests.
