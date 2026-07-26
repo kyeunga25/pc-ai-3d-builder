@@ -24,15 +24,17 @@ A requested workspace header never grants access by itself. The selected workspa
 
 ## Storage bindings
 
-D1 stores identity, workspace metadata, workspace-scoped catalogue records, current asset review state and append-only review events. Catalogue and asset mutations use expected versions and write their state transition and minimal audit event through D1 batches.
+D1 stores identity, workspace metadata, workspace-scoped catalogue records, private-file metadata, current asset review state and append-only review events. Catalogue and asset mutations use expected versions and write their state transition and minimal audit event through D1 batches.
 
-The R2 binding is private and has no public object-serving route in this release. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
+The R2 binding stores validated source images and self-contained GLB models under opaque keys. Objects are readable only through Access- and workspace-protected Worker routes; no bucket or permanent object URL is public. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
 
 ## Catalogue and asset review
 
 Catalogue reads are bounded to 100 rows per request and use an ID cursor. Staff, admin and owner roles may create, update or logically archive catalogue records; viewers remain read-only. Updates use optimistic record versions, and CSV imports validate at most 50 rows before submitting all catalogue and audit statements in one transactional D1 batch. The client-provided workspace header never becomes a database scope directly; the verified request context supplies the workspace predicate.
 
-The review queue returns only draft or in-review assets in the active workspace. Viewer roles are read-only, staff may save drafts, and owner or admin roles may approve or reject. Approval requires the complete fixed checklist and three positive, bounded dimensions. Visual geometry remains non-authoritative for compatibility.
+The review queue returns only draft or in-review assets in the active workspace. Viewer roles are read-only, staff may save drafts, and owner or admin roles may approve or reject. Approval requires a stored GLB model, the complete fixed checklist and three positive, bounded dimensions. Visual geometry remains non-authoritative for compatibility.
+
+Catalogue staff can create an asset by uploading a validated source image. File replacement uses an expected review version, stores a new R2 object, commits safe metadata and a minimal audit event, then removes the superseded object. Any replacement resets prior checklist and dimension evidence. Three.js and GLB parsing are lazy-loaded only when an authorized model blob is available.
 
 ## Privacy and observability
 

@@ -12,7 +12,7 @@ import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 import { readBoundedJson } from "../lib/request-body";
 
-type AssetReviewRow = {
+export type AssetReviewRow = {
   asset_id: string;
   part_id: string;
   sku: string;
@@ -27,6 +27,14 @@ type AssetReviewRow = {
   verified_height_mm: number | null;
   verified_depth_mm: number | null;
   review_version: number;
+  source_object_key: string | null;
+  source_content_type: string | null;
+  source_size_bytes: number | null;
+  source_sha256: string | null;
+  model_object_key: string | null;
+  model_content_type: string | null;
+  model_size_bytes: number | null;
+  model_sha256: string | null;
 };
 
 type ReviewTransition = {
@@ -34,7 +42,7 @@ type ReviewTransition = {
   quality: AssetReviewItem["quality"];
 };
 
-const recordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
+export const assetRecordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 
 function roleError(): ApiError {
   return new ApiError(
@@ -94,7 +102,7 @@ function parseCompletedChecks(value: string) {
   return assetReviewCheckSchema.array().parse(JSON.parse(value) as unknown);
 }
 
-function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
+export function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
   return assetReviewItemSchema.parse({
     id: row.asset_id,
     part: {
@@ -108,6 +116,22 @@ function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
     sourceKind: row.source_kind,
     completedChecks: parseCompletedChecks(row.completed_checks_json),
     sourceRightsConfirmed: row.source_rights_confirmed === 1,
+    files: {
+      source:
+        row.source_content_type && row.source_size_bytes
+          ? {
+              contentType: row.source_content_type,
+              sizeBytes: row.source_size_bytes,
+            }
+          : null,
+      model:
+        row.model_content_type && row.model_size_bytes
+          ? {
+              contentType: row.model_content_type,
+              sizeBytes: row.model_size_bytes,
+            }
+          : null,
+    },
     dimensionsMm: {
       width: row.verified_width_mm,
       height: row.verified_height_mm,
@@ -117,18 +141,22 @@ function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
   });
 }
 
-const assetSelect = `SELECT a.id AS asset_id, p.id AS part_id, p.sku,
+export const assetSelect = `SELECT a.id AS asset_id, p.id AS part_id, p.sku,
                             p.manufacturer, p.model, a.status, a.quality,
                             a.source_kind, a.completed_checks_json,
                             a.source_rights_confirmed, a.verified_width_mm,
                             a.verified_height_mm, a.verified_depth_mm,
-                            a.review_version
+                            a.review_version, a.source_object_key,
+                            a.source_content_type, a.source_size_bytes,
+                            a.source_sha256, a.model_object_key,
+                            a.model_content_type, a.model_size_bytes,
+                            a.model_sha256
                      FROM product_assets AS a
                      INNER JOIN catalog_parts AS p
                        ON p.workspace_id = a.workspace_id
                       AND p.id = a.catalog_part_id`;
 
-async function findAsset(
+export async function findAsset(
   db: D1Database,
   workspaceId: string,
   assetId: string,
@@ -141,6 +169,24 @@ async function findAsset(
     )
     .bind(workspaceId, assetId)
     .first<AssetReviewRow>();
+}
+
+export async function assetDetailResponse(
+  db: D1Database,
+  context: RequestContext,
+  assetId: string,
+): Promise<Response> {
+  if (!assetRecordIdPattern.test(assetId)) {
+    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  }
+  const asset = await findAsset(db, context.currentWorkspace.id, assetId);
+  if (!asset) {
+    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  }
+
+  return Response.json(mapAssetReviewRow(asset), {
+    headers: { "cache-control": "no-store" },
+  });
 }
 
 export async function assetReviewQueueResponse(
@@ -174,7 +220,7 @@ export async function assetReviewMutationResponse(
   assetId: string,
   requestId: string,
 ): Promise<Response> {
-  if (!recordIdPattern.test(assetId)) {
+  if (!assetRecordIdPattern.test(assetId)) {
     throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
   }
 
@@ -186,6 +232,19 @@ export async function assetReviewMutationResponse(
   }
 
   const input = parsed.data;
+  if (input.action === "approve") {
+    const current = await findAsset(db, context.currentWorkspace.id, assetId);
+    if (!current) {
+      throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+    }
+    if (!current.model_object_key) {
+      throw new ApiError(
+        409,
+        "ASSET_MODEL_REQUIRED",
+        "上載並檢查 GLB 模型後才可核准素材。",
+      );
+    }
+  }
   const transition = resolveReviewTransition(
     context.currentWorkspace.role,
     input,
@@ -247,7 +306,10 @@ export async function assetReviewMutationResponse(
          )
          SELECT ?1, workspace_id, id, ?2, ?3, ?4, ?5, ?6, ?7, ?8
          FROM product_assets
-         WHERE id = ?9 AND workspace_id = ?10 AND review_version = ?4`,
+         WHERE id = ?9
+           AND workspace_id = ?10
+           AND review_version = ?4
+           AND changes() = 1`,
       )
       .bind(
         reviewEventId,
@@ -269,7 +331,10 @@ export async function assetReviewMutationResponse(
          )
          SELECT ?1, workspace_id, ?2, ?3, 'product_asset', id, ?4, ?5
          FROM product_assets
-         WHERE id = ?6 AND workspace_id = ?7 AND review_version = ?8`,
+         WHERE id = ?6
+           AND workspace_id = ?7
+           AND review_version = ?8
+           AND changes() = 1`,
       )
       .bind(
         auditEventId,

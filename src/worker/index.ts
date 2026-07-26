@@ -5,9 +5,15 @@ import { logRecord } from "./lib/log";
 import { enforcePilotRateLimit } from "./lib/rate-limit";
 import { withPublicSecurityHeaders } from "./lib/security-headers";
 import {
+  assetDetailResponse,
   assetReviewMutationResponse,
   assetReviewQueueResponse,
 } from "./routes/assets";
+import {
+  assetFileResponse,
+  assetFileUploadResponse,
+  createAssetSourceResponse,
+} from "./routes/asset-files";
 import { catalogueResponse } from "./routes/catalogue";
 import {
   catalogueCreateResponse,
@@ -127,6 +133,26 @@ async function routeRequest(
       );
     }
 
+    const catalogueAssetSourceMatch =
+      /^\/api\/catalogue\/([^/]+)\/assets\/source$/u.exec(url.pathname);
+    if (catalogueAssetSourceMatch) {
+      if (request.method !== "POST") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "POST", "cache-control": "no-store" },
+        });
+      }
+
+      return createAssetSourceResponse(
+        request,
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context,
+        catalogueAssetSourceMatch[1]!,
+        requestId,
+      );
+    }
+
     if (url.pathname === "/api/assets/review-queue") {
       if (request.method !== "GET") {
         return new Response(null, {
@@ -136,6 +162,36 @@ async function routeRequest(
       }
 
       return assetReviewQueueResponse(env.DB, context);
+    }
+
+    const assetFileMatch = /^\/api\/assets\/([^/]+)\/files\/([^/]+)$/u.exec(
+      url.pathname,
+    );
+    if (assetFileMatch) {
+      if (request.method === "GET") {
+        return assetFileResponse(
+          env.DB,
+          env.PRIVATE_ASSETS,
+          context,
+          assetFileMatch[1]!,
+          assetFileMatch[2]!,
+        );
+      }
+      if (request.method === "PUT") {
+        return assetFileUploadResponse(
+          request,
+          env.DB,
+          env.PRIVATE_ASSETS,
+          context,
+          assetFileMatch[1]!,
+          assetFileMatch[2]!,
+          requestId,
+        );
+      }
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET, PUT", "cache-control": "no-store" },
+      });
     }
 
     const assetReviewMatch = /^\/api\/assets\/([^/]+)\/review$/u.exec(
@@ -156,6 +212,17 @@ async function routeRequest(
         assetReviewMatch[1]!,
         requestId,
       );
+    }
+
+    const assetDetailMatch = /^\/api\/assets\/([^/]+)$/u.exec(url.pathname);
+    if (assetDetailMatch) {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+      return assetDetailResponse(env.DB, context, assetDetailMatch[1]!);
     }
 
     return apiNotFound(requestId);

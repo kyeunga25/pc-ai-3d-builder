@@ -68,6 +68,7 @@ describe("catalogue route", () => {
         specifications_json: '{"formFactor":"ATX"}',
         specification_status: "verified",
         record_version: 3,
+        asset_id: "asset-fixture",
         asset_quality: "approved",
         asset_review_status: "approved",
       },
@@ -111,6 +112,7 @@ describe("catalogue route", () => {
       specifications_json: "{}",
       specification_status: "unverified",
       record_version: 0,
+      asset_id: null,
       asset_quality: null,
       asset_review_status: null,
     }));

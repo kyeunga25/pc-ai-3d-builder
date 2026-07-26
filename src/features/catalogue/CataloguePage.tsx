@@ -9,7 +9,9 @@ import {
   Upload,
 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
+import { createAssetFromSource } from "../asset-review/asset-review-api";
 import { useAuthenticatedSession } from "../auth/session-context";
 import {
   EmptyState,
@@ -17,6 +19,12 @@ import {
   LoadingState,
 } from "../../shared/components/AsyncState";
 import { StatusBadge } from "../../shared/components/StatusBadge";
+import {
+  AssetFileValidationError,
+  assetFileLimits,
+  validateAssetFileBytes,
+} from "../../shared/domain/asset-files";
+import type { AssetReviewItem } from "../../shared/domain/assets";
 import {
   catalogueCsvTemplate,
   parseCatalogueCsvFile,
@@ -79,6 +87,7 @@ function assetQualityLabel(quality: CatalogPart["assetQuality"]) {
 
 export function CataloguePage() {
   const { currentWorkspace } = useAuthenticatedSession();
+  const navigate = useNavigate();
   const isLocalPreview = import.meta.env.DEV;
   const canWrite = currentWorkspace.role !== "viewer";
   const [query, setQuery] = useState("");
@@ -233,6 +242,7 @@ export function CataloguePage() {
         ? {
             id: `part_local_${crypto.randomUUID()}`,
             ...input,
+            assetId: null,
             assetQuality: "unreviewed" as const,
             assetStatus: "proxy" as const,
             verified: input.specificationStatus === "verified",
@@ -260,6 +270,69 @@ export function CataloguePage() {
     setEditorState(undefined);
   };
 
+  const createAssetDraft = async (file: File) => {
+    if (!editorPart) {
+      throw new Error("請先儲存產品，然後再建立素材草稿。");
+    }
+    if (file.size > assetFileLimits.source) {
+      throw new AssetFileValidationError("來源圖片必須小於或等於 10 MiB。");
+    }
+    const contentType = validateAssetFileBytes(
+      "source",
+      file.type,
+      new Uint8Array(await file.arrayBuffer()),
+    );
+
+    let asset: AssetReviewItem;
+    let sourceUrl: string | undefined;
+    if (isLocalPreview) {
+      sourceUrl = URL.createObjectURL(file);
+      asset = {
+        id: `asset_local_${crypto.randomUUID()}`,
+        part: {
+          id: editorPart.id,
+          sku: editorPart.sku,
+          manufacturer: editorPart.manufacturer,
+          model: editorPart.model,
+        },
+        status: "draft",
+        quality: "unreviewed",
+        sourceKind: "uploaded",
+        completedChecks: [],
+        sourceRightsConfirmed: false,
+        files: {
+          source: { contentType, sizeBytes: file.size },
+          model: null,
+        },
+        dimensionsMm: { width: null, height: null, depth: null },
+        version: 0,
+      };
+    } else {
+      asset = await createAssetFromSource(
+        currentWorkspace.id,
+        editorPart.id,
+        file,
+      );
+    }
+
+    setParts((current) =>
+      current.map((part) =>
+        part.id === editorPart.id
+          ? {
+              ...part,
+              assetId: asset.id,
+              assetQuality: asset.quality,
+              assetStatus: "draft",
+            }
+          : part,
+      ),
+    );
+    setEditorState(undefined);
+    void navigate(`/asset-review?asset=${encodeURIComponent(asset.id)}`, {
+      state: isLocalPreview ? { localAsset: asset, sourceUrl } : undefined,
+    });
+  };
+
   const importCsvFile = async (file: File) => {
     if (file.size > 256 * 1024) {
       throw new Error("CSV 檔案不可超過 256 KiB。");
@@ -275,6 +348,7 @@ export function CataloguePage() {
       const created = inputs.map((input) => ({
         id: `part_local_${crypto.randomUUID()}`,
         ...input,
+        assetId: null,
         assetQuality: "unreviewed" as const,
         assetStatus: "proxy" as const,
         verified: input.specificationStatus === "verified",
@@ -536,6 +610,21 @@ export function CataloguePage() {
           onClose={() => setEditorState(undefined)}
           onSave={savePart}
           onArchive={editorPart ? archivePart : undefined}
+          onCreateAssetFromSource={
+            editorPart && editorPart.assetId === null
+              ? createAssetDraft
+              : undefined
+          }
+          onOpenAssetReview={
+            editorPart?.assetId
+              ? () => {
+                  setEditorState(undefined);
+                  void navigate(
+                    `/asset-review?asset=${encodeURIComponent(editorPart.assetId!)}`,
+                  );
+                }
+              : undefined
+          }
         />
       ) : null}
     </div>

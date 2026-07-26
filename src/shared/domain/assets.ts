@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  assetModelContentType,
+  assetSourceContentTypeSchema,
+} from "./asset-files";
+
 export const assetReviewChecks = [
   "model_identity",
   "variant_identity",
@@ -48,6 +53,20 @@ export const assetReviewItemSchema = z.object({
       message: "Review checks must be unique.",
     }),
   sourceRightsConfirmed: z.boolean(),
+  files: z.object({
+    source: z
+      .object({
+        contentType: assetSourceContentTypeSchema,
+        sizeBytes: z.number().int().positive(),
+      })
+      .nullable(),
+    model: z
+      .object({
+        contentType: z.literal(assetModelContentType),
+        sizeBytes: z.number().int().positive(),
+      })
+      .nullable(),
+  }),
   dimensionsMm: assetDimensionsSchema,
   version: z.number().int().nonnegative(),
 });

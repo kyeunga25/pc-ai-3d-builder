@@ -22,6 +22,12 @@ describe("withPublicSecurityHeaders", () => {
     expect(response.headers.get("content-security-policy")).toContain(
       "frame-ancestors 'none'",
     );
+    expect(response.headers.get("content-security-policy")).toContain(
+      "img-src 'self' data: blob:",
+    );
+    expect(response.headers.get("content-security-policy")).toContain(
+      "connect-src 'self' blob:",
+    );
     await expect(response.text()).resolves.toBe("ok");
   });
 });

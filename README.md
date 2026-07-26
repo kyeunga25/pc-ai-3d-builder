@@ -2,7 +2,7 @@
 
 RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。現有版本提供可測試的商戶介面、產品目錄與素材審核示範、PC Builder 場景，以及受 Cloudflare Access 與 D1 workspace membership 保護的 session API。
 
-最新公開版本：`v0.3.0`。
+最新公開版本：`v0.4.0`。
 
 ## 現有功能
 
@@ -14,15 +14,18 @@ RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。現�
 - Staff、admin 及 owner 可新增、編輯和封存產品；更新以版本條件避免覆寫較新資料。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
 - 素材審核佇列、草稿保存、角色限制、樂觀鎖及原子 audit 記錄。
+- 從產品目錄建立私人素材草稿，並上載最多 10 MiB 的 JPEG／PNG／WebP 來源圖片。
+- 上載最多 25 MiB 的自包含 glTF 2.0 GLB，經授權 API 讀取後在瀏覽器以 Three.js 人手預覽。
+- R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
 
-本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。Production 介面可在角色及 workspace 限制下讀寫 D1 目錄和審核資料，但版本庫不含任何真實商戶記錄。私人上載、真實 3D 供應商呼叫及完整匯出流程尚未啟用。
+本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。Production 介面可在角色及 workspace 限制下讀寫 D1 目錄和審核資料，並以私人 R2 儲存經驗證的來源圖片及 GLB；版本庫不含任何真實商戶記錄。真實 3D 供應商呼叫及完整匯出流程尚未啟用。
 
 ## 技術
 
-- React 19、React Router 8、Vite 8、TypeScript 6
+- React 19、React Router 8、Vite 8、TypeScript 6、Three.js 0.185
 - Cloudflare Workers、Static Assets、Access、D1、R2、Workflows
 - Zod、Vitest、ESLint、Prettier
 

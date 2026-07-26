@@ -50,11 +50,31 @@ The conditional catalogue update and minimal audit event are submitted in one D1
 
 ## `GET /api/assets/review-queue`
 
-Returns at most 50 draft or in-review assets from the resolved workspace, with their catalogue identity, fixed checklist identifiers, source-rights flag, human-verified dimensions and review version. It never returns private object keys or provider responses.
+Returns at most 50 draft or in-review assets from the resolved workspace, with their catalogue identity, fixed checklist identifiers, source-rights flag, human-verified dimensions, review version and safe file metadata. It never returns private object keys, checksums or provider responses.
+
+## `GET /api/assets/:assetId`
+
+Returns one active catalogue asset from the resolved workspace, including approved records. The response uses the same safe representation as the review queue.
+
+## `POST /api/catalogue/:partId/assets/source`
+
+Creates a new draft asset for an active catalogue part and uploads its first private source image. Viewer roles cannot mutate. The binary body must be JPEG, PNG or WebP, match its declared MIME type and be at most 10 MiB. A file signature mismatch rejects the request before D1 metadata is committed.
+
+The validated object is stored under an opaque private R2 key. The workspace-scoped asset row and minimal audit event are committed in one D1 batch. The response never contains the object key or checksum.
+
+## `PUT /api/assets/:assetId/files/:kind`
+
+Replaces `source` or `model` for a non-approved asset. Viewer roles cannot mutate. The `X-RigStage-Expected-Version` header is required. Source files use the same image rules as creation. Models must be a complete, self-contained glTF 2.0 GLB with a matching binary header and declared length, at most 25 MiB. External resource URIs are rejected before storage.
+
+A successful replacement increments the review version and resets the checklist, dimensions and approval state. The new R2 object is stored before the conditional D1 batch; a failed D1 transition removes only that new object. After a committed transition, the previous private object is removed separately.
+
+## `GET /api/assets/:assetId/files/:kind`
+
+Streams a private `source` or `model` file only after Access verification and active workspace membership resolution. The response is `private, no-store` with a generic filename. Permanent object URLs and keys are never returned.
 
 ## `PATCH /api/assets/:assetId/review`
 
-Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles cannot mutate. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item and three positive dimensions of at most 10,000 mm.
+Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles cannot mutate. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires a stored GLB, every fixed checklist item and three positive dimensions of at most 10,000 mm.
 
 The conditional asset update, review event and audit event are submitted in one D1 batch. A stale `expectedVersion` fails without overwriting the newer record.
 
@@ -70,6 +90,6 @@ The conditional asset update, review event and audit event are submitted in one 
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `ASSET_NOT_FOUND`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.

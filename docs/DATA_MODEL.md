@@ -28,7 +28,9 @@ Stores workspace-scoped product identity, pricing, stock state and structured-sp
 
 ## `product_assets`
 
-Stores one current visual-asset review record per workspace catalogue part. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from any private object location.
+Stores one current visual-asset review record per workspace catalogue part. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from private source-image and GLB metadata.
+
+Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. They never appear in browser API records, audit metadata, logs or checked-in fixtures.
 
 ## `asset_review_events`
 
@@ -43,3 +45,4 @@ Append-only review history for draft saves, approvals and rejections. Each asset
 - Test migrations against an empty temporary database and run `PRAGMA foreign_key_check`.
 - Keep every catalogue, asset and review relation explicitly workspace-scoped.
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
+- Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.

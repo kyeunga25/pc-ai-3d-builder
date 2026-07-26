@@ -1,5 +1,12 @@
-import { Archive, Save, X } from "lucide-react";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { Archive, Cuboid, Save, Upload, X } from "lucide-react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
 import {
   cataloguePartInputSchema,
@@ -14,6 +21,8 @@ type CatalogueEditorDialogProps = {
   part: CatalogPart | null;
   onArchive?: () => Promise<void>;
   onClose: () => void;
+  onCreateAssetFromSource?: (file: File) => Promise<void>;
+  onOpenAssetReview?: () => void;
   onSave: (input: CataloguePartInput) => Promise<void>;
   readOnly?: boolean;
 };
@@ -96,12 +105,15 @@ export function CatalogueEditorDialog({
   part,
   onArchive,
   onClose,
+  onCreateAssetFromSource,
+  onOpenAssetReview,
   onSave,
   readOnly = false,
 }: CatalogueEditorDialogProps) {
   const titleId = useId();
   const messageId = useId();
   const dialogRef = useRef<HTMLElement>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => editorDraft(part));
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +235,32 @@ export function CatalogueEditorDialog({
     }
   };
 
+  const createAssetFromSource = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const inputElement = event.currentTarget;
+    const file = inputElement.files?.[0];
+    if (!file || !onCreateAssetFromSource) {
+      inputElement.value = "";
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreateAssetFromSource(file);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "無法建立私人素材草稿。",
+      );
+    } finally {
+      inputElement.value = "";
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="catalogue-dialog-layer">
       <button
@@ -261,6 +299,14 @@ export function CatalogueEditorDialog({
         </header>
 
         <form className="catalogue-editor-form" onSubmit={handleSubmit}>
+          <input
+            ref={sourceInputRef}
+            hidden
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={saving || readOnly}
+            onChange={(event) => void createAssetFromSource(event)}
+          />
           <fieldset
             className="catalogue-editor-fields"
             disabled={saving || readOnly}
@@ -395,19 +441,41 @@ export function CatalogueEditorDialog({
           </p>
 
           <footer className="catalogue-dialog__actions">
-            {!readOnly && part && onArchive ? (
-              <button
-                className="button button--danger"
-                type="button"
-                disabled={saving}
-                onClick={() => void archive()}
-              >
-                <Archive aria-hidden="true" />
-                {confirmArchive ? "確認封存" : "封存產品"}
-              </button>
-            ) : (
-              <span />
-            )}
+            <div>
+              {!readOnly && part && onArchive ? (
+                <button
+                  className="button button--danger"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void archive()}
+                >
+                  <Archive aria-hidden="true" />
+                  {confirmArchive ? "確認封存" : "封存產品"}
+                </button>
+              ) : null}
+              {!readOnly && part && onCreateAssetFromSource ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => sourceInputRef.current?.click()}
+                >
+                  <Upload aria-hidden="true" />
+                  建立素材草稿
+                </button>
+              ) : null}
+              {part && onOpenAssetReview ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={saving}
+                  onClick={onOpenAssetReview}
+                >
+                  <Cuboid aria-hidden="true" />
+                  前往素材審核
+                </button>
+              ) : null}
+            </div>
             <div>
               <button
                 className="button button--secondary"

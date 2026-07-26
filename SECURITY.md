@@ -18,6 +18,9 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Catalogue and asset queries include the resolved workspace in every database predicate.
 - Catalogue mutations use bounded bodies, role checks, optimistic versions and logical archive.
 - Catalogue CSV imports validate the complete document before one transactional D1 batch.
+- Private image and GLB uploads enforce role, workspace, MIME, binary signature and bounded-size checks; GLB files cannot reference external resources.
+- R2 object keys and checksums remain server-only; authorized reads use `private, no-store` responses.
+- File replacement requires the current review version and resets prior approval evidence.
 - Asset review mutations use bounded JSON bodies, role checks and optimistic version conditions.
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
 - API responses use `no-store`; static and API responses receive restrictive security headers.

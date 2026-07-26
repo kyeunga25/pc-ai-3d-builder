@@ -105,3 +105,10 @@ export async function readBoundedCsv(
 
   return decodeUtf8(await readBoundedBody(request, maxBytes));
 }
+
+export async function readBoundedBinary(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  return readBoundedBody(request, maxBytes);
+}

@@ -38,6 +38,14 @@ const assetRow = {
   verified_height_mm: 200,
   verified_depth_mm: 300,
   review_version: 1,
+  source_object_key: "private/source-fixture",
+  source_content_type: "image/png",
+  source_size_bytes: 128,
+  source_sha256: "a".repeat(64),
+  model_object_key: "private/model-fixture",
+  model_content_type: "model/gltf-binary",
+  model_size_bytes: 256,
+  model_sha256: "b".repeat(64),
 };
 
 function context(role: WorkspaceRole = "owner"): RequestContext {
@@ -72,7 +80,7 @@ function reviewInput(
 }
 
 function fakeDatabase(
-  options: { changes?: number; rows?: (typeof assetRow)[] } = {},
+  options: { changes?: number; rows?: Array<Record<string, unknown>> } = {},
 ) {
   const prepared: FakeStatement[] = [];
   const batches: FakeStatement[][] = [];
@@ -151,7 +159,16 @@ describe("asset review routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      items: [{ id: "asset-fixture", version: 1 }],
+      items: [
+        {
+          id: "asset-fixture",
+          version: 1,
+          files: {
+            source: { contentType: "image/png", sizeBytes: 128 },
+            model: { contentType: "model/gltf-binary", sizeBytes: 256 },
+          },
+        },
+      ],
     });
     expect(prepared[0]?.sql).toContain("a.workspace_id = ?1");
     expect(prepared[0]?.values).toEqual(["workspace-fixture"]);
@@ -182,10 +199,39 @@ describe("asset review routes", () => {
     expect(batches[0]?.[0]?.sql).toContain("workspace_id = ?10");
     expect(batches[0]?.[0]?.values[9]).toBe("workspace-fixture");
     expect(batches[0]?.[2]?.sql).toContain("INSERT INTO audit_events");
+    expect(batches[0]?.[1]?.sql).toContain("changes() = 1");
+    expect(batches[0]?.[2]?.sql).toContain("changes() = 1");
     expect(batches[0]?.[2]?.values).toContain("request-fixture");
     expect(
       JSON.stringify(batches[0]?.map((statement) => statement.values)),
     ).not.toContain("fixture@example.com");
+  });
+
+  it("requires a private GLB record before approval", async () => {
+    const { db } = fakeDatabase({
+      rows: [{ ...assetRow, model_object_key: null }],
+    });
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/review",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(reviewInput()),
+      },
+    );
+
+    await expect(
+      assetReviewMutationResponse(
+        request,
+        db,
+        context(),
+        "asset-fixture",
+        "request-fixture",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_MODEL_REQUIRED",
+    });
   });
 
   it("rejects a stale review version without appending state transitions", async () => {

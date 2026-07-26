@@ -122,7 +122,8 @@ function auditInsertStatement(
        FROM catalog_parts
        WHERE id = ?6
          AND workspace_id = ?7
-         AND record_version = ?8`,
+         AND record_version = ?8
+         AND changes() = 1`,
     )
     .bind(
       crypto.randomUUID(),
