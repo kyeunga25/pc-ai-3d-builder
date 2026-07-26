@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readBoundedJson } from "./request-body";
+import { readBoundedCsv, readBoundedJson } from "./request-body";
 
 describe("bounded JSON request bodies", () => {
   it("parses a JSON body within the configured limit", async () => {
@@ -39,5 +39,15 @@ describe("bounded JSON request bodies", () => {
       status: 413,
       code: "PAYLOAD_TOO_LARGE",
     });
+  });
+
+  it("accepts bounded UTF-8 CSV bodies", async () => {
+    const request = new Request("https://app.example/api/catalogue/import", {
+      method: "POST",
+      headers: { "content-type": "text/csv; charset=utf-8" },
+      body: "sku,category\nCASE-001,case",
+    });
+
+    await expect(readBoundedCsv(request, 128)).resolves.toContain("CASE-001");
   });
 });

@@ -9,6 +9,11 @@ import {
   assetReviewQueueResponse,
 } from "./routes/assets";
 import { catalogueResponse } from "./routes/catalogue";
+import {
+  catalogueCreateResponse,
+  catalogueImportResponse,
+  catalogueMutationResponse,
+} from "./routes/catalogue-write";
 import { healthResponse } from "./routes/health";
 import { sessionResponse, workspacesResponse } from "./routes/session";
 
@@ -77,14 +82,49 @@ async function routeRequest(
     }
 
     if (url.pathname === "/api/catalogue") {
-      if (request.method !== "GET") {
+      if (request.method === "GET") {
+        return catalogueResponse(env.DB, context, url);
+      }
+
+      if (request.method === "POST") {
+        return catalogueCreateResponse(request, env.DB, context, requestId);
+      }
+
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET, POST", "cache-control": "no-store" },
+      });
+    }
+
+    if (url.pathname === "/api/catalogue/import") {
+      if (request.method !== "POST") {
         return new Response(null, {
           status: 405,
-          headers: { allow: "GET", "cache-control": "no-store" },
+          headers: { allow: "POST", "cache-control": "no-store" },
         });
       }
 
-      return catalogueResponse(env.DB, context, url);
+      return catalogueImportResponse(request, env.DB, context, requestId);
+    }
+
+    const cataloguePartMatch = /^\/api\/catalogue\/([^/]+)$/u.exec(
+      url.pathname,
+    );
+    if (cataloguePartMatch) {
+      if (request.method !== "PATCH") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "PATCH", "cache-control": "no-store" },
+        });
+      }
+
+      return catalogueMutationResponse(
+        request,
+        env.DB,
+        context,
+        cataloguePartMatch[1]!,
+        requestId,
+      );
     }
 
     if (url.pathname === "/api/assets/review-queue") {

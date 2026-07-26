@@ -24,7 +24,7 @@ Reserved for meaningful state transitions. Read-only session resolution does not
 
 ## `catalog_parts`
 
-Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. No production catalogue rows are included in migrations.
+Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. A non-negative record version protects concurrent edits, while `status` supports logical archive without deleting records. No production catalogue rows are included in migrations.
 
 ## `product_assets`
 
@@ -42,3 +42,4 @@ Append-only review history for draft saves, approvals and rejections. Each asset
 - Do not add production records, account identifiers or resource names to migrations.
 - Test migrations against an empty temporary database and run `PRAGMA foreign_key_check`.
 - Keep every catalogue, asset and review relation explicitly workspace-scoped.
+- Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.

@@ -2,7 +2,7 @@
 
 RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。現有版本提供可測試的商戶介面、產品目錄與素材審核示範、PC Builder 場景，以及受 Cloudflare Access 與 D1 workspace membership 保護的 session API。
 
-最新公開版本：`v0.2.0`。
+最新公開版本：`v0.3.0`。
 
 ## 現有功能
 
@@ -11,12 +11,14 @@ RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。現�
 - Cloudflare Access JWT 驗證、邀請制用戶及 server-side workspace scope。
 - 公開 health endpoint，以及受保護的 session／workspace endpoint。
 - 受 workspace 限制的分頁產品目錄 API，以及 production 介面的載入、空白與錯誤狀態。
+- Staff、admin 及 owner 可新增、編輯和封存產品；更新以版本條件避免覆寫較新資料。
+- CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
 - 素材審核佇列、草稿保存、角色限制、樂觀鎖及原子 audit 記錄。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
 
-本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。Production 介面可讀取 D1 內經 workspace 限制的目錄及審核資料，但版本庫不含任何真實商戶記錄。私人上載、真實 3D 供應商呼叫、目錄寫入及完整匯出流程尚未啟用。
+本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。Production 介面可在角色及 workspace 限制下讀寫 D1 目錄和審核資料，但版本庫不含任何真實商戶記錄。私人上載、真實 3D 供應商呼叫及完整匯出流程尚未啟用。
 
 ## 技術
 

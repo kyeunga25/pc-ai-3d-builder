@@ -14,6 +14,10 @@ Staff roles may save review drafts. Approval and rejection require an owner or a
 
 Compatibility decisions use verified specifications and deterministic rules. A visual mesh is never an authority for sockets, power, clearance or connectors.
 
+## Catalogue onboarding is bounded and transactional
+
+Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV imports validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch.
+
 ## Private object storage
 
 Original images, generated models and render outputs use a private object binding. The browser does not receive provider keys or permanent public object URLs.

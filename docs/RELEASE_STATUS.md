@@ -1,4 +1,4 @@
-# Public release status — v0.2.0
+# Public release status — v0.3.0
 
 This file records only the capabilities present in the current public branch.
 
@@ -12,6 +12,8 @@ This file records only the capabilities present in the current public branch.
 - [x] Concurrent identity-binding protection.
 - [x] Subject-keyed API rate limiting.
 - [x] Bounded workspace-scoped catalogue API and production UI states.
+- [x] Role-protected catalogue creation, optimistic update and logical archive.
+- [x] Validated CSV template and transactional import of at most 50 records.
 - [x] D1 asset-review queue with role checks and optimistic concurrency.
 - [x] Atomic asset, review-history and audit-event mutation batches.
 - [x] D1 migrations and synthetic unit fixtures.
@@ -21,7 +23,7 @@ This file records only the capabilities present in the current public branch.
 
 ## Demonstration-only
 
-Local catalogue records, prices, stock, review assets, compatibility results and the 3D scene are synthetic UI fixtures. Production catalogue and review routes read D1 records, but the repository contains no merchant records and does not provide catalogue onboarding. Private uploads, provider generation, compatibility decisions and exports remain inactive.
+Local catalogue records, prices, stock, review assets, compatibility results and the 3D scene are synthetic UI fixtures. Production catalogue and review routes use workspace-scoped D1 records, but the repository contains no merchant records. Private uploads, provider generation, compatibility decisions and exports remain inactive.
 
 ## Release checks
 

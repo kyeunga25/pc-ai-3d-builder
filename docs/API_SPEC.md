@@ -9,7 +9,7 @@ Public lightweight health check.
 ```json
 {
   "status": "ok",
-  "service": "app",
+  "service": "rigstage",
   "requestId": "generated-per-request"
 }
 ```
@@ -28,7 +28,25 @@ Uses the same authentication and workspace resolution path and returns only the 
 
 ## `GET /api/catalogue`
 
-Returns active catalogue parts from the resolved workspace. `limit` defaults to 50 and is bounded to 100. `cursor` is the last returned record ID; `category` accepts only a known component category. The response contains `items` and a nullable `nextCursor`.
+Returns active catalogue parts from the resolved workspace. `limit` defaults to 50 and is bounded to 100. `cursor` is the last returned record ID; `category` accepts only a known component category. Each record includes structured specifications, their verification status and a non-negative record version. The response contains `items` and a nullable `nextCursor`.
+
+## `POST /api/catalogue`
+
+Creates one active catalogue part in the resolved workspace. Viewer roles cannot mutate. The JSON body is limited to 32 KiB and must contain a valid SKU, category, manufacturer, model, HKD price in minor units, consistent stock status and count, structured specifications and their verification status. SKU values are unique within a workspace.
+
+The catalogue row and a minimal audit event are submitted in one D1 batch. The response is the created record with version `0`.
+
+## `POST /api/catalogue/import`
+
+Imports a CSV document using `Content-Type: text/csv`. The body is limited to 256 KiB and must contain the exact documented template headers and between 1 and 50 valid rows. Duplicate SKU values within the document or the resolved workspace reject the complete import.
+
+Every catalogue insert and its minimal audit event are submitted in one transactional D1 batch. The route never partially imports a rejected document.
+
+## `PATCH /api/catalogue/:partId`
+
+Updates or archives one active catalogue part in the resolved workspace. Viewer roles cannot mutate. Both actions require `expectedVersion`; a stale value fails without overwriting the newer record. Updates accept the same bounded catalogue fields as creation. Archive is a logical state transition and returns no body.
+
+The conditional catalogue update and minimal audit event are submitted in one D1 batch.
 
 ## `GET /api/assets/review-queue`
 
@@ -52,6 +70,6 @@ The conditional asset update, review event and audit event are submitted in one 
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `ASSET_NOT_FOUND`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `ASSET_NOT_FOUND`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.
