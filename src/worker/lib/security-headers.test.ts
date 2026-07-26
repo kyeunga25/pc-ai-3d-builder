@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 
 import { withPublicSecurityHeaders } from "./security-headers";
@@ -27,6 +29,13 @@ describe("withPublicSecurityHeaders", () => {
     );
     expect(response.headers.get("content-security-policy")).toContain(
       "connect-src 'self' blob:",
+    );
+    const staticHeaders = await readFile(
+      new URL("../../../public/_headers", import.meta.url),
+      "utf8",
+    );
+    expect(staticHeaders).toContain(
+      `Content-Security-Policy: ${response.headers.get("content-security-policy")}`,
     );
     await expect(response.text()).resolves.toBe("ok");
   });
