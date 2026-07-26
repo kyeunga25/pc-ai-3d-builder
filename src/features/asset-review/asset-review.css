@@ -104,6 +104,17 @@
   box-shadow: inset 3px 0 var(--accent-cyan);
 }
 
+.source-frame:disabled {
+  opacity: 1;
+}
+
+.source-frame img {
+  width: 100%;
+  height: 100%;
+  min-height: 103px;
+  object-fit: cover;
+}
+
 .source-frame__object {
   display: grid;
   width: 55px;
@@ -213,6 +224,41 @@
     linear-gradient(180deg, #0a0f18 0%, #06080d 72%);
 }
 
+.asset-model-preview {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.asset-model-preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: 0;
+}
+
+.asset-model-preview canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-cyan);
+}
+
+.asset-model-preview__state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  border: 1px solid var(--border-strong);
+  padding: 10px 12px;
+  background: rgba(9, 13, 20, 0.92);
+  color: var(--text-secondary);
+  font-size: 11px;
+  transform: translate(-50%, -50%);
+}
+
+.asset-model-preview__state.is-error {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+  color: var(--danger);
+}
+
 .review-grid {
   position: absolute;
   right: -10%;
@@ -306,6 +352,7 @@
   grid-template-columns: repeat(3, 22px);
   font-family: var(--font-mono);
   font-size: 10px;
+  z-index: 3;
 }
 
 .axis-x {
@@ -332,6 +379,7 @@
   background: rgba(9, 13, 20, 0.88);
   color: var(--text-secondary);
   font-size: 10px;
+  z-index: 3;
 }
 
 .viewport-readout strong {
@@ -352,6 +400,48 @@
 .review-inspector__section {
   border-bottom: 1px solid var(--border-subtle);
   padding: 16px;
+}
+
+.asset-file-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.asset-file-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border-subtle);
+  padding: 9px;
+  background: var(--surface-1);
+}
+
+.asset-file-control > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.asset-file-control strong {
+  font-size: 11px;
+}
+
+.asset-file-control span,
+.asset-file-controls > small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.asset-file-control .button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.asset-file-control .button svg {
+  width: 14px;
 }
 
 .technical-list {

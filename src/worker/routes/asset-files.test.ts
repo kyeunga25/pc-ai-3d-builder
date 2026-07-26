@@ -1,0 +1,256 @@
+import { describe, expect, it } from "vitest";
+
+import type { WorkspaceRole } from "../../shared/domain/session";
+import type { RequestContext } from "../auth/workspace";
+import { createD1Stub } from "../test/d1-stub";
+import {
+  assetFileResponse,
+  assetFileUploadResponse,
+  createAssetSourceResponse,
+} from "./asset-files";
+
+function context(role: WorkspaceRole = "owner"): RequestContext {
+  return {
+    user: {
+      id: "user-fixture",
+      email: "fixture@example.com",
+      displayName: "Fixture User",
+    },
+    currentWorkspace: {
+      id: "workspace-fixture",
+      slug: "fixture",
+      name: "Fixture",
+      locale: "zh-Hant-HK",
+      currency: "HKD",
+      role,
+    },
+    workspaces: [],
+  };
+}
+
+function minimalGlb(): Uint8Array {
+  const rawJson = new TextEncoder().encode(
+    JSON.stringify({ asset: { version: "2.0" }, scenes: [{}], scene: 0 }),
+  );
+  const paddedLength = Math.ceil(rawJson.byteLength / 4) * 4;
+  const bytes = new Uint8Array(20 + paddedLength);
+  bytes.set([0x67, 0x6c, 0x54, 0x46]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, bytes.byteLength, true);
+  view.setUint32(12, paddedLength, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  bytes.fill(0x20, 20);
+  bytes.set(rawJson, 20);
+  return bytes;
+}
+
+function assetRow(overrides: Record<string, unknown> = {}) {
+  return {
+    asset_id: "asset-fixture",
+    part_id: "part-fixture",
+    sku: "FIXTURE-001",
+    manufacturer: "Fixture",
+    model: "Review Part",
+    status: "draft",
+    quality: "unreviewed",
+    source_kind: "uploaded",
+    completed_checks_json: "[]",
+    source_rights_confirmed: 0,
+    verified_width_mm: null,
+    verified_height_mm: null,
+    verified_depth_mm: null,
+    review_version: 0,
+    source_object_key: "private/source-fixture",
+    source_content_type: "image/png",
+    source_size_bytes: 8,
+    source_sha256: "a".repeat(64),
+    model_object_key: null,
+    model_content_type: null,
+    model_size_bytes: null,
+    model_sha256: null,
+    ...overrides,
+  };
+}
+
+function createR2Stub(initial: Array<{ key: string; bytes: Uint8Array }> = []) {
+  const objects = new Map(initial.map(({ key, bytes }) => [key, bytes]));
+  const puts: string[] = [];
+  const deletes: string[] = [];
+  const bucket = {
+    async put(key: string, value: Uint8Array) {
+      puts.push(key);
+      objects.set(key, value);
+      return { key };
+    },
+    async get(key: string) {
+      const bytes = objects.get(key);
+      if (!bytes) {
+        return null;
+      }
+      return {
+        body: new Response(bytes.buffer as ArrayBuffer).body,
+        size: bytes.byteLength,
+      };
+    },
+    async delete(key: string) {
+      deletes.push(key);
+      objects.delete(key);
+    },
+  } as unknown as R2Bucket;
+  return { bucket, deletes, objects, puts };
+}
+
+describe("private asset routes", () => {
+  it("creates a workspace-scoped draft after validating and storing a source image", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [{ id: "part-fixture" }, null, assetRow()],
+    });
+    const { bucket, puts } = createR2Stub();
+    const source = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    const request = new Request(
+      "https://app.example/api/catalogue/part-fixture/assets/source",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: source.buffer as ArrayBuffer,
+      },
+    );
+
+    const response = await createAssetSourceResponse(
+      request,
+      db,
+      bucket,
+      context("staff"),
+      "part-fixture",
+      "request-fixture",
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "asset-fixture",
+      files: {
+        source: { contentType: "image/png", sizeBytes: 8 },
+        model: null,
+      },
+    });
+    expect(puts).toHaveLength(1);
+    const auditCall = calls.find((call) =>
+      call.sql.includes("asset.file.source.create"),
+    );
+    expect(auditCall?.sql).toContain("changes() = 1");
+    expect(auditCall?.values.join(" ")).not.toContain("workspaces/");
+  });
+
+  it("rejects viewer uploads before reading or storing a file", async () => {
+    const { calls, db } = createD1Stub();
+    const { bucket, puts } = createR2Stub();
+    const request = new Request(
+      "https://app.example/api/catalogue/part-fixture/assets/source",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: new Uint8Array([0x89]).buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      createAssetSourceResponse(
+        request,
+        db,
+        bucket,
+        context("viewer"),
+        "part-fixture",
+        "request-fixture",
+      ),
+    ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
+    expect(calls).toHaveLength(0);
+    expect(puts).toHaveLength(0);
+  });
+
+  it("uploads a GLB with an optimistic version and removes the replaced object", async () => {
+    const glb = minimalGlb();
+    const updated = assetRow({
+      review_version: 1,
+      model_object_key: "private/new-model",
+      model_content_type: "model/gltf-binary",
+      model_size_bytes: glb.byteLength,
+      model_sha256: "b".repeat(64),
+    });
+    const { calls, db } = createD1Stub({
+      firstResults: [
+        assetRow({ model_object_key: "private/old-model" }),
+        updated,
+      ],
+    });
+    const { bucket, deletes, puts } = createR2Stub([
+      { key: "private/old-model", bytes: glb },
+    ]);
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/files/model",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "model/gltf-binary",
+          "x-rigstage-expected-version": "0",
+        },
+        body: glb.buffer as ArrayBuffer,
+      },
+    );
+
+    const response = await assetFileUploadResponse(
+      request,
+      db,
+      bucket,
+      context(),
+      "asset-fixture",
+      "model",
+      "request-fixture",
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      version: 1,
+      files: {
+        model: {
+          contentType: "model/gltf-binary",
+          sizeBytes: glb.byteLength,
+        },
+      },
+    });
+    expect(puts).toHaveLength(1);
+    expect(deletes).toEqual(["private/old-model"]);
+    expect(
+      calls.find((call) => call.values.includes("asset.file.model.upload"))
+        ?.sql,
+    ).toContain("changes() = 1");
+  });
+
+  it("streams a private file only after a workspace-scoped asset lookup", async () => {
+    const source = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    const { calls, db } = createD1Stub({
+      firstResults: [assetRow()],
+    });
+    const { bucket } = createR2Stub([
+      { key: "private/source-fixture", bytes: source },
+    ]);
+
+    const response = await assetFileResponse(
+      db,
+      bucket,
+      context("viewer"),
+      "asset-fixture",
+      "source",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect((await response.arrayBuffer()).byteLength).toBe(8);
+    expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
+  });
+});

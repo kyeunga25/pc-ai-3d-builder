@@ -21,6 +21,7 @@ export type CatalogueRow = {
   specifications_json: string;
   specification_status: string;
   record_version: number;
+  asset_id: string | null;
   asset_quality: string | null;
   asset_review_status: string | null;
 };
@@ -103,6 +104,7 @@ export function mapCatalogueRow(row: CatalogueRow): CatalogPart {
     stockCount: row.stock_count,
     specifications,
     specificationStatus: row.specification_status,
+    assetId: row.asset_id,
     assetQuality: row.asset_quality ?? "unreviewed",
     assetStatus: mapAssetStatus(row.asset_review_status),
     verified: row.specification_status === "verified",
@@ -116,6 +118,7 @@ export const catalogueSelect = `SELECT p.id, p.sku, p.category,
                                        p.specifications_json,
                                        p.specification_status,
                                        p.record_version,
+                                       a.id AS asset_id,
                                        a.quality AS asset_quality,
                                        a.status AS asset_review_status
                                 FROM catalog_parts AS p

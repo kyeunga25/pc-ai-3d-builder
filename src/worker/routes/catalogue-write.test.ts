@@ -44,6 +44,7 @@ const catalogueRow = {
   specifications_json: '{"formFactor":"ATX"}',
   specification_status: "verified",
   record_version: 0,
+  asset_id: null,
   asset_quality: null,
   asset_review_status: null,
 };
@@ -148,7 +149,8 @@ describe("catalogue writes", () => {
       calls.some(
         (call) =>
           call.sql.includes("INSERT INTO audit_events") &&
-          call.values.includes("catalogue.part.create"),
+          call.values.includes("catalogue.part.create") &&
+          call.sql.includes("changes() = 1"),
       ),
     ).toBe(true);
   });

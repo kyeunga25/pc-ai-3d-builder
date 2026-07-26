@@ -1,6 +1,6 @@
 # Product behavior
 
-RigStage is an invite-only browser workspace for computer merchants. The current public build provides workspace-scoped catalogue onboarding and human asset-review decisions while retaining synthetic local fixtures and a synthetic PC assembly interface.
+RigStage is an invite-only browser workspace for computer merchants. The current public build provides workspace-scoped catalogue onboarding, private visual-asset files and human review decisions while retaining synthetic local fixtures and a synthetic PC assembly interface.
 
 ## Implemented behavior
 
@@ -12,6 +12,8 @@ RigStage is an invite-only browser workspace for computer merchants. The current
 - Validated CSV template download and transactional import of at most 50 catalogue records.
 - Draft saves for staff, with approval and rejection reserved for owner or admin roles.
 - Optimistic asset versions and append-only review and audit events.
+- Private source-image and GLB upload with signature, MIME and size validation.
+- Authorized private-file reads and manual Three.js GLB inspection without permanent object URLs.
 - Synthetic compatibility and build status presentation.
 - Clear draft, review and approved labels for visual assets.
 - Human approval remains mandatory before generated material is treated as usable.
@@ -22,7 +24,7 @@ RigStage is an invite-only browser workspace for computer merchants. The current
 - A visual mesh never establishes compatibility.
 - Prices, inventory and components shown in local development are fictional.
 - No public marketplace, payment flow or customer-data collection is enabled.
-- Private uploads, real provider generation and complete build export are not enabled in this release.
+- Real provider generation and complete build export are not enabled in this release.
 
 ## Data handling
 

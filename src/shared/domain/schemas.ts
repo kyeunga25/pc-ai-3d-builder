@@ -73,6 +73,7 @@ export const catalogPartSchema = z.object({
   stockCount: z.number().int().nonnegative().nullable(),
   specifications: catalogueSpecificationsSchema,
   specificationStatus: specificationStatusSchema,
+  assetId: z.string().min(1).nullable(),
   assetQuality: assetQualitySchema,
   assetStatus: z.enum(["approved", "needs_review", "draft", "proxy"]),
   verified: z.boolean(),

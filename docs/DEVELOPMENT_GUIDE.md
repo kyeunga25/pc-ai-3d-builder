@@ -10,7 +10,8 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - D1 workspace membership, catalogue, asset-review history and audit schema.
 - Workspace-scoped catalogue and asset-review APIs with bounded reads and mutation bodies.
 - Catalogue create, optimistic update, logical archive and transactional CSV import.
-- Private R2 and Workflow bindings reserved for approved asset workflows.
+- Private R2 source-image and GLB storage with protected Worker reads.
+- Lazy-loaded Three.js GLB preview and a Workflow binding reserved for provider generation.
 - Synthetic local UI fixtures for catalogue, review and builder demonstrations.
 
 ## Invariants
@@ -19,6 +20,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - An Access subject may bind to one invited user only.
 - Provider keys and Cloudflare deployment identifiers never reach the browser or Git.
 - Original images, generated models and render outputs remain private.
+- Browser responses never expose R2 object keys, checksums or permanent object URLs.
 - Generated meshes remain drafts until explicit human approval.
 - Asset-review writes require an authorized role and the current review version.
 - Catalogue writes require an authorized role and the current record version for existing rows.

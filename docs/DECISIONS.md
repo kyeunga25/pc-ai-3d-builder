@@ -20,7 +20,9 @@ Viewer roles remain read-only. Catalogue creation, update and logical archive us
 
 ## Private object storage
 
-Original images, generated models and render outputs use a private object binding. The browser does not receive provider keys or permanent public object URLs.
+Original images, uploaded GLB models and future render outputs use a private object binding. The browser receives file bytes only after Access and workspace verification, then uses a short-lived blob URL for the current page. It does not receive object keys, checksums, provider keys or permanent public object URLs.
+
+Uploads are bounded to 10 MiB for JPEG, PNG or WebP source images and 25 MiB for self-contained glTF 2.0 GLB models. Replacing a file increments the review version and resets all checklist and dimension evidence.
 
 ## Bounded asynchronous work
 
