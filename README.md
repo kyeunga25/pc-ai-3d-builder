@@ -2,7 +2,11 @@
 
 RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.0 提供受保護的產品目錄、私人素材審核、持久化 PC Builder、可解釋相容性規則、已核准模型預覽及安全 JSON 匯出。
 
-最新公開版本：`v1.0.0`。
+最新公開版本：`v1.0.1`。
+
+## English summary
+
+RigStage is an invite-only PC catalogue, private visual-asset review and 3D assembly workspace built with React and Cloudflare Workers. Version 1.0 provides workspace-scoped onboarding, human-approved GLB previews, persistent builds, deterministic compatibility evidence and privacy-bounded export.
 
 ## 現有功能
 
@@ -69,7 +73,7 @@ Cloudflare Workers Builds 會自動提供 Worker 名稱 override；其他 CI 環
 
 Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets。
 
-身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
+身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
 
 ## 安全邊界
 

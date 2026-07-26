@@ -1,0 +1,55 @@
+name: Bug report
+description: 回報可重現的程式錯誤 / Report a reproducible software defect
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        請只使用合成資料、placeholder identifier 及已遮蔽的 log。安全漏洞請使用 Security tab 私人回報。
+
+        Use synthetic data, placeholder identifiers, and redacted logs only. Report vulnerabilities privately through the Security tab.
+  - type: textarea
+    id: summary
+    attributes:
+      label: 問題摘要 / Summary
+      description: 說明發生了甚麼及受影響的公開功能。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 重現步驟 / Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期結果 / Expected result
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 測試環境 / Test environment
+      description: 只提供瀏覽器及作業系統版本；不要加入帳戶或部署資料。
+      placeholder: Firefox 128, macOS 15
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 已遮蔽證據 / Redacted evidence
+      description: 可選填已移除私人及部署識別資料的截圖或 log。
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 私隱確認 / Privacy confirmation
+      options:
+        - label: I removed personal data, credentials, deployment identifiers, actual resource names, private URLs and production records.
+          required: true
