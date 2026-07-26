@@ -2,7 +2,7 @@
 
 The current public release accepts one private source image and one self-contained GLB per visual-asset record. Production validates the declared MIME type, binary signature and bounded size before storing an opaque R2 object key in workspace-scoped D1 metadata. Authorized reads stream the object through the Worker without exposing its key, checksum or a permanent URL.
 
-The browser creates short-lived blob URLs for the current page and lazy-loads Three.js only when a GLB is available. Camera presets and orbit controls support manual visual inspection. A GLB remains a draft until an owner or admin completes every checklist item and supplies human-verified dimensions.
+The browser creates short-lived blob URLs for the current page and lazy-loads Three.js only when a GLB is available. Camera presets, fit-to-view, shaded, wireframe and static controls support manual visual inspection. After approval, the builder may retrieve the currently selected component through the same protected route; changing the selection revokes the previous object URL. A GLB remains a draft until an owner or admin completes every checklist item and supplies human-verified dimensions.
 
 Review mutations use a fixed checklist, bounded human-verified dimensions, role checks and an expected version. Asset state, review history and the minimal audit event are committed together. Approval remains a visual-asset decision only and never establishes compatibility.
 

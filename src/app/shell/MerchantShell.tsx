@@ -1,11 +1,4 @@
-import {
-  Boxes,
-  ChevronDown,
-  Cuboid,
-  Gauge,
-  Settings,
-  Wrench,
-} from "lucide-react";
+import { Boxes, ChevronDown, Cuboid, Gauge, Wrench } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 
 import {
@@ -63,16 +56,13 @@ export function MerchantShell() {
           <span className="status-dot" aria-hidden="true" />
           已驗證 · {roleLabels[currentWorkspace.role]}
         </div>
-        <button className="icon-button" type="button" aria-label="開啟設定">
-          <Settings aria-hidden="true" />
-        </button>
-        <button
+        <span
           className="account-button"
-          type="button"
-          aria-label="開啟帳戶選單"
+          aria-label={`${user.displayName} 帳戶`}
+          title={user.displayName}
         >
           {accountInitials(user.displayName, user.email)}
-        </button>
+        </span>
       </header>
 
       <aside className="merchant-nav" aria-label="商戶導覽列">
@@ -92,14 +82,9 @@ export function MerchantShell() {
           ))}
         </nav>
         <div className="merchant-nav__footer">
-          <span>目錄覆蓋率</span>
-          <strong>18 / 24 項已核准</strong>
-          <div
-            className="progress-track"
-            aria-label="產品目錄覆蓋率百分之七十五"
-          >
-            <span style={{ width: "75%" }} />
-          </div>
+          <span>目前工作空間</span>
+          <strong>{currentWorkspace.name}</strong>
+          <small>{roleLabels[currentWorkspace.role]} · 私人資料範圍</small>
         </div>
       </aside>
 

@@ -1,4 +1,4 @@
-# Public release status — v0.5.0
+# Public release status — v1.0.0
 
 This file records only the capabilities present in the current public branch.
 
@@ -7,6 +7,7 @@ This file records only the capabilities present in the current public branch.
 - [x] React, Vite and TypeScript application shell.
 - [x] Traditional Chinese merchant interface with responsive and reduced-motion behavior.
 - [x] Dashboard, catalogue, asset-review and lazy-loaded builder routes.
+- [x] Live read-only dashboard metrics and recent work from the resolved workspace.
 - [x] Cloudflare Worker health endpoint and Static Assets delivery.
 - [x] Cloudflare Access verification and D1 workspace membership enforcement.
 - [x] Concurrent identity-binding protection.
@@ -18,9 +19,11 @@ This file records only the capabilities present in the current public branch.
 - [x] Private R2 source-image and GLB upload with bounded binary validation.
 - [x] Access- and workspace-protected private-file streaming.
 - [x] Lazy-loaded Three.js GLB preview with manual camera controls.
+- [x] Builder preview of the selected component's approved private GLB with short-lived object URLs.
 - [x] File replacement resets review evidence and removes one superseded object.
 - [x] Atomic asset, review-history and audit-event mutation batches.
 - [x] Explicit workspace-scoped build creation, switching and optimistic persistence.
+- [x] Two-step logical archive for build drafts.
 - [x] One selected catalogue part per component category, bounded to nine categories.
 - [x] Six deterministic compatibility rules with bilingual evidence and fail-closed unknown states.
 - [x] Portable JSON export without identity, workspace, pricing, stock, private-asset or deployment fields.
@@ -30,9 +33,9 @@ This file records only the capabilities present in the current public branch.
 - [x] Local check, test, build and deployment dry-run commands.
 - [x] Production deploy command applies pending D1 migrations before Worker upload.
 
-## Demonstration-only
+## Explicit boundaries
 
-Local catalogue records, prices, stock, review assets and the builder scene are synthetic UI fixtures. Production catalogue, private-file, review and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility and portable export are active; external provider generation and multi-model 3D scene composition remain inactive.
+Local catalogue records, prices, stock, review assets and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. External provider generation and multi-model 3D scene composition are not v1.0 capabilities.
 
 ## Release checks
 

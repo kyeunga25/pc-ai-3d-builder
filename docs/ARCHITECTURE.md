@@ -28,6 +28,10 @@ D1 stores identity, workspace metadata, workspace-scoped catalogue records, priv
 
 The R2 binding stores validated source images and self-contained GLB models under opaque keys. Objects are readable only through Access- and workspace-protected Worker routes; no bucket or permanent object URL is public. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
 
+## Dashboard
+
+The dashboard performs workspace-scoped aggregate reads only. Catalogue and asset counts are derived by bounded SQL queries. Compatibility readiness is evaluated from at most the latest 50 active build drafts and their selected catalogue records; the response returns at most six recent work items. It never creates a draft, appends an audit row or returns user identity.
+
 ## Catalogue and asset review
 
 Catalogue reads are bounded to 100 rows per request and use an ID cursor. Staff, admin and owner roles may create, update or logically archive catalogue records; viewers remain read-only. Updates use optimistic record versions, and CSV imports validate at most 50 rows before submitting all catalogue and audit statements in one transactional D1 batch. The client-provided workspace header never becomes a database scope directly; the verified request context supplies the workspace predicate.
@@ -44,6 +48,8 @@ Compatibility is calculated at read time from current, verified structured speci
 
 Portable export is a read-only response and is blocked while any rule is `error` or `unknown`. The JSON contains product identity, verified specifications and bilingual rule evidence only. It omits build and workspace IDs, users, pricing, stock, asset metadata, R2 locations and deployment configuration.
 
+The builder may preview the currently selected component only when its asset is approved. It retrieves the model through the same protected private-file route used by review, creates a page-local object URL and revokes it when the selection changes. The GLB remains visual evidence only and never changes a compatibility result.
+
 ## Privacy and observability
 
 Logs contain request method, path, status, duration, request ID and stable error code only. They exclude JWTs, cookies, email addresses, prompts, provider responses and private object locations.
@@ -52,4 +58,4 @@ Tracked Wrangler configuration is a non-operational template. Actual deployment 
 
 ## Frontend
 
-The application uses feature-oriented React modules. The builder route is lazy-loaded so the general shell does not require its code before navigation. Its production state loads bounded catalogue and build APIs; local development uses explicit synthetic fixtures. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.
+The application uses feature-oriented React modules. The builder route is lazy-loaded so the general shell does not require its code before navigation; Three.js is loaded only when a private GLB is available. Production dashboard, catalogue, review and builder states use protected APIs, while local development uses explicit synthetic fixtures. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.

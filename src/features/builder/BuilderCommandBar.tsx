@@ -1,7 +1,7 @@
 import {
+  Archive,
   ChevronDown,
   CircleCheck,
-  Eye,
   PanelRightOpen,
   Plus,
 } from "lucide-react";
@@ -18,9 +18,11 @@ export function BuilderCommandBar({
   buildId,
   builds,
   canWrite,
+  archiveArmed,
   onBuildNameChange,
   onBuildSelect,
   onCreateBuild,
+  onArchiveBuild,
   onOpenInspector,
 }: {
   saveState: string;
@@ -28,9 +30,11 @@ export function BuilderCommandBar({
   buildId: string;
   builds: BuildListItem[];
   canWrite: boolean;
+  archiveArmed: boolean;
   onBuildNameChange: (name: string) => void;
   onBuildSelect: (buildId: string) => void;
   onCreateBuild: () => void;
+  onArchiveBuild: () => void;
   onOpenInspector: () => void;
 }) {
   const { currentWorkspace, user } = useAuthenticatedSession();
@@ -41,13 +45,12 @@ export function BuilderCommandBar({
         <BrandMark compact />
       </Link>
 
-      <button className="command-workspace" type="button">
+      <div className="command-workspace">
         <span>
           <small>工作空間</small>
           {currentWorkspace.name}
         </span>
-        <ChevronDown aria-hidden="true" />
-      </button>
+      </div>
 
       <div className="command-build">
         <label>
@@ -73,14 +76,27 @@ export function BuilderCommandBar({
           onChange={(event) => onBuildNameChange(event.target.value)}
         />
         {canWrite ? (
-          <button
-            className="icon-button command-new-build"
-            type="button"
-            aria-label="建立新組裝"
-            onClick={onCreateBuild}
-          >
-            <Plus aria-hidden="true" />
-          </button>
+          <>
+            <button
+              className="icon-button command-new-build"
+              type="button"
+              aria-label="建立新組裝"
+              onClick={onCreateBuild}
+            >
+              <Plus aria-hidden="true" />
+            </button>
+            <button
+              className={`icon-button command-archive-build${
+                archiveArmed ? " is-armed" : ""
+              }`}
+              type="button"
+              aria-label={archiveArmed ? "確認封存目前組裝" : "封存目前組裝"}
+              title={archiveArmed ? "再次按下以確認封存" : "封存目前組裝"}
+              onClick={onArchiveBuild}
+            >
+              <Archive aria-hidden="true" />
+            </button>
+          </>
         ) : null}
       </div>
 
@@ -88,19 +104,6 @@ export function BuilderCommandBar({
         <CircleCheck aria-hidden="true" />
         {saveState}
       </span>
-
-      <label className="command-view">
-        <Eye aria-hidden="true" />
-        <span>
-          <small>檢視預設</small>
-          <select defaultValue="組裝">
-            <option>組裝</option>
-            <option>展示</option>
-            <option>淨空空間</option>
-          </select>
-        </span>
-        <ChevronDown aria-hidden="true" />
-      </label>
 
       <button
         className="button command-inspector-button"
@@ -111,13 +114,13 @@ export function BuilderCommandBar({
         檢查器
       </button>
 
-      <button
+      <span
         className="account-button"
-        type="button"
-        aria-label="開啟帳戶選單"
+        aria-label={`${user.displayName} 帳戶`}
+        title={user.displayName}
       >
         {accountInitials(user.displayName, user.email)}
-      </button>
+      </span>
     </header>
   );
 }

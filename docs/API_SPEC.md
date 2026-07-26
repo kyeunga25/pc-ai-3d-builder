@@ -26,6 +26,10 @@ The request may include `X-RigStage-Workspace-Id`. The Worker treats it only as 
 
 Uses the same authentication and workspace resolution path and returns only the caller's active workspace summaries.
 
+## `GET /api/dashboard`
+
+Returns read-only counts for the resolved workspace: active and verified catalogue records, approved and pending visual assets, draft builds, and compatibility readiness across the latest 50 drafts. Recent work combines at most six asset-review or build items. The route performs no writes, appends no audit event and returns no user identity.
+
 ## `GET /api/catalogue`
 
 Returns active catalogue parts from the resolved workspace. `limit` defaults to 50 and is bounded to 100. `cursor` is the last returned record ID; `category` accepts only a known component category. Each record includes structured specifications, their verification status and a non-negative record version. The response contains `items` and a nullable `nextCursor`.

@@ -1,5 +1,4 @@
 import {
-  Axis3D,
   Box,
   Camera,
   Check,
@@ -56,7 +55,7 @@ import {
 import "./asset-review.css";
 
 const AssetModelPreview = lazy(async () => {
-  const module = await import("./AssetModelPreview");
+  const module = await import("../../shared/components/AssetModelPreview");
   return { default: module.AssetModelPreview };
 });
 
@@ -167,6 +166,10 @@ export function AssetReviewPage() {
     ? (localNavigationState?.localAsset ?? reviewAsset)
     : null;
   const [camera, setCamera] = useState("等角");
+  const [modelRenderMode, setModelRenderMode] = useState<
+    "shaded" | "wireframe"
+  >("shaded");
+  const [modelResetToken, setModelResetToken] = useState(0);
   const [form, setForm] = useState<ReviewForm | null>(() =>
     initialAsset ? createReviewForm(initialAsset) : null,
   );
@@ -679,6 +682,7 @@ export function AssetReviewPage() {
                   key={preset}
                   type="button"
                   aria-pressed={camera === preset}
+                  disabled={!visibleFileUrls.model}
                   onClick={() => setCamera(preset)}
                 >
                   {preset}
@@ -686,13 +690,28 @@ export function AssetReviewPage() {
               ))}
             </div>
             <div>
-              <button type="button" aria-label="切換座標軸顯示">
-                <Axis3D aria-hidden="true" />
-              </button>
-              <button type="button" aria-label="切換邊界框顯示">
+              <button
+                type="button"
+                aria-label="調整模型至合適視野"
+                disabled={!visibleFileUrls.model}
+                onClick={() => {
+                  setCamera("等角");
+                  setModelResetToken((token) => token + 1);
+                }}
+              >
                 <Scan aria-hidden="true" />
               </button>
-              <button type="button" aria-label="切換線框顯示">
+              <button
+                type="button"
+                aria-label="切換線框顯示"
+                aria-pressed={modelRenderMode === "wireframe"}
+                disabled={!visibleFileUrls.model}
+                onClick={() =>
+                  setModelRenderMode((mode) =>
+                    mode === "wireframe" ? "shaded" : "wireframe",
+                  )
+                }
+              >
                 <Cuboid aria-hidden="true" />
               </button>
             </div>
@@ -710,6 +729,8 @@ export function AssetReviewPage() {
                 <AssetModelPreview
                   key={visibleFileUrls.model}
                   cameraPreset={camera}
+                  renderMode={modelRenderMode}
+                  resetToken={modelResetToken}
                   url={visibleFileUrls.model}
                 />
               </Suspense>

@@ -25,6 +25,8 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
 - Build reads and writes are workspace-scoped; explicit writes use bounded selections, optimistic versions and guarded D1 batches.
 - Build export fails closed on hard errors or unknown compatibility results and excludes identities, workspace identifiers, prices, stock, private assets and deployment data.
+- Dashboard aggregates are bounded, workspace-scoped and read-only; they do not append audit records or expose user identity data.
+- Builder model previews request only an approved asset through the protected Worker route and revoke the short-lived object URL when the selected part changes.
 - API responses use `no-store`; static and API responses receive restrictive security headers.
 - Unexpected exceptions are logged with a stable code rather than raw error text.
 - Production source maps and Wrangler telemetry are disabled.

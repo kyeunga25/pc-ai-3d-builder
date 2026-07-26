@@ -8,10 +8,10 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Cloudflare Worker serving Static Assets and a small API.
 - Cloudflare Access identity verification.
 - D1 workspace membership, catalogue, asset-review history, persistent build and audit schema.
-- Workspace-scoped catalogue, asset-review and build APIs with bounded reads and mutation bodies.
+- Workspace-scoped dashboard, catalogue, asset-review and build APIs with bounded reads and mutation bodies.
 - Catalogue create, optimistic update, logical archive and transactional CSV import.
 - Private R2 source-image and GLB storage with protected Worker reads.
-- Lazy-loaded Three.js GLB preview and a Workflow binding reserved for provider generation.
+- Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow binding reserved for provider generation.
 - Deterministic build compatibility and sanitized portable JSON export.
 - Synthetic local UI fixtures for catalogue, review and builder demonstrations.
 
@@ -30,6 +30,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Compatibility is determined from structured, verified specifications, never inferred from a visual mesh.
 - Long-running work must be asynchronous and idempotent.
 - Read-only requests must not create unbounded database writes.
+- Dashboard reads must remain bounded and must not append audit events.
 - Tests and documentation use synthetic identities and data.
 
 ## Code organization

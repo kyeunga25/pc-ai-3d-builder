@@ -20,9 +20,11 @@ Every data-dependent screen must represent loading, empty and error states. Synt
 
 Asset status uses explicit text labels. A draft cannot be presented as approved. Compatibility errors, warnings and information use separate icons and text in addition to colour.
 
+The production dashboard must use protected workspace data and must not present fixed catalogue, review, timing or readiness claims. Controls without an available model or permitted action remain visibly disabled. Logical archive requires a separate confirmation action and never masquerades as permanent deletion.
+
 ## Performance
 
-The builder route is lazy-loaded. UI navigation must remain usable before any 3D code or private asset is available. A static placeholder remains available when no approved model has loaded.
+The builder route is lazy-loaded. UI navigation must remain usable before any 3D code or private asset is available. Three.js loads only when a protected GLB is decoded. A static placeholder remains available when no approved model has loaded.
 
 ## Visual tokens
 
