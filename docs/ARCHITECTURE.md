@@ -4,17 +4,19 @@
 
 ```text
 Browser
-  -> Cloudflare Access
-  -> Worker
-     -> public health route
-     -> verified Access identity
-     -> subject-keyed rate limit
-     -> D1 invited user and active memberships
-     -> workspace-scoped API response
-  -> Static Assets binding
+  -> public static landing page
+  -> protected workspace route
+     -> Cloudflare Access
+     -> Worker
+        -> protected API request
+        -> verified Access identity
+        -> subject-keyed rate limit
+        -> D1 invited user and active memberships
+        -> workspace-scoped API response
+  -> Static Assets binding for the React application
 ```
 
-The Worker handles `/api/*` before falling back to the built Vite application. Static Assets use single-page-application fallback.
+The Worker handles `/api/*` before falling back to the built Vite application. Static Assets use single-page-application fallback. The `/` route is a static product introduction and makes no session request. Navigation to `/dashboard` is a full-page request so the configured Access application can perform its browser login flow before the protected React workspace loads.
 
 ## Authentication and tenancy
 
@@ -58,4 +60,4 @@ Tracked Wrangler configuration is a non-operational template. Actual deployment 
 
 ## Frontend
 
-The application uses feature-oriented React modules. The builder route is lazy-loaded so the general shell does not require its code before navigation; Three.js is loaded only when a private GLB is available. Production dashboard, catalogue, review and builder states use protected APIs, while local development uses explicit synthetic fixtures. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.
+The application uses feature-oriented React modules. The public landing route sits outside `SessionProvider`, so it cannot trigger a protected session read. Dashboard, catalogue, review and builder routes mount the session gate before rendering workspace content. The builder route is lazy-loaded so the general shell does not require its code before navigation; Three.js is loaded only when a private GLB is available. Production dashboard, catalogue, review and builder states use protected APIs, while local development uses explicit synthetic fixtures. Semantic controls, visible focus states, responsive layouts and reduced-motion rules are part of the shared design system.

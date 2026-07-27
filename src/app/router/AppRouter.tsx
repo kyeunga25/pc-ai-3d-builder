@@ -1,10 +1,13 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Navigate, Outlet, Route, Routes } from "react-router";
 
 import { MerchantShell } from "../shell/MerchantShell";
 import { AssetReviewPage } from "../../features/asset-review/AssetReviewPage";
+import { SessionGate } from "../../features/auth/SessionGate";
+import { SessionProvider } from "../../features/auth/SessionProvider";
 import { CataloguePage } from "../../features/catalogue/CataloguePage";
 import { DashboardPage } from "../../features/dashboard/DashboardPage";
+import { LandingPage } from "../../features/landing/LandingPage";
 import { LoadingState } from "../../shared/components/AsyncState";
 
 const BuilderPage = lazy(async () => {
@@ -12,26 +15,38 @@ const BuilderPage = lazy(async () => {
   return { default: module.BuilderPage };
 });
 
+function ProtectedWorkspace() {
+  return (
+    <SessionProvider>
+      <SessionGate>
+        <Outlet />
+      </SessionGate>
+    </SessionProvider>
+  );
+}
+
 export function AppRouter() {
   return (
     <Routes>
-      <Route element={<MerchantShell />}>
-        <Route index element={<Navigate replace to="/dashboard" />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/catalogue" element={<CataloguePage />} />
-        <Route path="/asset-review" element={<AssetReviewPage />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route element={<ProtectedWorkspace />}>
+        <Route element={<MerchantShell />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/catalogue" element={<CataloguePage />} />
+          <Route path="/asset-review" element={<AssetReviewPage />} />
+        </Route>
+        <Route
+          path="/builder"
+          element={
+            <Suspense
+              fallback={<LoadingState label="正在載入電腦組裝工作空間" />}
+            >
+              <BuilderPage />
+            </Suspense>
+          }
+        />
       </Route>
-      <Route
-        path="/builder"
-        element={
-          <Suspense
-            fallback={<LoadingState label="正在載入電腦組裝工作空間" />}
-          >
-            <BuilderPage />
-          </Suspense>
-        }
-      />
-      <Route path="*" element={<Navigate replace to="/dashboard" />} />
+      <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
   );
 }

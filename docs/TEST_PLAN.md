@@ -44,6 +44,8 @@ Apply all numbered migrations to an empty temporary SQLite database and confirm 
 
 Test the built application at desktop and tablet widths. Confirm:
 
+- `/` 在不建立 session 的情況下顯示完整產品介紹，並以 top-level navigation 導向 `/dashboard` 登入入口；
+- 首頁的流程、安全邊界及 invite-only 指引在桌面和 390 px 均完整可讀；
 - the authentication loading and failure states are readable;
 - every navigation item is keyboard reachable;
 - the builder route loads lazily;

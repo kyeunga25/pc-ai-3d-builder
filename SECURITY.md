@@ -4,13 +4,14 @@
 
 Security fixes apply to the latest code on the default branch.
 
-The current application is invite-only. Production use requires a Cloudflare Access application, valid Worker secrets, a migrated D1 database and an explicitly created workspace membership. The repository does not contain production account identifiers, resource names, user records or private assets.
+The workspace is invite-only. The public landing page is static and does not request a session or contain merchant data. Production workspace routes require a Cloudflare Access application, valid Worker secrets, a migrated D1 database and an explicitly created workspace membership. The repository does not contain production account identifiers, resource names, user records or private assets.
 
 The browser preview uses synthetic data only. Do not enter real merchant, customer, payment or private asset data into a local or preview environment.
 
 ## Security controls
 
 - Access JWT signature, issuer, audience, expiry and subject are verified in the Worker.
+- The public landing page performs no protected API request; workspace pages and every non-health API route remain behind Access.
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
 - Protected API requests are rate-limited by verified Access subject.
