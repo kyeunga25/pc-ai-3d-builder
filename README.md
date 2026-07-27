@@ -10,6 +10,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 
 ## 現有功能
 
+- 公開的產品介紹主頁，以及導向受 Cloudflare Access 保護工作台的登入入口；主頁不讀取 session 或任何商戶資料。
 - 香港繁體中文介面及港幣格式。
 - 讀取真實 D1 聚合資料的 Dashboard，以及產品目錄、素材審核及 PC Builder 路由。
 - Cloudflare Access JWT 驗證、邀請制用戶及 server-side workspace scope。
@@ -28,7 +29,9 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
 
-本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。Production 介面可在角色及 workspace 限制下讀寫 D1 目錄、審核及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.0 是可用的邀請制人工審批 MVP，真實 3D 供應商生成及多模型裝配場景不在此版本承諾內。
+本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。公開主頁只介紹產品及提供登入導向，不會載入 session、商戶記錄或私人素材。Production 工作台可在角色及 workspace 限制下讀寫 D1 目錄、審核及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.0 是可用的邀請制人工審批 MVP，真實 3D 供應商生成及多模型裝配場景不在此版本承諾內。
+
+主頁的電腦爆炸視圖是無品牌的生成概念圖，只用作產品介面示意，不代表真實零件、商戶素材、工程規格或相容性證據。
 
 ## 技術
 

@@ -1,15 +1,18 @@
 # 試行身份驗證與工作空間設定
 
-正式部署使用 Cloudflare Access 作外層登入閘門。Worker 仍會驗證 Access JWT，並以 D1 的邀請及 active membership 建立 request-scoped workspace context。
+正式部署使用 Cloudflare Access 保護工作台及 API。公開主頁只提供產品介紹及登入導向；Worker 仍會驗證 Access JWT，並以 D1 的邀請及 active membership 建立 request-scoped workspace context。
 
 ## 安全邊界
 
-- Access 應保護整個 hostname，而不只是 API 路徑。
+- Access 應保護 `/dashboard*`、`/catalogue*`、`/asset-review*`、`/builder*` 及 `/api/*`；不要把公開 `/` 路徑納入同一個保護範圍。
 - `/api/health` 保持公開；其他 API 先驗證身份及限流。
+- 主頁按鈕以 top-level navigation 前往 `/dashboard`，讓 Access 在載入工作台前完成登入流程。
 - Worker 不信任未驗證的身份 header。
 - 用戶要求的 workspace 必須由 D1 membership 重新核對。
 - 首次登入只可把一個 Access subject 綁定至一個邀請。
 - JWT、cookie、電郵、實際資源名稱及平台識別資料不得進入 log 或 Git。
+
+Cloudflare Access 支援以 self-hosted application path 保護指定路徑。正式套用前，逐一確認以上工作台路徑及 `/api/*` 均受邀請政策保護，`/` 與所需靜態資源只包含公開內容；不要使用會把受保護路徑一併公開的廣泛 Bypass 規則。
 
 ## Access 值
 
