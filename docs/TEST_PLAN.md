@@ -46,6 +46,8 @@ Test the built application at desktop and tablet widths. Confirm:
 
 - `/` 在不建立 session 的情況下顯示完整產品介紹，並以 top-level navigation 導向 `/dashboard` 登入入口；
 - 首頁的流程、安全邊界及 invite-only 指引在桌面和 390 px 均完整可讀；
+- 首頁的 Dashboard、產品目錄、素材審核及 Builder 合成工作區畫面均可載入、放大查看，且不包含真實商戶或私人素材；
+- 首頁的正文、案例、圖說及輔助文字在桌面和 390 px 均維持適合繁體中文閱讀的字級、行距及對比；
 - the authentication loading and failure states are readable;
 - every navigation item is keyboard reachable;
 - the builder route loads lazily;
