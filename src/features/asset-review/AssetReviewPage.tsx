@@ -10,6 +10,7 @@ import {
   Rotate3D,
   Save,
   Scan,
+  Sparkles,
   Upload,
   X,
 } from "lucide-react";
@@ -43,12 +44,19 @@ import {
   type AssetReviewItem,
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
+import {
+  type GenerationJob,
+  type GenerationJobListResponse,
+} from "../../shared/domain/generation-jobs";
 import { reviewAsset } from "../../shared/domain/mockData";
+import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import {
   AssetReviewApiError,
   fetchAssetFileBlob,
   fetchAssetReview,
   fetchAssetReviewQueue,
+  fetchGenerationJobs,
+  startGenerationJob,
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
@@ -144,7 +152,16 @@ function reviewBadge(status: AssetReviewItem["status"]) {
 const sourceKindLabels: Record<AssetReviewItem["sourceKind"], string> = {
   synthetic: "合成測試素材",
   uploaded: "私人上載素材",
-  generated: "供應商生成草稿",
+  generated: "生成流程草稿",
+};
+
+const generationStatusLabels: Record<GenerationJob["status"], string> = {
+  queued: "已排入佇列",
+  running: "正在建立草稿",
+  validating: "正在驗證 GLB",
+  awaiting_review: "等待人工審核",
+  failed: "工作失敗",
+  cancelled: "工作已取消",
 };
 
 const qualityLabels: Record<AssetReviewItem["quality"], string> = {
@@ -204,6 +221,16 @@ export function AssetReviewPage() {
         : "合成資料變更只保留在本機"
       : "已載入工作空間審核狀態",
   );
+  const [generationState, setGenerationState] =
+    useState<GenerationJobListResponse>(() => ({
+      capability: {
+        mode: isLocalPreview ? "simulation" : "disabled",
+        maxCostMinor: 0,
+      },
+      items: [],
+    }));
+  const [generationSubmitting, setGenerationSubmitting] = useState(false);
+  const appliedGenerationJobRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -302,6 +329,90 @@ export function AssetReviewPage() {
     };
   }, [activeAsset, currentWorkspace.id, isLocalPreview]);
 
+  useEffect(() => {
+    if (isLocalPreview || !activeAsset) {
+      return;
+    }
+    const controller = new AbortController();
+    void fetchGenerationJobs(
+      controller.signal,
+      currentWorkspace.id,
+      activeAsset.id,
+    )
+      .then(setGenerationState)
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setGenerationState({
+            capability: { mode: "disabled", maxCostMinor: 0 },
+            items: [],
+          });
+        }
+      });
+    return () => controller.abort();
+  }, [activeAsset, currentWorkspace.id, isLocalPreview, reloadToken]);
+
+  useEffect(() => {
+    const activeJob = generationState.items.find((job) =>
+      ["queued", "running", "validating"].includes(job.status),
+    );
+    if (isLocalPreview || !activeAsset || !activeJob) {
+      return;
+    }
+    const controller = new AbortController();
+    let refreshing = false;
+    const refresh = async () => {
+      if (refreshing) {
+        return;
+      }
+      refreshing = true;
+      try {
+        const next = await fetchGenerationJobs(
+          controller.signal,
+          currentWorkspace.id,
+          activeAsset.id,
+        );
+        if (controller.signal.aborted) {
+          return;
+        }
+        setGenerationState(next);
+        const latest = next.items[0];
+        if (
+          latest?.status === "awaiting_review" &&
+          latest.outputReady &&
+          appliedGenerationJobRef.current !== latest.id
+        ) {
+          const updated = await fetchAssetReview(
+            controller.signal,
+            currentWorkspace.id,
+            activeAsset.id,
+          );
+          if (!controller.signal.aborted) {
+            appliedGenerationJobRef.current = latest.id;
+            setForm(createReviewForm(updated));
+            setReviewStatus(
+              "模擬 GLB 草稿已通過格式驗證；必須重新完成人工審核",
+            );
+          }
+        } else if (latest?.status === "failed") {
+          setReviewStatus(
+            `模擬生成失敗：${latest.failureCode ?? "GENERATION_WORKFLOW_FAILED"}`,
+          );
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setReviewStatus("暫時無法更新生成工作狀態");
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const timer = window.setInterval(() => void refresh(), 2_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [activeAsset, currentWorkspace.id, generationState.items, isLocalPreview]);
+
   const retryQueue = () => {
     setLoadState("loading");
     setForm(null);
@@ -361,6 +472,25 @@ export function AssetReviewPage() {
     parsedDimensions.width !== null &&
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
+  const latestGenerationJob = generationState.items[0] ?? null;
+  const generationActive = generationState.items.some((job) =>
+    ["queued", "running", "validating"].includes(job.status),
+  );
+  const persistedChecks = new Set(asset.completedChecks);
+  const reviewHasUnsavedChanges =
+    form.checks.size !== persistedChecks.size ||
+    [...form.checks].some((check) => !persistedChecks.has(check)) ||
+    parsedDimensions.width !== asset.dimensionsMm.width ||
+    parsedDimensions.height !== asset.dimensionsMm.height ||
+    parsedDimensions.depth !== asset.dimensionsMm.depth;
+  const canRequestGeneration =
+    canDecide &&
+    asset.files.source !== null &&
+    asset.sourceRightsConfirmed &&
+    !reviewHasUnsavedChanges &&
+    generationState.capability.mode === "simulation" &&
+    !generationActive &&
+    !generationSubmitting;
 
   const toggleCheck = (check: AssetReviewCheck) => {
     if (!canEdit) {
@@ -502,6 +632,102 @@ export function AssetReviewPage() {
     } finally {
       inputElement.value = "";
       setUploadingKind(null);
+    }
+  };
+
+  const requestGeneration = async () => {
+    const currentForm = form;
+    if (!currentForm || !canRequestGeneration) {
+      return;
+    }
+    setGenerationSubmitting(true);
+    setReviewStatus("正在建立零成本模擬生成工作…");
+    try {
+      if (isLocalPreview) {
+        const bytes = createSyntheticDraftGlb();
+        const objectUrl = URL.createObjectURL(
+          new Blob(
+            [
+              bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength,
+              ) as ArrayBuffer,
+            ],
+            { type: assetModelContentType },
+          ),
+        );
+        localObjectUrlsRef.current.add(objectUrl);
+        const updated: AssetReviewItem = {
+          ...currentForm.asset,
+          status: "draft",
+          quality: "unreviewed",
+          sourceKind: "generated",
+          completedChecks: [],
+          sourceRightsConfirmed: false,
+          dimensionsMm: { width: null, height: null, depth: null },
+          files: {
+            ...currentForm.asset.files,
+            model: {
+              contentType: assetModelContentType,
+              sizeBytes: bytes.byteLength,
+            },
+          },
+          version: currentForm.asset.version + 1,
+        };
+        setFileUrls((current) => {
+          if (current.model && localObjectUrlsRef.current.has(current.model)) {
+            URL.revokeObjectURL(current.model);
+            localObjectUrlsRef.current.delete(current.model);
+          }
+          return {
+            assetKey: assetKey(updated),
+            model: objectUrl,
+            source:
+              current.assetKey === assetKey(currentForm.asset)
+                ? current.source
+                : null,
+          };
+        });
+        const now = new Date().toISOString();
+        const job: GenerationJob = {
+          id: `simulation_${crypto.randomUUID()}`,
+          assetId: updated.id,
+          status: "awaiting_review",
+          kind: "simulation",
+          outputReady: true,
+          failureCode: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        setGenerationState((current) => ({
+          ...current,
+          items: [job, ...current.items].slice(0, 20),
+        }));
+        setForm(createReviewForm(updated));
+      } else {
+        const job = await startGenerationJob(
+          currentWorkspace.id,
+          currentForm.asset.id,
+          { expectedVersion: currentForm.asset.version },
+        );
+        setGenerationState((current) => ({
+          ...current,
+          items: [job, ...current.items.filter((item) => item.id !== job.id)],
+        }));
+      }
+      setReviewStatus(
+        isLocalPreview
+          ? "本地模擬 GLB 已建立；核准證據已重設"
+          : "模擬生成工作已排入 Workflow；不會產生供應商費用",
+      );
+    } catch (error) {
+      setReviewStatus(
+        error instanceof AssetReviewApiError
+          ? error.message
+          : "無法建立模擬生成工作；沒有產生供應商費用",
+      );
+    } finally {
+      setGenerationSubmitting(false);
     }
   };
 
@@ -855,6 +1081,37 @@ export function AssetReviewPage() {
             </small>
           </div>
 
+          <div className="review-inspector__section generation-job-panel">
+            <div className="review-panel-heading">
+              <Sparkles aria-hidden="true" />
+              <div>
+                <strong>生成工作</strong>
+                <span>只顯示中立狀態，不公開供應商或私人物件資料</span>
+              </div>
+            </div>
+            <dl className="technical-list">
+              <div>
+                <dt>執行模式</dt>
+                <dd>
+                  {generationState.capability.mode === "simulation"
+                    ? "零成本模擬"
+                    : "未啟用"}
+                </dd>
+              </div>
+              <div>
+                <dt>最新狀態</dt>
+                <dd>
+                  {latestGenerationJob
+                    ? generationStatusLabels[latestGenerationJob.status]
+                    : "沒有工作"}
+                </dd>
+              </div>
+            </dl>
+            <small>
+              模擬輸出仍是草稿，格式驗證通過後亦須重新核對身份、方向、尺寸、樞軸及使用權。
+            </small>
+          </div>
+
           <div className="review-inspector__section">
             <div className="review-panel-heading">
               <Scan aria-hidden="true" />
@@ -926,11 +1183,28 @@ export function AssetReviewPage() {
           <button
             className="button"
             type="button"
-            disabled
-            title="外部 3D 供應商尚未啟用"
+            disabled={!canRequestGeneration}
+            title={
+              generationState.capability.mode !== "simulation"
+                ? "Production kill switch 維持關閉"
+                : !canDecide
+                  ? "只有 owner 或 admin 可建立生成工作"
+                  : asset.files.source === null
+                    ? "先上載私人來源圖片"
+                    : generationActive
+                      ? "已有進行中的生成工作"
+                      : !asset.sourceRightsConfirmed || reviewHasUnsavedChanges
+                        ? "先儲存來源圖片使用權確認及其他審核變更"
+                        : "建立零成本合成 GLB 草稿，不呼叫外部供應商"
+            }
+            onClick={() => void requestGeneration()}
           >
             <RefreshCw aria-hidden="true" />
-            供應商重試未啟用
+            {generationSubmitting
+              ? "建立中…"
+              : generationActive
+                ? "模擬工作進行中"
+                : "建立模擬 GLB 草稿"}
           </button>
         </div>
         <div>

@@ -8,6 +8,12 @@ import {
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
+import { sha256Hex } from "../lib/digest";
+import {
+  assetObjectKey,
+  deletePrivateObjectQuietly,
+  putPrivateObject,
+} from "../lib/private-assets";
 import { readBoundedBinary } from "../lib/request-body";
 import { assetRecordIdPattern, findAsset, mapAssetReviewRow } from "./assets";
 import { catalogueRecordIdPattern } from "./catalogue";
@@ -66,17 +72,6 @@ function normalizedContentType(request: Request): string {
   );
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digestInput = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  const digest = await crypto.subtle.digest("SHA-256", digestInput);
-  return Array.from(new Uint8Array(digest))
-    .map((value) => value.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 async function readValidatedFile(
   request: Request,
   kind: AssetFileKind,
@@ -98,44 +93,6 @@ async function readValidatedFile(
       throw validationError(error.message);
     }
     throw error;
-  }
-}
-
-function assetObjectKey(
-  workspaceId: string,
-  assetId: string,
-  kind: AssetFileKind,
-): string {
-  return `workspaces/${workspaceId}/assets/${assetId}/${kind}/${crypto.randomUUID()}`;
-}
-
-async function deleteObjectQuietly(
-  bucket: R2Bucket,
-  objectKey: string | null,
-): Promise<void> {
-  if (!objectKey) {
-    return;
-  }
-  try {
-    await bucket.delete(objectKey);
-  } catch {
-    // A stale private object is safer than failing a committed D1 transition.
-  }
-}
-
-async function putPrivateObject(
-  bucket: R2Bucket,
-  objectKey: string,
-  file: ValidatedAssetFile,
-): Promise<void> {
-  const stored = await bucket.put(objectKey, file.bytes, {
-    httpMetadata: {
-      contentType: file.contentType,
-      cacheControl: "no-store",
-    },
-  });
-  if (!stored) {
-    throw new Error("Private asset object could not be stored.");
   }
 }
 
@@ -197,7 +154,7 @@ export async function createAssetSourceResponse(
     assetId,
     "source",
   );
-  await putPrivateObject(bucket, objectKey, file);
+  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
 
   try {
     await db.batch([
@@ -244,7 +201,7 @@ export async function createAssetSourceResponse(
         ),
     ]);
   } catch (error) {
-    await deleteObjectQuietly(bucket, objectKey);
+    await deletePrivateObjectQuietly(bucket, objectKey);
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new ApiError(
         409,
@@ -311,7 +268,7 @@ export async function assetFileUploadResponse(
   const previousObjectKey =
     kind === "source" ? current.source_object_key : current.model_object_key;
   const nextVersion = currentVersion + 1;
-  await putPrivateObject(bucket, objectKey, file);
+  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
 
   const updateStatement =
     kind === "source"
@@ -417,12 +374,12 @@ export async function assetFileUploadResponse(
         ),
     ]);
   } catch (error) {
-    await deleteObjectQuietly(bucket, objectKey);
+    await deletePrivateObjectQuietly(bucket, objectKey);
     throw error;
   }
 
   if (updateResult?.meta.changes !== 1) {
-    await deleteObjectQuietly(bucket, objectKey);
+    await deletePrivateObjectQuietly(bucket, objectKey);
     const existing = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!existing) {
       throw assetNotFound();
@@ -430,7 +387,7 @@ export async function assetFileUploadResponse(
     throw assetVersionConflict();
   }
 
-  await deleteObjectQuietly(bucket, previousObjectKey);
+  await deletePrivateObjectQuietly(bucket, previousObjectKey);
   const updated = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!updated) {
     throw new Error("Uploaded asset could not be read.");

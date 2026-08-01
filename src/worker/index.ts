@@ -28,6 +28,10 @@ import {
   buildMutationResponse,
 } from "./routes/builds";
 import { dashboardResponse } from "./routes/dashboard";
+import {
+  generationJobListResponse,
+  generationJobStartResponse,
+} from "./routes/generation-jobs";
 import { healthResponse } from "./routes/health";
 import { sessionResponse, workspacesResponse } from "./routes/session";
 
@@ -277,6 +281,27 @@ async function routeRequest(
         assetReviewMatch[1]!,
         requestId,
       );
+    }
+
+    const generationJobsMatch =
+      /^\/api\/assets\/([^/]+)\/generation-jobs$/u.exec(url.pathname);
+    if (generationJobsMatch) {
+      if (request.method === "GET") {
+        return generationJobListResponse(env, context, generationJobsMatch[1]!);
+      }
+      if (request.method === "POST") {
+        return generationJobStartResponse(
+          request,
+          env,
+          context,
+          generationJobsMatch[1]!,
+          requestId,
+        );
+      }
+      return new Response(null, {
+        status: 405,
+        headers: { allow: "GET, POST", "cache-control": "no-store" },
+      });
     }
 
     const assetDetailMatch = /^\/api\/assets\/([^/]+)$/u.exec(url.pathname);
