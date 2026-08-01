@@ -18,4 +18,6 @@ The active upload and review boundary preserves these rules:
 - Make long-running work asynchronous and idempotent.
 - Provide explicit failure and retry states without automatically duplicating paid work.
 
-External provider generation, paid retries and generated-output ingestion remain inactive. No provider choice, commercial routing rule or private quality target is recorded in this repository.
+The v1.1 Workflow can ingest only a runtime synthetic, zero-cost GLB when simulation is explicitly enabled. It validates and stores the draft through the same private boundary, increments the review version and resets prior evidence. Tracked production configuration remains disabled, so this path is orchestration evidence rather than an external 3D-generation capability.
+
+External provider generation, paid retries and provider callbacks remain inactive. No provider choice, commercial routing rule or private quality target is recorded in this repository. See [Generation pipeline](GENERATION_PIPELINE.md).

@@ -11,7 +11,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Workspace-scoped dashboard, catalogue, asset-review and build APIs with bounded reads and mutation bodies.
 - Catalogue create, optimistic update, logical archive and transactional CSV import.
 - Private R2 source-image and GLB storage with protected Worker reads.
-- Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow binding reserved for provider generation.
+- Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
 - Deterministic build compatibility and sanitized portable JSON export.
 - Synthetic local UI fixtures for catalogue, review and builder demonstrations.
 
@@ -32,6 +32,10 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Read-only requests must not create unbounded database writes.
 - Dashboard reads must remain bounded and must not append audit events.
 - Tests and documentation use synthetic identities and data.
+- Generation starts only after a workspace-scoped job/event/audit commit, saved source-rights confirmation, current review version and explicit owner/admin action.
+- Generated output is checksum-validated, remains private, resets review evidence and cannot enter the Builder before human approval.
+- Unknown generation configuration, non-zero simulation cost or the production kill switch fails closed before billable work.
+- Payment remains disconnected and disabled; no browser route or public binding may create a payment object.
 
 ## Code organization
 
@@ -39,6 +43,8 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - `src/features/`: feature-owned UI.
 - `src/shared/`: reusable components, domain schemas and locale helpers.
 - `src/worker/`: Access verification, workspace resolution, API routes and Workflow classes.
+- `src/worker/generation/`: provider-neutral generation configuration and adapters; the public adapter is synthetic only.
+- `src/worker/payment/`: provider-neutral payment boundary; the public adapter is disabled only.
 - `migrations/`: explicit D1 schema changes.
 - `docs/`: public implementation documentation only.
 

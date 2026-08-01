@@ -28,6 +28,12 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Build export fails closed on hard errors or unknown compatibility results and excludes identities, workspace identifiers, prices, stock, private assets and deployment data.
 - Dashboard aggregates are bounded, workspace-scoped and read-only; they do not append audit records or expose user identity data.
 - Builder model previews request only an approved asset through the protected Worker route and revoke the short-lived object URL when the selected part changes.
+- Generation requests require owner/admin role, saved source rights, the current asset version, a unique idempotency key and the verified workspace before a job is committed.
+- One active generation job is allowed per asset; the tracked kill switch is disabled and the current simulation cost cap is zero.
+- Workflow output is private, size/signature/structure/checksum validated and staged only while its source checksum and review version remain current.
+- Generated output resets all review evidence and remains unavailable to the Builder until a new human approval.
+- Job responses and audits exclude object keys, checksums, Workflow IDs, raw errors and provider references.
+- Payment is not reachable: the public payment adapter is disabled and has no route, binding, ledger or browser control.
 - API responses use `no-store`; static and API responses receive restrictive security headers.
 - Unexpected exceptions are logged with a stable code rather than raw error text.
 - Production source maps and Wrangler telemetry are disabled.

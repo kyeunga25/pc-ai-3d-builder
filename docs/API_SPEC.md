@@ -102,6 +102,20 @@ Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `complet
 
 The conditional asset update, review event and audit event are submitted in one D1 batch. A stale `expectedVersion` fails without overwriting the newer record.
 
+## `GET /api/assets/:assetId/generation-jobs`
+
+Returns the active generation capability and at most 20 recent jobs for one asset in the resolved workspace. Viewer roles may read status. Each public job contains only its ID, asset ID, provider-neutral simulation kind, stable status, output-ready flag, stable failure code and timestamps.
+
+The response never contains the requester, idempotency key, Workflow instance ID, cost data, input or output checksum, R2 key, provider reference or raw error. A disabled capability is a valid `200` response and accurately represents the tracked production default.
+
+## `POST /api/assets/:assetId/generation-jobs`
+
+Creates a zero-cost simulation job only when the runtime capability is explicitly set to simulation. The route is restricted to owner or admin roles and requires a valid `Idempotency-Key`, an unapproved asset, its current `expectedVersion`, a stored private source image and a previously saved source-rights confirmation.
+
+The queued job, initial event and minimal audit record are committed before the uniquely identified Workflow instance is created. Reusing an idempotency key for the same asset returns the original job without creating duplicate work; reusing it for another asset is rejected. Only one queued, running or validating job may exist for the asset.
+
+Successful creation returns `202`. The Workflow output remains a draft and resets all prior checklist and dimension evidence before its state becomes `awaiting_review`. Tracked production configuration returns `GENERATION_DISABLED` before any database write or external activity.
+
 ## Errors
 
 ```json
@@ -114,6 +128,6 @@ The conditional asset update, review event and audit event are submitted in one 
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.

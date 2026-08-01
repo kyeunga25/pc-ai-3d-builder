@@ -38,7 +38,19 @@ The builder may decode only the selected component's approved GLB. It uses the p
 
 ## Bounded asynchronous work
 
-Long-running jobs use a swappable provider boundary and an idempotent Workflow. The current Workflow is a placeholder and has no provider side effects.
+Long-running jobs use a swappable provider boundary and an idempotent Workflow. A generation request is accepted only after its workspace-scoped job, initial event and audit record commit. The Workflow uses unique instance IDs, bounded retry/timeout settings and guarded D1 transitions.
+
+The current adapter creates a zero-cost synthetic GLB solely to exercise storage, validation and human-review transitions. Tracked production configuration disables it. A real provider requires another decision covering commercial terms, data rights, callbacks, cost reservation, settlement and a capped non-production test.
+
+## Generated output remains review evidence
+
+The Workflow validates a private output object before it changes any review record. The asset source checksum, saved rights confirmation and optimistic review version must still match. Staging increments the review version and resets checklist, dimensions and approval fields. It never marks an asset approved or modifies compatibility evidence.
+
+Generation-job API records are provider-neutral and omit object keys, checksums, Workflow IDs, requester identity and cost details. Stable failure codes replace raw provider or platform errors.
+
+## Payment remains a private future boundary
+
+No payment route, UI, binding or ledger is active. The public source contains only generic types and a disabled adapter. Provider-specific checkout, signature, merchant mapping and credential code requires due diligence and an explicitly approved private server boundary.
 
 ## Read-only requests remain read-only
 

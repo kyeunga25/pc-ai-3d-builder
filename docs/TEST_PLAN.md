@@ -35,10 +35,16 @@ Current unit tests cover:
 - export exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state and identity exclusion;
 - guarded logical archive for a build draft.
+- generation capability fail-closed parsing and disabled-provider behavior;
+- runtime synthetic GLB structure and existing self-contained-model validation;
+- owner/admin generation role checks, saved source-rights requirement and current review version;
+- workspace-scoped generation job listing without private object or Workflow data;
+- idempotent, zero-cost job creation before Workflow start, including rejection of cross-asset key reuse;
+- payment provider boundary remaining disconnected and disabled.
 
 ## Migration check
 
-Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `7`, the catalogue record-version column, private asset-file metadata columns, `builds` and `build_items`, and no rows from `PRAGMA foreign_key_check`. Insert only synthetic workspace, catalogue, asset and build fixtures when checking relational constraints. Never use a local copy of production data.
+Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `8`, the catalogue record-version column, private asset-file metadata columns, `builds`, `build_items`, `generation_jobs` and `generation_job_events`, and no rows from `PRAGMA foreign_key_check`. Confirm that duplicate workspace idempotency keys and concurrent active jobs for one asset are rejected. Insert only synthetic workspace, catalogue, asset, generation-job and build fixtures when checking relational constraints. Never use a local copy of production data.
 
 ## Browser check
 
@@ -61,6 +67,9 @@ Test the built application at desktop and tablet widths. Confirm:
 - a synthetic GLB unlocks the manual Three.js preview and remains required for approval;
 - desktop and 390 px layouts show source and model controls without page-level horizontal overflow;
 - completing the final asset checklist item enables approval, and approval locks the reviewed fields;
+- local preview requires a saved source-rights confirmation before enabling zero-cost simulation;
+- local simulation creates a runtime synthetic GLB, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
+- production capability remains disabled unless a separately reviewed private configuration enables simulation;
 - a verified 9-category build reports six passing rules and enables export;
 - changing a GPU to one above the selected PSU recommendation produces a warning;
 - unsaved changes disable export, saving increments the local version and re-enables export;
@@ -73,4 +82,4 @@ Test the built application at desktop and tablet widths. Confirm:
 
 ## Deployment check
 
-Use a Git-ignored deployment configuration. Verify the public health endpoint, static deep-link fallback, protected session, dashboard, build and private-file rejection without Access, security headers and absence of source maps. Do not print or record deployment identifiers during validation.
+Use a Git-ignored deployment configuration. Verify the public health endpoint, static deep-link fallback, protected session, dashboard, build, generation-job and private-file rejection without Access, security headers and absence of source maps. Confirm that tracked production configuration reports generation disabled and rejects job creation before a D1 write. Do not print or record deployment identifiers during validation.
