@@ -1,4 +1,4 @@
-# Public release status — v1.0.1
+# Public release status — v1.1.0
 
 This file records only the capabilities present in the current public branch.
 
@@ -29,14 +29,22 @@ This file records only the capabilities present in the current public branch.
 - [x] Portable JSON export without identity, workspace, pricing, stock, private-asset or deployment fields.
 - [x] Export gate for hard errors, unknown rules and unsaved browser changes.
 - [x] D1 migrations and synthetic unit fixtures.
-- [x] Active private R2 binding and placeholder-only Workflow binding.
+- [x] Active private R2 and Workflow bindings with external-provider activity disabled.
+- [x] Workspace-scoped generation-job and append-only event schema with unique idempotency and one-active-job constraints.
+- [x] Owner/admin generation request API with current asset version, stored source image and saved rights gate.
+- [x] Zero-cost runtime synthetic adapter for controlled pipeline validation without source-image reads or external calls.
+- [x] Workflow claim, bounded retry/timeout, private R2 write/read-back, GLB validation, checksum comparison and guarded draft staging.
+- [x] Generated-output review-version increment and complete approval-evidence reset before `awaiting_review`.
+- [x] Provider-neutral job status UI and local synthetic GLB test flow.
+- [x] Tracked production generation kill switch defaults to disabled with a zero cost cap.
+- [x] Provider-neutral payment interface with a disabled-only adapter and no route, binding, ledger or browser flow.
 - [x] Local check, test, build and deployment dry-run commands.
 - [x] Production deploy command applies pending D1 migrations before Worker upload.
 - [x] Bilingual public issue forms, pull-request privacy checklist and support guidance.
 
 ## Explicit boundaries
 
-Local catalogue records, prices, stock, review assets and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. External provider generation and multi-model 3D scene composition are not v1.0 capabilities.
+Local catalogue records, prices, stock, review assets, runtime simulation output and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review, generation-job and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. The synthetic adapter tests orchestration only and remains disabled in tracked production configuration. External provider generation, Workers AI automation, payment processing and multi-model 3D scene composition are not v1.1 capabilities.
 
 ## Release checks
 

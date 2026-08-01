@@ -44,6 +44,16 @@ Stores workspace-scoped draft identity, logical status, optimistic record versio
 
 Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. Archived catalogue parts remain referentially intact for existing builds but cannot be newly selected.
 
+## `generation_jobs`
+
+Stores one durable, workspace-scoped orchestration record per explicit request. The record includes the asset, requester, unique idempotency key, unique Workflow instance ID, requested review version, input checksum, execution mode, cost cap, state, stable failure code and private output metadata.
+
+The browser representation omits the input checksum, Workflow ID, object keys, output checksum, requester and cost details. A partial unique index permits at most one queued, running or validating job for a workspace asset. The currently valid execution mode is `simulation`; no external-provider identifier appears in the table or public domain model.
+
+## `generation_job_events`
+
+Stores append-only queued, running, validating, review-ready, failed or cancelled transitions. Metadata is bounded and may record sizes, review versions and integer cost results only. It must not contain user identity, source or output object keys, checksums, prompts, provider responses or raw errors.
+
 ## Migration rules
 
 - Add schema changes through numbered migration files.
@@ -55,3 +65,6 @@ Stores at most one selected catalogue part per build and component category. Com
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
 - Build selection updates must use an expected version and server-only mutation token in one D1 batch.
+- Generation requests must persist the job, initial event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
+- Generated output may update an asset only while its source checksum, saved rights confirmation and review version still match the requested input.
+- Staging a generated draft must update the asset review version, job state, job event and minimal audit record in one guarded batch; output remains private and unapproved.

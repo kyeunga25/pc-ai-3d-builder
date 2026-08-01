@@ -1,6 +1,6 @@
 # Product behavior
 
-RigStage is an invite-only browser workspace for computer merchants. Version 1.0 provides a usable human-reviewed workflow from workspace catalogue onboarding and private visual assets to persistent PC builds, deterministic compatibility evidence and privacy-bounded export.
+RigStage is an invite-only browser workspace for computer merchants. Version 1.1 provides a usable human-reviewed workflow from workspace catalogue onboarding and private visual assets to persistent PC builds, deterministic compatibility evidence and privacy-bounded export. It also includes a fail-closed generation-job foundation whose only implemented adapter is a zero-cost synthetic simulation.
 
 ## Implemented behavior
 
@@ -22,6 +22,10 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.0
 - Portable JSON export that fails closed and excludes identity, operational and private-asset fields.
 - Clear draft, review and approved labels for visual assets.
 - Human approval remains mandatory before generated material is treated as usable.
+- Workspace-scoped, owner/admin-only generation requests with saved source-rights confirmation, optimistic asset versions and idempotency keys.
+- Durable queued, running, validating, review-ready and failed generation states with bounded job history.
+- Runtime synthetic GLB creation, private R2 storage, read-back validation and atomic review-version reset for local or explicitly controlled simulation testing.
+- A tracked production kill switch that rejects generation before database writes or provider activity.
 
 ## Boundaries
 
@@ -29,7 +33,9 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.0
 - A visual mesh never establishes compatibility.
 - Prices, inventory and components shown in local development are fictional.
 - No public marketplace, payment flow or customer-data collection is enabled.
-- External provider generation and multi-model 3D scene composition are optional future integrations, not v1.0 product capabilities.
+- The runtime synthetic adapter validates orchestration only; it is not AI or a professional 3D-generation capability.
+- External provider generation and multi-model 3D scene composition are optional future integrations, not v1.1 product capabilities.
+- No checkout, invoice, subscription, payment webhook or payment ledger is enabled. The public payment interface remains disconnected and disabled.
 
 ## Data handling
 

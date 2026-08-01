@@ -26,9 +26,9 @@ A requested workspace header never grants access by itself. The selected workspa
 
 ## Storage bindings
 
-D1 stores identity, workspace metadata, workspace-scoped catalogue records, private-file metadata, current asset review state, append-only review events and persistent build selections. Catalogue, asset and build mutations use expected versions and write their state transition and minimal audit event through D1 batches.
+D1 stores identity, workspace metadata, workspace-scoped catalogue records, private-file metadata, current asset review state, append-only review events, generation jobs/events and persistent build selections. Catalogue, asset, generation and build mutations use expected versions or idempotency keys and write their state transition and minimal audit event through D1 batches.
 
-The R2 binding stores validated source images and self-contained GLB models under opaque keys. Objects are readable only through Access- and workspace-protected Worker routes; no bucket or permanent object URL is public. The Workflow binding exports a placeholder class but no HTTP route starts it and it performs no external generation work.
+The R2 binding stores validated source images and self-contained GLB models under opaque keys. Objects are readable only through Access- and workspace-protected Worker routes; no bucket or permanent object URL is public. The Workflow binding can run the zero-cost synthetic validation pipeline when an explicitly controlled environment selects simulation mode. Tracked production configuration remains disabled, and the current Workflow performs no external provider or Workers AI call.
 
 ## Dashboard
 
@@ -41,6 +41,14 @@ Catalogue reads are bounded to 100 rows per request and use an ID cursor. Staff,
 The review queue returns only draft or in-review assets in the active workspace. Viewer roles are read-only, staff may save drafts, and owner or admin roles may approve or reject. Approval requires a stored GLB model, the complete fixed checklist and three positive, bounded dimensions. Visual geometry remains non-authoritative for compatibility.
 
 Catalogue staff can create an asset by uploading a validated source image. File replacement uses an expected review version, stores a new R2 object, commits safe metadata and a minimal audit event, then removes the superseded object. Any replacement resets prior checklist and dimension evidence. Three.js and GLB parsing are lazy-loaded only when an authorized model blob is available.
+
+## Generation jobs
+
+Only an owner or admin may request generation for a current, unapproved asset whose private source image and saved rights confirmation belong to the resolved workspace. The API requires an `Idempotency-Key`, commits the queued job, event and audit row first, and then creates a uniquely identified Workflow instance. One partial unique index prevents concurrent active jobs for the same asset.
+
+The current provider-neutral adapter supports only zero-cost simulation. Each Workflow side effect lives inside a bounded, retryable step: claim the unchanged input, create and privately store a runtime synthetic GLB, move the job to validation, read the object back, enforce the 25 MiB limit, parse its self-contained glTF structure and compare its checksum. A conditional D1 batch then replaces the draft model metadata, increments the asset review version, resets all approval evidence and marks the job `awaiting_review`. Superseded private output is removed in a separate idempotent cleanup step.
+
+Any source replacement, review-version change, missing rights confirmation, approval, invalid output, non-zero simulation cost or disabled kill switch fails closed. Job APIs omit object keys, checksums, provider references, deployment data and identities. See [Generation pipeline](GENERATION_PIPELINE.md).
 
 ## Builds, compatibility and export
 
@@ -57,6 +65,8 @@ The builder may preview the currently selected component only when its asset is 
 Logs contain request method, path, status, duration, request ID and stable error code only. They exclude JWTs, cookies, email addresses, prompts, provider responses and private object locations.
 
 Tracked Wrangler configuration is a non-operational template. Actual deployment coordinates and secrets stay in an ignored local config or Cloudflare's secret store. Wrangler telemetry and dependency instrumentation are disabled.
+
+Payment remains outside the active request path. The public repository contains a provider-neutral disabled interface only; it has no route, UI, binding, ledger or credential. See [Payment boundary](PAYMENT_BOUNDARY.md).
 
 ## Frontend
 

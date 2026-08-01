@@ -10,6 +10,12 @@ import {
   type AssetReviewItem,
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
+import {
+  generationJobListResponseSchema,
+  generationJobSchema,
+  type GenerationJob,
+  type GenerationJobStartInput,
+} from "../../shared/domain/generation-jobs";
 
 const apiErrorSchema = z.object({
   error: z.object({
@@ -173,4 +179,46 @@ export async function fetchAssetFileBlob(
     throw await apiError(response);
   }
   return response.blob();
+}
+
+export async function fetchGenerationJobs(
+  signal: AbortSignal,
+  workspaceId: string,
+  assetId: string,
+) {
+  const response = await fetch(
+    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
+    {
+      credentials: "same-origin",
+      headers: workspaceHeaders(workspaceId),
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw await apiError(response);
+  }
+  return generationJobListResponseSchema.parse(await response.json());
+}
+
+export async function startGenerationJob(
+  workspaceId: string,
+  assetId: string,
+  input: GenerationJobStartInput,
+): Promise<GenerationJob> {
+  const headers = workspaceHeaders(workspaceId);
+  headers.set("content-type", "application/json");
+  headers.set("idempotency-key", crypto.randomUUID());
+  const response = await fetch(
+    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) {
+    throw await apiError(response);
+  }
+  return generationJobSchema.parse(await response.json());
 }

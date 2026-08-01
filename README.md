@@ -1,12 +1,12 @@
 # RigStage
 
-RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.0 提供受保護的產品目錄、私人素材審核、持久化 PC Builder、可解釋相容性規則、已核准模型預覽及安全 JSON 匯出。
+RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.1 提供受保護的產品目錄、私人素材審核、持久化 PC Builder、可解釋相容性規則、已核准模型預覽、安全 JSON 匯出，以及預設關閉的零成本生成工作驗證管線。
 
-最新公開版本：`v1.0.1`。
+最新公開版本：`v1.1.0`。
 
 ## English summary
 
-RigStage is an invite-only PC catalogue, private visual-asset review and 3D assembly workspace built with React and Cloudflare Workers. Version 1.0 provides workspace-scoped onboarding, human-approved GLB previews, persistent builds, deterministic compatibility evidence and privacy-bounded export.
+RigStage is an invite-only PC catalogue, private visual-asset review and 3D assembly workspace built with React and Cloudflare Workers. Version 1.1 adds a fail-closed, zero-cost generation-job validation pipeline to the workspace-scoped catalogue, human-approved GLB preview, persistent build, deterministic compatibility and privacy-bounded export workflow.
 
 ## 現有功能
 
@@ -26,10 +26,13 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
+- 受 workspace、角色、素材版本、已儲存使用權及 `Idempotency-Key` 限制的生成工作 API；同一素材只可有一項進行中工作。
+- 零成本 synthetic adapter 可在本地或明確控制的非正式環境驗證 Workflow、GLB 格式、安全檢查、私人 R2 draft ingestion 及人工審批銜接。
+- Tracked production 設定的 generation kill switch 預設關閉；沒有外部 3D provider、Workers AI 模型或付款呼叫。
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
 
-本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。公開主頁只介紹產品及提供登入導向，不會載入 session、商戶記錄或私人素材。Production 工作台可在角色及 workspace 限制下讀寫 D1 目錄、審核及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.0 是可用的邀請制人工審批 MVP，真實 3D 供應商生成及多模型裝配場景不在此版本承諾內。
+本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。公開主頁只介紹產品及提供登入導向，不會載入 session、商戶記錄或私人素材。Production 工作台可在角色及 workspace 限制下讀寫 D1 目錄、審核、生成工作及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.1 是可用的邀請制人工審批 MVP；runtime synthetic GLB 只驗證安全管線，真實 3D 供應商生成、Workers AI 自動化及多模型裝配場景不在此版本承諾內。
 
 主頁的工作區畫面均從本地合成示範介面擷取，用作準確展示 Dashboard、產品目錄、私人素材審核及 Builder；不包含真實商戶資料、私人素材或 production data，亦不構成報價、工程規格或相容性證據。
 
@@ -76,7 +79,9 @@ Cloudflare Workers Builds 會自動提供 Worker 名稱 override；其他 CI 環
 
 Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets。
 
-身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
+Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 production fail-closed 預設值，不是供應商設定。任何外部生成啟用都需要另一次明確批准、私密設定、費用上限及非正式環境驗證。
+
+身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)，生成與付款界線見 [Generation pipeline](docs/GENERATION_PIPELINE.md) 及 [Payment boundary](docs/PAYMENT_BOUNDARY.md)。相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
 
 ## 安全邊界
 
@@ -92,3 +97,5 @@ Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬�
 - 限流鍵使用已驗證 Access subject，不記錄 JWT 或電郵。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
 - Builder 只讀取已核准素材的私人 GLB，並在選擇切換或頁面卸載時撤銷瀏覽器 object URL。
+- 生成工作先提交 D1 job／event／audit，再啟動 Workflow；輸入版本、使用權、成本上限、輸出格式及 checksum 任一失敗都不會建立可核准素材。
+- 模擬輸出會重設所有人工審核證據；production kill switch 關閉時不會建立工作或呼叫外部服務。
