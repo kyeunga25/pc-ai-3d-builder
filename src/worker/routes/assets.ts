@@ -9,6 +9,10 @@ import {
 } from "../../shared/domain/assets";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
+import {
+  findReservedGenerationForAsset,
+  generationReviewAccountingStatements,
+} from "../generation/accounting";
 import { ApiError } from "../lib/api-error";
 import { readBoundedJson } from "../lib/request-body";
 
@@ -232,12 +236,13 @@ export async function assetReviewMutationResponse(
   }
 
   const input = parsed.data;
-  if (input.action === "approve") {
-    const current = await findAsset(db, context.currentWorkspace.id, assetId);
+  let current: AssetReviewRow | null = null;
+  if (input.action === "approve" || input.action === "reject") {
+    current = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!current) {
       throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
     }
-    if (!current.model_object_key) {
+    if (input.action === "approve" && !current.model_object_key) {
       throw new ApiError(
         409,
         "ASSET_MODEL_REQUIRED",
@@ -261,6 +266,15 @@ export async function assetReviewMutationResponse(
     decision: input.action,
     reviewVersion: nextVersion,
   });
+  const reservedGeneration =
+    current?.source_kind === "generated"
+      ? await findReservedGenerationForAsset(
+          db,
+          context.currentWorkspace.id,
+          assetId,
+          current.model_object_key,
+        )
+      : null;
 
   const statements = [
     db
@@ -347,6 +361,19 @@ export async function assetReviewMutationResponse(
         nextVersion,
       ),
   ];
+
+  if (
+    reservedGeneration &&
+    (input.action === "approve" || input.action === "reject")
+  ) {
+    statements.push(
+      ...generationReviewAccountingStatements(db, {
+        workspaceId: context.currentWorkspace.id,
+        jobId: reservedGeneration.jobId,
+        action: input.action,
+      }),
+    );
+  }
 
   const [updateResult] = await db.batch(statements);
   if (updateResult?.meta.changes !== 1) {

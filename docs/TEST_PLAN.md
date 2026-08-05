@@ -39,16 +39,20 @@ Current unit tests cover:
 - read-only workspace dashboard aggregates, empty state and identity exclusion;
 - guarded logical archive for a build draft.
 - generation capability fail-closed parsing and disabled-provider behavior;
-- runtime synthetic GLB structure and existing self-contained-model validation;
+- runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;
 - owner/admin generation role checks, saved source-rights requirement and current review version;
 - workspace-scoped generation job listing without private object or Workflow data;
-- idempotent, zero-cost job creation before Workflow start, including rejection of cross-asset key reuse;
+- idempotent, zero-cost job creation with exactly one capability reservation before Workflow start, including rejection of cross-asset key reuse;
+- immutable provider-attempt disposition for duplicates, out-of-order results, conflicts and late completion;
+- exact-once capability settlement after approval and release after rejection, replacement or terminal failure;
 - payment provider boundary remaining disconnected and disabled.
 - private owner-onboarding input validation, idempotent owner/workspace SQL and optional bounded credit-account creation.
 
+Workers Runtime integration tests apply the real migrations and use Miniflare/workerd D1, R2 and Workflow bindings. They force a transient post-storage validation retry and verify one provider attempt, one reservation, deterministic private output, read-back validation, idempotent request replay and exact-once approval settlement. A terminal validation failure verifies draft cleanup and exact-once release.
+
 ## Migration check
 
-Apply all numbered migrations to an empty temporary SQLite database and confirm schema phase `8`, the catalogue record-version column, private asset-file metadata columns, `builds`, `build_items`, `generation_jobs` and `generation_job_events`, and no rows from `PRAGMA foreign_key_check`. Confirm that duplicate workspace idempotency keys and concurrent active jobs for one asset are rejected. Insert only synthetic workspace, catalogue, asset, generation-job and build fixtures when checking relational constraints. Never use a local copy of production data.
+Apply all numbered migrations to an empty local database and confirm schema phase `9`, the catalogue record-version column, private asset-file metadata columns, `builds`, `build_items`, `generation_jobs`, `generation_job_events`, `generation_credit_accounts`, `generation_job_entitlements`, `generation_credit_events` and `generation_provider_attempts`, and no rows from `PRAGMA foreign_key_check`. Confirm that duplicate workspace idempotency keys, duplicate provider-attempt references and concurrent active jobs for one asset are rejected. Insert only synthetic workspace, catalogue, asset, generation-job, capability and build fixtures when checking relational constraints. Never use a local copy of production data.
 
 ## Browser check
 
@@ -73,8 +77,10 @@ Test the built application at desktop and tablet widths. Confirm:
 - a synthetic GLB unlocks the manual Three.js preview and remains required for approval;
 - desktop and 390 px layouts show source and model controls without page-level horizontal overflow;
 - completing the final asset checklist item enables approval, and approval locks the reviewed fields;
-- local preview requires a saved source-rights confirmation before enabling zero-cost simulation;
-- local simulation creates a runtime synthetic GLB, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
+- local preview starts with two clearly non-monetary capability credits and requires a saved source-rights confirmation before enabling zero-cost simulation;
+- local simulation reserves exactly one capability credit, creates a runtime synthetic GLB, records one provider cost unit, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
+- a second generation is blocked while the first reservation awaits review;
+- approving the synthetic draft settles the reservation once and opens the approved synthetic model in Builder; rejecting or replacing it releases the reservation once;
 - production capability remains disabled unless a separately reviewed private configuration enables simulation;
 - a verified 9-category build reports six passing rules and enables export;
 - changing a GPU to one above the selected PSU recommendation produces a warning;
@@ -89,3 +95,5 @@ Test the built application at desktop and tablet widths. Confirm:
 ## Deployment check
 
 Use a mode-`0600`, Git-ignored deployment configuration with `workers.dev` and preview URLs disabled. Verify the public health endpoint, static deep-link fallback, protected session, every workspace parent/deep route, dashboard, build, generation-job and private-file rejection without Access, security headers and absence of source maps. Confirm exact-email Access Allow policy behavior for the owner and denial for an uninvited identity. Confirm that tracked production configuration reports generation disabled and rejects job creation before a D1 write. Do not print or record identities, tokens or deployment identifiers during validation.
+
+The local generation milestone is not a provider-readiness check and must not be represented as real-provider, preview or production-generation evidence.

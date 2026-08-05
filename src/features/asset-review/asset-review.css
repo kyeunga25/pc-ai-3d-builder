@@ -421,6 +421,14 @@
   width: 14px;
 }
 
+.asset-file-control__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .technical-list {
   display: grid;
   gap: 7px;

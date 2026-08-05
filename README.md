@@ -1,12 +1,16 @@
 # RigStage
 
-RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.1 提供受保護的產品目錄、私人素材審核、持久化 PC Builder、可解釋相容性規則、已核准模型預覽、安全 JSON 匯出，以及預設關閉的零成本生成工作驗證管線。
+RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.1 提供受保護的產品目錄、私人素材審核、持久化 PC Builder、可解釋相容性規則、已核准模型預覽、安全 JSON 匯出，以及預設關閉的零成本生成工作驗證管線。目前 source 另包含本機 AI 開發里程碑，用 synthetic adapter 驗證 credit、重試、GLB 安全閘及人工審批銜接；它不代表 production 已啟用 AI。
+
+**部署平台：Cloudflare Workers。** Vite 產生的前端由 Workers Static Assets 發佈，`/api/*` 由同一個 Worker 處理；受保護功能再使用 Cloudflare Access、D1、私人 R2、Workflows 及 Rate Limiting bindings。這不是 Cloudflare Pages 專案。
+
+公開版本庫只描述可核對的程式行為、邏輯元件及自部署介面，不包含任何實際 hostname、Cloudflare account／resource identifier、Access policy 值、token、production 資料、私人資產或營運拓撲。由於可取得原始碼的人仍可閱讀程式及 migration，若連邏輯架構本身也屬機密，應使用私人版本庫及獨立的私人營運文檔。
 
 最新公開版本：`v1.1.0`。
 
 ## English summary
 
-RigStage is an invite-only PC catalogue, private visual-asset review and 3D assembly workspace built with React and Cloudflare Workers. Version 1.1 adds a fail-closed, zero-cost generation-job validation pipeline to the workspace-scoped catalogue, human-approved GLB preview, persistent build, deterministic compatibility and privacy-bounded export workflow.
+RigStage is an invite-only PC catalogue, private visual-asset review and 3D assembly workspace built with React and Cloudflare Workers. Version 1.1 adds a fail-closed, zero-cost generation-job validation pipeline. The current source also includes a local-development milestone with non-monetary credit accounting, attempt idempotency, strict GLB safety gates and an end-to-end synthetic review-to-Builder path without enabling a real AI provider.
 
 ## 現有功能
 
@@ -27,8 +31,10 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
-- 受 workspace、角色、素材版本、已儲存使用權及 `Idempotency-Key` 限制的生成工作 API；同一素材只可有一項進行中工作。
+- 受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制的生成工作 API；同一素材只可有一項進行中或等待人工決定的保留工作。
 - 零成本 synthetic adapter 可在本地或明確控制的非正式環境驗證 Workflow、GLB 格式、安全檢查、私人 R2 draft ingestion 及人工審批銜接。
+- Generation credit 會在要求時原子保留，在核准時結算，在拒絕、失敗、啟動失敗或草稿被取代時釋放；這是非貨幣 entitlement 記帳，不是付款、餘額或售價。
+- Provider attempt 以穩定 attempt key 去重，供應商邊界只接收假名化工作參考、來源檔案描述及明確輸出限制。生成 GLB 在寫入 R2 前及讀回後均檢查自包含結構、尺寸、三角形、貼圖、byte bounds 及 checksum。
 - Tracked production 設定的 generation kill switch 預設關閉；沒有外部 3D provider、Workers AI 模型或付款呼叫。
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
@@ -37,11 +43,17 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 
 主頁的工作區畫面均從本地合成示範介面擷取，用作準確展示 Dashboard、產品目錄、私人素材審核及 Builder；不包含真實商戶資料、私人素材或 production data，亦不構成報價、工程規格或相容性證據。
 
-## 技術
+## 技術棧
 
-- React 19、React Router 8、Vite 8、TypeScript 6、Three.js 0.185
-- Cloudflare Workers、Static Assets、Access、D1、R2、Workflows
-- Zod、Vitest、ESLint、Prettier
+| 層面 | 使用技術 |
+| --- | --- |
+| 前端 | React 19、React Router 8、Vite 8、TypeScript 6、Lucide React |
+| 3D 與資料驗證 | Three.js 0.185、glTF 2.0／GLB、Zod 4 |
+| Edge 與存取控制 | Cloudflare Workers、Static Assets、Access、Rate Limiting、`jose` |
+| 持久化與非同步工作 | Cloudflare D1、私人 R2、Cloudflare Workflows |
+| 測試與品質 | Vitest、Cloudflare Workers Vitest pool、ESLint、Prettier、Wrangler 4 |
+
+精確套件版本以 [`package.json`](package.json) 及 lockfile 為準；Cloudflare binding 形狀以 [`wrangler.jsonc`](wrangler.jsonc) 的 identifier-free 範本為準。
 
 ## 本地開發
 
@@ -64,9 +76,53 @@ npm audit --audit-level=high
 
 本地 UI 使用合成 session、目錄、素材審核及組裝記錄，方便測試版面、人手核准、相容性及匯出流程。Worker 的 Access 驗證沒有本地繞過；要測試真實登入及 D1 路徑，請使用受保護的非正式環境。
 
-## 部署設定
+完整 synthetic 圖片 → 3D → 審核 → Builder 流程：
 
-版本庫內的 `wrangler.jsonc` 只記錄 placeholder Worker label 及不含識別資料的 binding 範本。`main` 分支由 Cloudflare Workers Builds 執行 `npm run build` 及 `npm run deploy:ci`；部署指令會以平台提供的 CI override 與 Cloudflare build secrets 產生 Git 忽略的臨時設定，先套用尚未執行的 D1 migrations，再上傳 Worker。Account ID、D1 ID、實際資源名稱、token、私有物件 URL 及商戶身份資料不會進入 Git。
+```bash
+npm run local:ai:start
+```
+
+在 `/asset-review` 按「合成圖片」，明確勾選圖片使用權並儲存草稿，再建立模擬 GLB。完成六項核准清單及三個人手核實尺寸後核准素材，最後按「在 Builder 檢查」。這條路徑只在 Vite development mode 使用記憶體及 browser object URL，不會上載圖片、呼叫供應商或連接 production。
+
+要驗證本機 D1 migration、R2 與 Workflow runtime：
+
+```bash
+npm run db:migrate:local
+npm run test:worker
+npm run local:ai:debug
+```
+
+`local:ai:debug` 明確使用 Wrangler `--local`、synthetic runtime vars 及本機儲存。受保護 API 仍然要求 Access 身份；此命令不加入身份繞過。一次執行全部本機品質閘可用 `npm run local:ai:verify`。
+
+## 自行部署（摘要）
+
+自部署會建立一套完全獨立的 Cloudflare 資源，不會複製 RigStage 的正式資料、用戶、Access policy 或部署座標。開始前請先確認你有權使用此原始碼；本版本庫目前未附帶授權條款，公開可讀不等於獲授權複製、修改或商用。
+
+1. 準備 Node.js 22.22 或以上版本、npm、Git、Cloudflare 帳戶，以及可設定 Cloudflare Access 的 hostname。
+2. Fork 或取得獲授權的 source copy，在新的工作目錄執行 `npm ci`，再完成下列品質檢查。
+3. 以 Wrangler 互動登入，在自己的 Cloudflare 帳戶建立一個空白 D1 database 及一個保持 private 的 R2 bucket。
+4. 在 Git 忽略的本機檔案填入自己的 Worker／D1／R2／Workflow／Rate Limiting 座標，以及 Access runtime secrets；不要改寫 tracked `wrangler.jsonc` 的 placeholders。
+5. 產生 `.wrangler/deploy.jsonc`，在 private config 明確關閉 `workers.dev` 及 preview URL，先 dry-run，再套用 migration 及部署 Worker。
+6. 在加入任何真實資料前，完成 Access、邀請及 workspace membership 的私人設定，並驗證所有 protected route 均 fail closed。
+
+```bash
+npm ci
+npm run check
+npm run test
+npm run build
+npm run cf:dry-run
+npm audit --audit-level=high
+
+npx wrangler login
+npx wrangler d1 create <your-private-d1-name>
+npx wrangler r2 bucket create <your-private-r2-name>
+```
+
+完整的私密設定檔格式、手動部署、Workers Builds、自部署驗收、回復及資料外洩檢查，見 [Cloudflare Workers 自部署指南](docs/SELF_HOSTING.md)。該指南只使用 placeholders；請勿把終端輸出、實際 identifier 或 Access 值貼到 issue、pull request、截圖或聊天記錄。
+
+## Cloudflare Workers 部署設定
+
+版本庫內的 `wrangler.jsonc` 只記錄 placeholder Worker label 及不含識別資料的 binding 範本。`main` 分支由 Cloudflare Workers Builds 執行 `npm run build` 及 `npm run deploy:ci`；部署指令會以平台提供的 CI override 與 Cloudflare build secrets 產生 Git 忽略的臨時設定，明確關閉 `workers.dev` 與 preview URLs，先套用尚未執行的 D1 migrations，再上傳 Worker。Account ID、D1 ID、實際資源名稱、token、私有物件 URL 及商戶身份資料不會進入 Git。
 
 Cloudflare build 環境需要以下 secret 名稱，值只儲存在 Cloudflare：
 
@@ -90,7 +146,7 @@ npm run owner:onboard
 
 Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 production fail-closed 預設值，不是供應商設定。任何外部生成啟用都需要另一次明確批准、私密設定、費用上限及非正式環境驗證。
 
-身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)，生成與付款界線見 [Generation pipeline](docs/GENERATION_PIPELINE.md) 及 [Payment boundary](docs/PAYMENT_BOUNDARY.md)。相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
+自部署入口見 [Cloudflare Workers 自部署指南](docs/SELF_HOSTING.md)，身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。生成與付款界線見 [Generation pipeline](docs/GENERATION_PIPELINE.md) 及 [Payment boundary](docs/PAYMENT_BOUNDARY.md)，相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
 
 ## 安全邊界
 
@@ -107,5 +163,13 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - 限流鍵使用已驗證 Access subject，不記錄 JWT 或電郵。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
 - Builder 只讀取已核准素材的私人 GLB，並在選擇切換或頁面卸載時撤銷瀏覽器 object URL。
-- 生成工作先提交 D1 job／event／audit，再啟動 Workflow；輸入版本、使用權、成本上限、輸出格式及 checksum 任一失敗都不會建立可核准素材。
+- 生成工作先原子保留一個非貨幣 credit，提交 D1 job／entitlement／event／audit，再啟動 Workflow；輸入版本、使用權、成本上限、輸出格式及 checksum 任一失敗都不會建立可核准素材，保留 credit 只會釋放一次。
 - 模擬輸出會重設所有人工審核證據；production kill switch 關閉時不會建立工作或呼叫外部服務。
+
+## 技術、AI 模型與參考資料
+
+- **Runtime AI 模型：沒有。** 現有 `SyntheticGenerationProvider` 是 deterministic TypeScript 測試 adapter，只建立合成 GLB fixture；它不執行 inference、不讀取來源圖片內容，也不呼叫 Workers AI、OpenAI 或第三方 3D provider。
+- **雲端技術：** [Cloudflare Workers](https://developers.cloudflare.com/workers/)、[Static Assets](https://developers.cloudflare.com/workers/static-assets/)、[Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/)、[D1](https://developers.cloudflare.com/d1/)、[R2](https://developers.cloudflare.com/r2/)、[Workflows](https://developers.cloudflare.com/workflows/) 及 [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)。
+- **Web 與 3D：** [React](https://react.dev/)、[React Router](https://reactrouter.com/)、[Vite](https://vite.dev/)、[TypeScript](https://www.typescriptlang.org/docs/)、[Three.js](https://threejs.org/docs/) 及 Khronos [glTF 2.0 specification](https://registry.khronos.org/glTF/)。
+- **資料來源：** repository 只包含 synthetic fixtures、程式測試資料及公開標準參考；不包含正式 catalogue、用戶、客戶、價格、庫存、圖片、模型、prompt、provider response 或資料庫 dump。
+- 完整的用途對照、版本依據、官方參考連結、AI／dataset 聲明及更新規則見 [技術、模型與資料來源](docs/TECHNOLOGY_REFERENCES.md)。

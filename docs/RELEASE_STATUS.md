@@ -1,8 +1,8 @@
-# Public release status — v1.1.0
+# Release status — v1.1.0 baseline and local-development milestone
 
-This file records only the capabilities present in the current public branch.
+The first section records the tagged v1.1.0 public baseline. The second records public-safe source designed for local synthetic verification. Including this source in a deployed Worker does not enable production generation: the tracked production gate remains disabled, and local checks do not prove provider quality or remote readiness.
 
-## Available
+## Available in public v1.1.0
 
 - [x] React, Vite and TypeScript application shell.
 - [x] Traditional Chinese merchant interface with responsive and reduced-motion behavior.
@@ -42,9 +42,22 @@ This file records only the capabilities present in the current public branch.
 - [x] Production deploy command applies pending D1 migrations before Worker upload.
 - [x] Bilingual public issue forms, pull-request privacy checklist and support guidance.
 
+## Local development milestone
+
+- [x] Workspace-scoped, non-monetary generation capability accounts with reserve, settle and release transitions.
+- [x] One customer capability unit and a one-unit provider-cost ceiling per local synthetic job, without price, currency, purchase or payment semantics.
+- [x] Immutable provider-attempt records and stable provider idempotency references for duplicate, late, conflicting and out-of-order results.
+- [x] Pseudonymous provider input that excludes workspace, user, asset, object and deployment identifiers.
+- [x] Strict GLB validation for binary structure, buffer/accessor bounds, node graphs, transformed dimensions, triangles, textures and external resources.
+- [x] Validation both before private R2 storage and after read-back, with stable public failure codes and private raw errors.
+- [x] Exact-once reservation settlement after human approval and release after rejection, source replacement or terminal failure.
+- [x] Workers Runtime integration tests using real migrations plus local D1, R2 and Workflow bindings, including forced transient retry.
+- [x] A browser-only synthetic PNG-to-GLB-to-review-to-Builder path with visible capability state and no external calls.
+- [x] Explicit local development, migration, debugging and verification commands.
+
 ## Explicit boundaries
 
-Local catalogue records, prices, stock, review assets, runtime simulation output and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review, generation-job and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. The synthetic adapter tests orchestration only and remains disabled in tracked production configuration. External provider generation, Workers AI automation, payment processing and multi-model 3D scene composition are not v1.1 capabilities.
+Local catalogue records, prices, stock, review assets, runtime simulation output and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review, generation-job and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. The synthetic adapter tests orchestration only and remains disabled in tracked production configuration. Capability credits are safety accounting only: they are not money, purchased usage or payment evidence. External provider generation, Workers AI automation, payment processing and multi-model 3D scene composition are neither v1.1 capabilities nor delivered by the local-development milestone.
 
 ## Release checks
 

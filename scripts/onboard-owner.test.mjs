@@ -66,7 +66,13 @@ test("executes idempotently across the complete D1 schema", async () => {
       );
     }
 
-    database.exec(buildOwnerOnboardingSql(syntheticInput));
+    database.exec(
+      buildOwnerOnboardingSql({
+        ...syntheticInput,
+        includeCreditAccount: true,
+        creditUnits: 2,
+      }),
+    );
     database.exec(`
       UPDATE users SET status = 'suspended'
       WHERE email = 'owner@example.invalid';
@@ -81,6 +87,8 @@ test("executes idempotently across the complete D1 schema", async () => {
         workspaceSlug: "owner-beta-unused-second-run",
         auditId: "audit_second_run",
         requestId: "onboarding_second_run",
+        includeCreditAccount: true,
+        creditUnits: 999,
       }),
     );
 
@@ -95,7 +103,9 @@ test("executes idempotently across the complete D1 schema", async () => {
           (SELECT COUNT(*) FROM users) AS user_count,
           (SELECT COUNT(*) FROM workspaces) AS workspace_count,
           (SELECT COUNT(*) FROM workspace_memberships) AS membership_count,
-          (SELECT COUNT(*) FROM audit_events) AS audit_count
+          (SELECT COUNT(*) FROM audit_events) AS audit_count,
+          (SELECT COUNT(*) FROM generation_credit_accounts) AS credit_account_count,
+          (SELECT available_units FROM generation_credit_accounts) AS available_units
         FROM users AS u
         INNER JOIN workspace_memberships AS wm ON wm.user_id = u.id
         INNER JOIN workspaces AS w ON w.id = wm.workspace_id
@@ -115,6 +125,8 @@ test("executes idempotently across the complete D1 schema", async () => {
         workspace_count: 1,
         membership_count: 1,
         audit_count: 2,
+        credit_account_count: 1,
+        available_units: 2,
       },
     );
   } finally {
