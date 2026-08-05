@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { BrandMark } from "../../shared/components/BrandMark";
 import { LoadingState } from "../../shared/components/AsyncState";
+import { workspaceLoginPath } from "./access-navigation";
 import { useSessionState } from "./session-context";
 import "./auth.css";
 
@@ -44,13 +45,19 @@ export function SessionGate({ children }: { children: ReactNode }) {
               : "RigStage 未有載入任何商戶資料。請稍後再試。"}
           </p>
         </div>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={state.reload}
-        >
-          重新驗證
-        </button>
+        {denied ? (
+          <a className="button button--secondary" href={workspaceLoginPath}>
+            重新登入
+          </a>
+        ) : (
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={state.reload}
+          >
+            重新驗證
+          </button>
+        )}
       </section>
     </main>
   );

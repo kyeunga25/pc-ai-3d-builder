@@ -12,9 +12,10 @@
     "build": "npm run typegen && npm run check:types && vite build",
     "check": "npm run typegen:check && npm run check:types && eslint . && prettier --check .",
     "check:types": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.worker-test.json --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "npm run test:unit && npm run test:worker",
+    "test": "npm run test:unit && npm run test:worker && npm run test:owner-onboarding",
     "test:unit": "vitest run",
     "test:worker": "vitest run --config vitest.worker.config.ts",
+    "test:owner-onboarding": "node --test scripts/onboard-owner.test.mjs",
     "test:watch": "vitest",
     "typegen": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs wrangler types",
     "typegen:check": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs wrangler types --check",
@@ -24,7 +25,8 @@
     "db:migrate:local": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply DB --local",
     "prepare:deploy": "node scripts/create-cloudflare-config.mjs",
     "db:migrate:ci": "wrangler d1 migrations apply DB --remote --config .wrangler/deploy.jsonc",
-    "deploy:ci": "npm run prepare:deploy && npm run db:migrate:ci && wrangler deploy --config .wrangler/deploy.jsonc"
+    "deploy:ci": "npm run prepare:deploy && npm run db:migrate:ci && wrangler deploy --config .wrangler/deploy.jsonc",
+    "owner:onboard": "node scripts/onboard-owner.mjs"
   },
   "dependencies": {
     "jose": "6.2.4",

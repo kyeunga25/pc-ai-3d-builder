@@ -18,6 +18,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 香港繁體中文介面及港幣格式。
 - 讀取真實 D1 聚合資料的 Dashboard，以及產品目錄、素材審核及 PC Builder 路由。
 - Cloudflare Access JWT 驗證、邀請制用戶及 server-side workspace scope。
+- Dashboard、產品目錄、素材審核及 Builder 的 parent／deep route 都以 Worker-first 驗證 Access JWT 與 active D1 membership，Static Assets 不可繞過私人 shell 授權。
 - 公開 health endpoint，以及受保護的 session／workspace endpoint。
 - 受 workspace 限制的分頁產品目錄 API，以及 production 介面的載入、空白與錯誤狀態。
 - Staff、admin 及 owner 可新增、編輯和封存產品；更新以版本條件避免覆寫較新資料。
@@ -135,6 +136,14 @@ Cloudflare Workers Builds 會自動提供 Worker 名稱 override；其他 CI 環
 
 Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets。
 
+私人 owner onboarding 只從 shell environment 讀取 `OWNER_LOGIN_IDENTITY`，並使用 Git 忽略、權限為 `0600` 且已關閉 `workers.dev`／preview URL 的 deployment config。工具不接受 command-line identity，也不輸出 identity、D1／Worker identifier 或 SQL；若日後已套用 generation credit migration，可由同一個私密流程建立不超過 1,000 單位的非貨幣 beta entitlement，現有記帳不會被重設。
+
+```bash
+npm run owner:onboard
+```
+
+真實值必須在執行前由私密 terminal session 放入環境；不要把 export 指令、終端記錄或結果貼入 issue、PR 或文件。
+
 Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 production fail-closed 預設值，不是供應商設定。任何外部生成啟用都需要另一次明確批准、私密設定、費用上限及非正式環境驗證。
 
 自部署入口見 [Cloudflare Workers 自部署指南](docs/SELF_HOSTING.md)，身份及 D1 設定見 [試行存取設定](docs/PILOT_ACCESS_SETUP.md)。生成與付款界線見 [Generation pipeline](docs/GENERATION_PIPELINE.md) 及 [Payment boundary](docs/PAYMENT_BOUNDARY.md)，相容性證據見 [規則文件](docs/COMPATIBILITY_RULES.md)，協作及回報渠道見 [Contribution workflow](docs/CONTRIBUTING.md) 與 [Support](SUPPORT.md)，公開安全政策見 [SECURITY.md](SECURITY.md)。
@@ -142,6 +151,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 ## 安全邊界
 
 - 除 health endpoint 外，API 必須先驗證 Access JWT。
+- 私人 SPA parent 及 deep route 在讀取 Static Assets 前同樣驗證 Access JWT、owner invite 及 active workspace membership。
 - Workspace 選擇必須由 D1 membership 重新核對。
 - 首次身份綁定採用條件更新，失敗後重新讀取持久化 subject。
 - 讀取 session 不會寫入 audit table。

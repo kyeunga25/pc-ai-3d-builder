@@ -1,4 +1,8 @@
 import { authenticateAccessRequest } from "./auth/access";
+import {
+  isProtectedWorkspacePath,
+  privateWorkspaceAssetResponse,
+} from "./auth/protected-routes";
 import { resolveRequestContext } from "./auth/workspace";
 import { ApiError, apiErrorResponse } from "./lib/api-error";
 import { logRecord } from "./lib/log";
@@ -50,6 +54,16 @@ function apiNotFound(requestId: string): Response {
   );
 }
 
+async function authenticateWorkspaceRequest(request: Request, env: Env) {
+  const identity = await authenticateAccessRequest(request, env);
+  await enforcePilotRateLimit(env.PILOT_RATE_LIMITER, identity.subject);
+  return resolveRequestContext(
+    env.DB,
+    identity,
+    request.headers.get("x-rigstage-workspace-id"),
+  );
+}
+
 async function routeRequest(
   request: Request,
   env: Env,
@@ -68,14 +82,8 @@ async function routeRequest(
     return healthResponse(requestId);
   }
 
-  if (url.pathname.startsWith("/api/")) {
-    const identity = await authenticateAccessRequest(request, env);
-    await enforcePilotRateLimit(env.PILOT_RATE_LIMITER, identity.subject);
-    const context = await resolveRequestContext(
-      env.DB,
-      identity,
-      request.headers.get("x-rigstage-workspace-id"),
-    );
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+    const context = await authenticateWorkspaceRequest(request, env);
 
     if (url.pathname === "/api/session") {
       if (request.method !== "GET") {
@@ -316,6 +324,11 @@ async function routeRequest(
     }
 
     return apiNotFound(requestId);
+  }
+
+  if (isProtectedWorkspacePath(url.pathname)) {
+    await authenticateWorkspaceRequest(request, env);
+    return privateWorkspaceAssetResponse(await env.ASSETS.fetch(request));
   }
 
   return env.ASSETS.fetch(request);

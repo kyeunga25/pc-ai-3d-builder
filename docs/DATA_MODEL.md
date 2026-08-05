@@ -18,6 +18,8 @@ Stores invited application users. The verified Cloudflare Access subject is init
 
 Links users to workspaces with an explicit role and status. Server routes select only active memberships and active workspaces.
 
+Private owner onboarding activates one existing non-archived owner workspace or creates one generic owner workspace. It never seeds an identity or workspace in a migration. If the optional generation credit schema exists, onboarding may create a bounded non-monetary account without overwriting an existing ledger.
+
 ## `audit_events`
 
 Reserved for meaningful state transitions. Read-only session resolution does not create audit rows. Metadata must be small, structured and free of JWTs, email addresses, provider keys, prompts and private object URLs.

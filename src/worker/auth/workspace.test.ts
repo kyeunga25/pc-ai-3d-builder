@@ -43,8 +43,10 @@ function fakeDatabase(
   } = {},
 ) {
   const writes: Array<{ sql: string; values: unknown[] }> = [];
+  const queries: string[] = [];
   const db = {
     prepare(sql: string) {
+      queries.push(sql);
       return {
         bind(...values: unknown[]) {
           return {
@@ -72,7 +74,7 @@ function fakeDatabase(
     },
   } as unknown as D1Database;
 
-  return { db, writes };
+  return { db, queries, writes };
 }
 
 describe("workspace scope resolution", () => {
@@ -119,8 +121,28 @@ describe("workspace scope resolution", () => {
     expect(writes).toHaveLength(0);
   });
 
+  it("filters suspended accounts before membership resolution", async () => {
+    const { db, queries, writes } = fakeDatabase(null);
+
+    await expect(
+      resolveRequestContext(
+        db,
+        {
+          subject: "access-suspended",
+          email: "suspended@example.com",
+          displayName: null,
+        },
+        null,
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "INVITE_REQUIRED" });
+
+    expect(queries[0]).toContain("WHERE status = 'active'");
+    expect(queries).toHaveLength(1);
+    expect(writes).toHaveLength(0);
+  });
+
   it("binds an invited identity only after resolving an active membership", async () => {
-    const { db, writes } = fakeDatabase({
+    const { db, queries, writes } = fakeDatabase({
       id: "user_pilot",
       email: "pilot@example.com",
       access_subject: null,
@@ -140,6 +162,8 @@ describe("workspace scope resolution", () => {
 
     expect(context.currentWorkspace.id).toBe("ws_beta");
     expect(context.workspaces).toHaveLength(2);
+    expect(queries[1]).toContain("wm.status = 'active'");
+    expect(queries[1]).toContain("w.status = 'active'");
     expect(writes).toHaveLength(1);
     expect(writes[0]?.values).toEqual([
       "access-pilot",

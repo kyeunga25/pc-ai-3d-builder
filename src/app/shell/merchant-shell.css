@@ -75,6 +75,29 @@
   font-size: 12px;
 }
 
+.merchant-header__logout {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.merchant-header__logout:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.merchant-header__logout svg {
+  width: 15px;
+  height: 15px;
+}
+
 .merchant-nav {
   position: sticky;
   top: 64px;
@@ -190,6 +213,21 @@
 
   .merchant-header__status {
     display: none;
+  }
+
+  .merchant-header__logout {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .merchant-header__logout span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .merchant-nav {

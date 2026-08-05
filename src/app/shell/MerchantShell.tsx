@@ -1,10 +1,18 @@
-import { Boxes, ChevronDown, Cuboid, Gauge, Wrench } from "lucide-react";
+import {
+  Boxes,
+  ChevronDown,
+  Cuboid,
+  Gauge,
+  LogOut,
+  Wrench,
+} from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 
 import {
   useAuthenticatedSession,
   useSessionState,
 } from "../../features/auth/session-context";
+import { accessLogoutPath } from "../../features/auth/access-navigation";
 import { BrandMark } from "../../shared/components/BrandMark";
 import {
   accountInitials,
@@ -63,6 +71,14 @@ export function MerchantShell() {
         >
           {accountInitials(user.displayName, user.email)}
         </span>
+        <a
+          className="merchant-header__logout"
+          href={accessLogoutPath}
+          aria-label="登出 Cloudflare Access"
+        >
+          <LogOut aria-hidden="true" />
+          <span>登出</span>
+        </a>
       </header>
 
       <aside className="merchant-nav" aria-label="商戶導覽列">
