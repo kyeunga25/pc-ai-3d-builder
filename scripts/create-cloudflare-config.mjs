@@ -41,8 +41,6 @@ source.main = "../src/worker/index.ts";
 source.workers_dev = false;
 source.preview_urls = false;
 source.assets = { ...source.assets, directory: "../dist" };
-source.workers_dev = false;
-source.preview_urls = false;
 
 source.d1_databases = [
   {
