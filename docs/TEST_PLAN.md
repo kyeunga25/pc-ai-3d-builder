@@ -15,6 +15,9 @@ Current unit tests cover:
 - domain schema and locale formatting;
 - synthetic session parsing;
 - Access JWT validation failures and accepted claims;
+- required application-token type and rejection of expired Access assertions;
+- exact protected SPA parent/deep-route matching and Static Assets Worker-first configuration;
+- AJAX expiry signaling and top-level re-login/logout paths;
 - workspace membership selection and tampering rejection;
 - concurrent first-login subject binding;
 - subject-keyed API rate limiting;
@@ -43,6 +46,7 @@ Current unit tests cover:
 - immutable provider-attempt disposition for duplicates, out-of-order results, conflicts and late completion;
 - exact-once capability settlement after approval and release after rejection, replacement or terminal failure;
 - payment provider boundary remaining disconnected and disabled.
+- private owner-onboarding input validation, idempotent owner/workspace SQL and optional bounded credit-account creation.
 
 Workers Runtime integration tests apply the real migrations and use Miniflare/workerd D1, R2 and Workflow bindings. They force a transient post-storage validation retry and verify one provider attempt, one reservation, deterministic private output, read-back validation, idempotent request replay and exact-once approval settlement. A terminal validation failure verifies draft cleanup and exact-once release.
 
@@ -55,10 +59,12 @@ Apply all numbered migrations to an empty local database and confirm schema phas
 Test the built application at desktop and tablet widths. Confirm:
 
 - `/` 在不建立 session 的情況下顯示完整產品介紹，並以 top-level navigation 導向 `/dashboard` 登入入口；
+- `/dashboard`、`/catalogue`、`/asset-review`、`/builder` 及各自 deep route 在 Static Assets 前要求有效 Access identity 與 active D1 membership；
 - 首頁的流程、安全邊界及 invite-only 指引在桌面和 390 px 均完整可讀；
 - 首頁的 Dashboard、產品目錄、素材審核及 Builder 合成工作區畫面均可載入、放大查看，且不包含真實商戶或私人素材；
 - 首頁的正文、案例、圖說及輔助文字在桌面和 390 px 均維持適合繁體中文閱讀的字級、行距及對比；
 - the authentication loading and failure states are readable;
+- logout clears the Access application session, re-login uses a top-level navigation, and an expired AJAX session returns a bounded authorization failure;
 - every navigation item is keyboard reachable;
 - the builder route loads lazily;
 - no horizontal overflow obscures primary actions;
@@ -88,6 +94,6 @@ Test the built application at desktop and tablet widths. Confirm:
 
 ## Deployment check
 
-Use a Git-ignored deployment configuration. Verify the public health endpoint, static deep-link fallback, protected session, dashboard, build, generation-job and private-file rejection without Access, security headers and absence of source maps. Confirm that tracked production configuration reports generation disabled and rejects job creation before a D1 write. Do not print or record deployment identifiers during validation.
+Use a mode-`0600`, Git-ignored deployment configuration with `workers.dev` and preview URLs disabled. Verify the public health endpoint, static deep-link fallback, protected session, every workspace parent/deep route, dashboard, build, generation-job and private-file rejection without Access, security headers and absence of source maps. Confirm exact-email Access Allow policy behavior for the owner and denial for an uninvited identity. Confirm that tracked production configuration reports generation disabled and rejects job creation before a D1 write. Do not print or record identities, tokens or deployment identifiers during validation.
 
 The local generation milestone is not a provider-readiness check and must not be represented as real-provider, preview or production-generation evidence.

@@ -25,6 +25,7 @@ describe("Cloudflare Access identity", () => {
       sub: "access-user-1",
       email: "  PILOT@EXAMPLE.COM ",
       name: " 試行用戶 ",
+      type: "app",
     });
     const request = new Request("https://rigstage.test/api/session", {
       headers: { "Cf-Access-Jwt-Assertion": "signed-token" },
@@ -48,6 +49,38 @@ describe("Cloudflare Access identity", () => {
       headers: { "Cf-Access-Jwt-Assertion": "invalid-token" },
     });
     const verify = vi.fn().mockRejectedValue(new Error("signature mismatch"));
+
+    await expect(
+      authenticateAccessRequest(request, env, verify),
+    ).rejects.toMatchObject({
+      status: 401,
+      code: "ACCESS_TOKEN_INVALID",
+    });
+  });
+
+  it("rejects an expired application token", async () => {
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "expired-token" },
+    });
+    const verify = vi.fn().mockRejectedValue(new Error("JWT expired"));
+
+    await expect(
+      authenticateAccessRequest(request, env, verify),
+    ).rejects.toMatchObject({
+      status: 401,
+      code: "ACCESS_TOKEN_INVALID",
+    });
+  });
+
+  it("accepts only an identity-based Access application token", async () => {
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "non-identity-token" },
+    });
+    const verify = vi.fn().mockResolvedValue({
+      sub: "access-user-1",
+      email: "pilot@example.com",
+      type: "org",
+    });
 
     await expect(
       authenticateAccessRequest(request, env, verify),

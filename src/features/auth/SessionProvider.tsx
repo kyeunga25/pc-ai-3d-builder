@@ -10,6 +10,7 @@ import {
   sessionResponseSchema,
   type SessionResponse,
 } from "../../shared/domain/session";
+import { apiFetch } from "../../shared/lib/api-fetch";
 import {
   SessionContext,
   type SessionContextValue,
@@ -53,7 +54,7 @@ async function fetchSession(
     headers.set("x-rigstage-workspace-id", workspaceId);
   }
 
-  const response = await fetch("/api/session", {
+  const response = await apiFetch("/api/session", {
     credentials: "same-origin",
     headers,
     signal,

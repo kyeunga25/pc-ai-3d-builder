@@ -88,6 +88,7 @@ async function verifyWithCloudflareAccess(
     issuer: config.issuer,
     audience: config.audience,
     algorithms: ["RS256"],
+    requiredClaims: ["sub", "exp", "iat"],
   });
 
   return payload;
@@ -119,8 +120,10 @@ export async function authenticateAccessRequest(
       typeof payload.name === "string" && payload.name.trim().length > 0
         ? payload.name.trim()
         : null;
+    const tokenType =
+      typeof payload.type === "string" ? payload.type.trim() : "";
 
-    if (!subject || !email) {
+    if (!subject || !email || tokenType !== "app") {
       throw new Error("Access identity claims are incomplete");
     }
 

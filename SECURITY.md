@@ -19,7 +19,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 ## Security controls
 
 - Access JWT signature, issuer, audience, expiry and subject are verified in the Worker.
-- The public landing page performs no protected API request; workspace pages and every non-health API route remain behind Access.
+- The public landing page performs no protected API request; workspace parent and deep routes run through Worker authentication before Static Assets, and every non-health API route remains behind Access.
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
 - Protected API requests are rate-limited by verified Access subject.
@@ -46,6 +46,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Unexpected exceptions are logged with a stable code rather than raw error text.
 - Production source maps and Wrangler telemetry are disabled.
 - Provider keys, Access values and Cloudflare identifiers must stay outside Git.
+- Private owner onboarding reads the exact login identity only from a private environment, requires a mode-`0600` ignored deployment config with alternate public Worker URLs disabled, and suppresses Wrangler output that could contain identity or resource mappings.
 
 ## Dependencies
 

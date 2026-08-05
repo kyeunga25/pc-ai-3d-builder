@@ -22,6 +22,8 @@ Requires a valid Cloudflare Access assertion, an invited active user and at leas
 
 The request may include `X-RigStage-Workspace-Id`. The Worker treats it only as a request and accepts it only when D1 confirms active membership. Session reads do not write audit records.
 
+Browser API requests send `X-Requested-With: XMLHttpRequest`. An expired Access application session therefore returns `401`; the UI performs a top-level navigation to re-enter the Access login flow rather than adding an application bypass.
+
 ## `GET /api/workspaces`
 
 Uses the same authentication and workspace resolution path and returns only the caller's active workspace summaries.

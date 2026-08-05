@@ -8,6 +8,7 @@ import {
   type BuildMutation,
   type BuildRecord,
 } from "../../shared/domain/builds";
+import { apiFetch } from "../../shared/lib/api-fetch";
 
 export class BuildRequestError extends Error {
   constructor(
@@ -46,7 +47,7 @@ export async function fetchBuildList(
   signal: AbortSignal,
   workspaceId: string,
 ): Promise<BuildListItem[]> {
-  const response = await fetch("/api/builds", {
+  const response = await apiFetch("/api/builds", {
     credentials: "same-origin",
     headers: workspaceHeaders(workspaceId),
     signal,
@@ -62,11 +63,14 @@ export async function fetchBuild(
   workspaceId: string,
   buildId: string,
 ): Promise<BuildRecord> {
-  const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}`, {
-    credentials: "same-origin",
-    headers: workspaceHeaders(workspaceId),
-    signal,
-  });
+  const response = await apiFetch(
+    `/api/builds/${encodeURIComponent(buildId)}`,
+    {
+      credentials: "same-origin",
+      headers: workspaceHeaders(workspaceId),
+      signal,
+    },
+  );
   if (!response.ok) {
     throw await buildError(response);
   }
@@ -79,7 +83,7 @@ export async function createBuild(
 ): Promise<BuildRecord> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await fetch("/api/builds", {
+  const response = await apiFetch("/api/builds", {
     method: "POST",
     credentials: "same-origin",
     headers,
@@ -98,12 +102,15 @@ export async function mutateBuild(
 ): Promise<BuildRecord | null> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}`, {
-    method: "PATCH",
-    credentials: "same-origin",
-    headers,
-    body: JSON.stringify(buildMutationSchema.parse(mutation)),
-  });
+  const response = await apiFetch(
+    `/api/builds/${encodeURIComponent(buildId)}`,
+    {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify(buildMutationSchema.parse(mutation)),
+    },
+  );
   if (!response.ok) {
     throw await buildError(response);
   }
@@ -117,7 +124,7 @@ export async function fetchBuildExport(
   workspaceId: string,
   buildId: string,
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/builds/${encodeURIComponent(buildId)}/export`,
     {
       credentials: "same-origin",

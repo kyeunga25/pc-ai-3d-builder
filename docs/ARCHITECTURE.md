@@ -16,13 +16,17 @@ Browser
   -> Static Assets binding for the React application
 ```
 
-The Worker handles `/api/*` before falling back to the built Vite application. Static Assets use single-page-application fallback. The `/` route is a static product introduction and makes no session request. Navigation to `/dashboard` is a full-page request so the configured Access application can perform its browser login flow before the protected React workspace loads.
+The Worker handles `/api/*` and each protected workspace parent/deep route before falling back to the built Vite application. Static Assets use single-page-application fallback. The `/` route is a static product introduction and makes no session request. Navigation to `/dashboard` is a full-page request so the configured Access application can perform its browser login flow before the Worker independently validates the JWT and active D1 membership, then serves the private React shell with `private, no-store` caching.
 
 ## Authentication and tenancy
 
 The Worker validates the Access assertion against the configured issuer and audience. It then resolves the active D1 user by bound subject or, for the first login only, by a verified invited email. Subject binding uses a conditional update and verifies the persisted winner before returning a context.
 
 A requested workspace header never grants access by itself. The selected workspace must be present in the caller's active membership set.
+
+All browser API requests include `X-Requested-With: XMLHttpRequest`, allowing Access to return a bounded `401` when an application session expires. The client then requires a top-level re-login navigation. Logout uses Cloudflare Access's same-origin `/cdn-cgi/access/logout` endpoint; the application does not create a parallel session or identity bypass.
+
+Owner provisioning is an out-of-band private operation. The tracked tool reads the exact login identity only from a private environment, writes a short-lived mode-`0600` SQL file, executes it through Wrangler against the configured D1 binding, verifies only a boolean owner result and removes the temporary file. It never returns the identity, private SQL or deployment coordinates.
 
 ## Storage bindings
 
