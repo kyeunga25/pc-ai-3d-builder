@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import { validateAssetFileBytes } from "../../shared/domain/asset-files";
-import { createGenerationProvider, generationRuntimeConfig } from "./provider";
+import {
+  createGenerationProvider,
+  generationOutputRequirements,
+  generationRuntimeConfig,
+  type GenerationProviderInput,
+} from "./provider";
+
+const providerInput: GenerationProviderInput = {
+  attemptRef: `gref_${"a".repeat(32)}`,
+  jobRef: `gref_${"b".repeat(32)}`,
+  workspaceRef: `gref_${"c".repeat(32)}`,
+  source: {
+    contentType: "image/png",
+    sha256: "d".repeat(64),
+    sizeBytes: 128,
+  },
+  requirements: generationOutputRequirements,
+};
 
 describe("generation provider boundary", () => {
   it("fails closed for unknown or non-zero-cost configuration", () => {
@@ -19,17 +36,16 @@ describe("generation provider boundary", () => {
     ).toEqual({ mode: "disabled", maxCostMinor: 0 });
   });
 
-  it("produces only a zero-cost synthetic draft in simulation mode", async () => {
+  it("produces only a bounded synthetic draft in simulation mode", async () => {
     const runtime = generationRuntimeConfig({
       GENERATION_MODE: "simulation",
       GENERATION_MAX_COST_MINOR: "0",
     });
-    const output = await createGenerationProvider(runtime.mode).generateDraft({
-      jobId: "generation-fixture",
-      inputSha256: "a".repeat(64),
-    });
+    const output = await createGenerationProvider(runtime.mode).generateDraft(
+      providerInput,
+    );
 
-    expect(output.actualCostMinor).toBe(0);
+    expect(output.providerCostUnits).toBe(1);
     expect(
       validateAssetFileBytes("model", output.contentType, output.bytes),
     ).toBe("model/gltf-binary");
@@ -38,8 +54,7 @@ describe("generation provider boundary", () => {
   it("rejects generation while the kill switch is disabled", async () => {
     await expect(
       createGenerationProvider("disabled").generateDraft({
-        jobId: "generation-fixture",
-        inputSha256: "a".repeat(64),
+        ...providerInput,
       }),
     ).rejects.toMatchObject({ code: "GENERATION_KILL_SWITCH" });
   });

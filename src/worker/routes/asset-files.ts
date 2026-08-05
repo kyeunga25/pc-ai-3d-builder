@@ -7,6 +7,10 @@ import {
 } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
+import {
+  findReservedGenerationForAsset,
+  generationSupersededAccountingStatements,
+} from "../generation/accounting";
 import { ApiError } from "../lib/api-error";
 import { sha256Hex } from "../lib/digest";
 import {
@@ -267,6 +271,15 @@ export async function assetFileUploadResponse(
   const objectKey = assetObjectKey(context.currentWorkspace.id, assetId, kind);
   const previousObjectKey =
     kind === "source" ? current.source_object_key : current.model_object_key;
+  const reservedGeneration =
+    current.source_kind === "generated"
+      ? await findReservedGenerationForAsset(
+          db,
+          context.currentWorkspace.id,
+          assetId,
+          current.model_object_key,
+        )
+      : null;
   const nextVersion = currentVersion + 1;
   await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
 
@@ -347,7 +360,7 @@ export async function assetFileUploadResponse(
 
   let updateResult: D1Result<unknown> | undefined;
   try {
-    [updateResult] = await db.batch([
+    const statements = [
       updateStatement,
       db
         .prepare(
@@ -372,7 +385,16 @@ export async function assetFileUploadResponse(
           context.currentWorkspace.id,
           nextVersion,
         ),
-    ]);
+    ];
+    if (reservedGeneration) {
+      statements.push(
+        ...generationSupersededAccountingStatements(db, {
+          workspaceId: context.currentWorkspace.id,
+          jobId: reservedGeneration.jobId,
+        }),
+      );
+    }
+    [updateResult] = await db.batch(statements);
   } catch (error) {
     await deletePrivateObjectQuietly(bucket, objectKey);
     throw error;

@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import { fetchCataloguePage } from "../catalogue/catalogue-api";
@@ -36,6 +37,10 @@ import { ComponentRail } from "./ComponentRail";
 import "./builder.css";
 
 type StepId = ComponentCategory | "summary";
+
+type LocalBuilderNavigationState = {
+  localApprovedAssetId?: string;
+};
 
 function buildListItem(build: BuildRecord): BuildListItem {
   return {
@@ -81,30 +86,60 @@ async function fetchBuilderCatalogue(
   throw new Error("產品目錄超出組裝工具的 1,000 項讀取上限。");
 }
 
-const localInitialBuild = composeBuildRecord({
-  id: currentBuild.id,
-  name: currentBuild.name,
-  status: "draft",
-  selectedParts: catalogParts.filter((part) =>
-    currentBuild.selectedPartIds.includes(part.id),
-  ),
-  version: 0,
-  updatedAt: "2026-07-26T00:00:00Z",
-});
+function createLocalInitialBuild(parts: CatalogPart[]): BuildRecord {
+  return composeBuildRecord({
+    id: currentBuild.id,
+    name: currentBuild.name,
+    status: "draft",
+    selectedParts: parts.filter((part) =>
+      currentBuild.selectedPartIds.includes(part.id),
+    ),
+    version: 0,
+    updatedAt: "2026-07-26T00:00:00Z",
+  });
+}
 
 export function BuilderPage() {
   const { currentWorkspace } = useAuthenticatedSession();
+  const location = useLocation();
   const isLocalPreview = import.meta.env.DEV;
+  const localApprovedAssetId = isLocalPreview
+    ? ((location.state as LocalBuilderNavigationState | null)
+        ?.localApprovedAssetId ?? null)
+    : null;
+  const localCatalogue = useMemo(
+    () =>
+      catalogParts.map((part) =>
+        part.assetId === localApprovedAssetId
+          ? {
+              ...part,
+              assetQuality: "approved" as const,
+              assetStatus: "approved" as const,
+            }
+          : part,
+      ),
+    [localApprovedAssetId],
+  );
+  const localInitialBuild = useMemo(
+    () => createLocalInitialBuild(localCatalogue),
+    [localCatalogue],
+  );
   const canWrite = currentWorkspace.role !== "viewer";
-  const [selectedCategory, setSelectedCategory] = useState<StepId>("gpu");
+  const [selectedCategory, setSelectedCategory] = useState<StepId>(
+    localApprovedAssetId ? "cooling" : "gpu",
+  );
   const [camera, setCamera] = useState("等角");
   const [displayMode, setDisplayMode] = useState<BuilderDisplayMode>("著色");
   const [saveState, setSaveState] = useState(
-    isLocalPreview ? "本地合成組裝已載入" : "正在載入組裝",
+    isLocalPreview
+      ? localApprovedAssetId
+        ? "已載入剛核准的本機合成 GLB"
+        : "本地合成組裝已載入"
+      : "正在載入組裝",
   );
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [catalogue, setCatalogue] = useState<CatalogPart[]>(
-    isLocalPreview ? catalogParts : [],
+    isLocalPreview ? localCatalogue : [],
   );
   const [builds, setBuilds] = useState<BuildListItem[]>(
     isLocalPreview ? [buildListItem(localInitialBuild)] : [],
@@ -526,6 +561,7 @@ export function BuilderPage() {
           selectedPart={selectedPart}
           workspaceId={currentWorkspace.id}
           isLocalPreview={isLocalPreview}
+          localApprovedAssetId={localApprovedAssetId}
         />
         <aside className="desktop-inspector" aria-label="組裝檢查器">
           <BuildInspector part={selectedPart} findings={visibleFindings} />

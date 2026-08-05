@@ -5,20 +5,36 @@ import {
 } from "cloudflare:workers";
 
 import {
+  AssetFileValidationError,
   assetFileLimits,
+  assetSourceContentTypeSchema,
   validateAssetFileBytes,
+  type AssetSourceContentType,
 } from "../../shared/domain/asset-files";
 import type { AssetGenerationParams } from "../../shared/domain/generation-jobs";
 import {
+  GlbValidationError,
+  validateGeneratedGlb,
+  type GlbValidationReport,
+} from "../../shared/domain/glb-validation";
+import { entitlementTransitionStatements } from "../generation/accounting";
+import {
   createGenerationProvider,
   GenerationProviderUnavailableError,
+  generationOutputRequirements,
   generationRuntimeConfig,
 } from "../generation/provider";
+import {
+  beginProviderAttempt,
+  completeProviderAttempt,
+  ProviderAttemptStateError,
+  recordProviderValidation,
+} from "../generation/provider-attempts";
 import {
   generationClaimDisposition,
   generationStageFailure,
 } from "../generation/job-guards";
-import { sha256Hex } from "../lib/digest";
+import { pseudonymousGenerationRef, sha256Hex } from "../lib/digest";
 import {
   assetObjectKey,
   deletePrivateObjectQuietly,
@@ -32,28 +48,44 @@ type GenerationStateRow = {
   requested_review_version: number;
   input_sha256: string;
   max_cost_minor: number;
+  max_provider_cost_units: number;
   output_object_key: string | null;
   previous_model_object_key: string | null;
   asset_status: string;
   review_version: number;
   source_rights_confirmed: number;
   source_object_key: string | null;
+  source_content_type: string | null;
+  source_size_bytes: number | null;
   source_sha256: string | null;
   model_object_key: string | null;
+  entitlement_status: string | null;
 };
 
-type ClaimedGeneration = {
-  inputSha256: string;
-  maxCostMinor: number;
-  requestedBy: string | null;
-};
+type ClaimedGeneration =
+  | { disposition: "completed" }
+  | {
+      disposition: "runnable";
+      inputSha256: string;
+      maxCostMinor: number;
+      maxProviderCostUnits: number;
+      requestedBy: string | null;
+      source: {
+        contentType: AssetSourceContentType;
+        sha256: string;
+        sizeBytes: number;
+      };
+    };
 
 type DraftArtifact = {
-  actualCostMinor: number;
+  attemptKey: string;
   contentType: "model/gltf-binary";
+  durationMs: number;
   objectKey: string;
+  providerCostUnits: number;
   sha256: string;
   sizeBytes: number;
+  validation: GlbValidationReport;
 };
 
 type StagedDraft = {
@@ -80,13 +112,17 @@ async function loadGenerationState(
     .prepare(
       `SELECT j.id AS job_id, j.status AS job_status, j.requested_by,
               j.requested_review_version, j.input_sha256, j.max_cost_minor,
+              j.max_provider_cost_units,
               j.output_object_key, j.previous_model_object_key,
               a.status AS asset_status, a.review_version,
-              a.source_rights_confirmed, a.source_object_key, a.source_sha256,
-              a.model_object_key
+              a.source_rights_confirmed, a.source_object_key,
+              a.source_content_type, a.source_size_bytes, a.source_sha256,
+              a.model_object_key, e.status AS entitlement_status
        FROM generation_jobs AS j
        INNER JOIN product_assets AS a
          ON a.workspace_id = j.workspace_id AND a.id = j.asset_id
+       LEFT JOIN generation_job_entitlements AS e
+         ON e.workspace_id = j.workspace_id AND e.job_id = j.id
        WHERE j.workspace_id = ?1 AND j.id = ?2 AND j.asset_id = ?3
        LIMIT 1`,
     )
@@ -147,6 +183,12 @@ export async function markGenerationFailed(
         params.assetId,
         failureCode,
       ),
+    ...entitlementTransitionStatements(db, {
+      workspaceId: params.workspaceId,
+      jobId: params.jobId,
+      transition: "released",
+      reasonCode: "generation_failed",
+    }),
   ]);
 }
 
@@ -161,9 +203,10 @@ export async function claimGenerationJob(
   const disposition = generationClaimDisposition(
     {
       assetStatus: current.asset_status,
+      entitlementStatus: current.entitlement_status,
       inputSha256: current.input_sha256,
       jobStatus: current.job_status,
-      maxCostMinor: current.max_cost_minor,
+      maxProviderCostUnits: current.max_provider_cost_units,
       outputObjectKey: current.output_object_key,
       requestedReviewVersion: current.requested_review_version,
       reviewVersion: current.review_version,
@@ -174,14 +217,13 @@ export async function claimGenerationJob(
     params.requestedReviewVersion,
   );
   if (disposition.kind === "completed") {
-    return {
-      inputSha256: current.input_sha256,
-      maxCostMinor: current.max_cost_minor,
-      requestedBy: current.requested_by,
-    };
+    return { disposition: "completed" };
   }
   if (disposition.kind === "rejected") {
-    if (disposition.code === "GENERATION_INPUT_STALE") {
+    if (
+      disposition.code === "GENERATION_INPUT_STALE" ||
+      disposition.code === "GENERATION_ENTITLEMENT_MISSING"
+    ) {
       await markGenerationFailed(db, params, disposition.code);
     }
     throw new GenerationWorkflowStateError(disposition.code);
@@ -222,10 +264,31 @@ export async function claimGenerationJob(
   if (!current || !["running", "validating"].includes(current.job_status)) {
     throw new GenerationWorkflowStateError("GENERATION_JOB_NOT_RUNNABLE");
   }
+  const sourceContentType = assetSourceContentTypeSchema.safeParse(
+    current.source_content_type,
+  );
+  if (
+    !sourceContentType.success ||
+    !Number.isSafeInteger(current.source_size_bytes) ||
+    current.source_size_bytes === null ||
+    current.source_size_bytes <= 0 ||
+    current.source_size_bytes > assetFileLimits.source ||
+    !current.source_sha256
+  ) {
+    await markGenerationFailed(db, params, "GENERATION_INPUT_INVALID");
+    throw new GenerationWorkflowStateError("GENERATION_INPUT_INVALID");
+  }
   return {
+    disposition: "runnable",
     inputSha256: current.input_sha256,
     maxCostMinor: current.max_cost_minor,
+    maxProviderCostUnits: current.max_provider_cost_units,
     requestedBy: current.requested_by,
+    source: {
+      contentType: sourceContentType.data,
+      sha256: current.source_sha256,
+      sizeBytes: current.source_size_bytes,
+    },
   };
 }
 
@@ -287,12 +350,17 @@ export async function stageGeneratedDraft(
   ) {
     return { previousModelObjectKey: current.previous_model_object_key };
   }
+  if (current.job_status === "awaiting_review") {
+    await deletePrivateObjectQuietly(env.PRIVATE_ASSETS, draft.objectKey);
+    throw new GenerationWorkflowStateError("GENERATION_RESULT_LATE");
+  }
   const stageFailure = generationStageFailure(
     {
       assetStatus: current.asset_status,
+      entitlementStatus: current.entitlement_status,
       inputSha256: current.input_sha256,
       jobStatus: current.job_status,
-      maxCostMinor: current.max_cost_minor,
+      maxProviderCostUnits: current.max_provider_cost_units,
       outputObjectKey: current.output_object_key,
       requestedReviewVersion: current.requested_review_version,
       reviewVersion: current.review_version,
@@ -301,7 +369,7 @@ export async function stageGeneratedDraft(
       sourceSha256: current.source_sha256,
     },
     params.requestedReviewVersion,
-    draft.actualCostMinor,
+    draft.providerCostUnits,
   );
   if (stageFailure) {
     await deletePrivateObjectQuietly(env.PRIVATE_ASSETS, draft.objectKey);
@@ -342,15 +410,17 @@ export async function stageGeneratedDraft(
       ),
       env.DB.prepare(
         `UPDATE generation_jobs
-           SET status = 'awaiting_review', actual_cost_minor = ?1,
-               output_object_key = ?2, output_content_type = ?3,
-               output_size_bytes = ?4, output_sha256 = ?5,
-               previous_model_object_key = ?6, failure_code = NULL,
+           SET status = 'awaiting_review', actual_cost_minor = 0,
+               provider_cost_units = ?1, validation_code = ?2,
+               output_object_key = ?3, output_content_type = ?4,
+               output_size_bytes = ?5, output_sha256 = ?6,
+               previous_model_object_key = ?7, failure_code = NULL,
                updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
-           WHERE workspace_id = ?7 AND id = ?8 AND asset_id = ?9
+           WHERE workspace_id = ?8 AND id = ?9 AND asset_id = ?10
              AND status = 'validating' AND changes() = 1`,
       ).bind(
-        draft.actualCostMinor,
+        draft.providerCostUnits,
+        "GLB_VALID",
         draft.objectKey,
         draft.contentType,
         draft.sizeBytes,
@@ -372,9 +442,13 @@ export async function stageGeneratedDraft(
       ).bind(
         crypto.randomUUID(),
         JSON.stringify({
-          actualCostMinor: draft.actualCostMinor,
+          dimensionMm: draft.validation.dimensionMm,
+          providerCostUnits: draft.providerCostUnits,
           reviewVersion: nextReviewVersion,
           sizeBytes: draft.sizeBytes,
+          textureCount: draft.validation.textureCount,
+          triangleCount: draft.validation.triangleCount,
+          validationCode: "GLB_VALID",
         }),
         params.workspaceId,
         params.jobId,
@@ -414,6 +488,48 @@ export async function stageGeneratedDraft(
   return { previousModelObjectKey: current.model_object_key };
 }
 
+function generationFailureCode(error: unknown): string {
+  if (error instanceof GenerationProviderUnavailableError) {
+    return "GENERATION_KILL_SWITCH";
+  }
+  if (error instanceof GenerationWorkflowStateError) {
+    return error.code;
+  }
+  if (error instanceof ProviderAttemptStateError) {
+    return error.code;
+  }
+  if (error instanceof GlbValidationError) {
+    return `GENERATION_OUTPUT_${error.code.slice(4)}`;
+  }
+  if (error instanceof AssetFileValidationError) {
+    return error.code.startsWith("GLB_")
+      ? `GENERATION_OUTPUT_${error.code.slice(4)}`
+      : "GENERATION_OUTPUT_INVALID";
+  }
+  return "GENERATION_WORKFLOW_FAILED";
+}
+
+async function recordValidationFailure(
+  db: D1Database,
+  params: AssetGenerationParams,
+  attemptKey: string,
+  error: unknown,
+): Promise<void> {
+  const failureCode = generationFailureCode(error);
+  if (
+    failureCode.startsWith("GENERATION_OUTPUT_") ||
+    failureCode === "GENERATION_COST_CAP_EXCEEDED" ||
+    failureCode === "GENERATION_CHECKSUM_MISMATCH"
+  ) {
+    await recordProviderValidation(db, {
+      workspaceId: params.workspaceId,
+      jobId: params.jobId,
+      attemptKey,
+      validationCode: failureCode,
+    });
+  }
+}
+
 export class AssetGenerationWorkflow extends WorkflowEntrypoint<
   Env,
   AssetGenerationParams
@@ -423,34 +539,94 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
     step: WorkflowStep,
   ): Promise<{ jobId: string; status: "awaiting_review" }> {
     const params = event.payload;
+    const attemptKey = "primary";
+    let attemptStarted = false;
     let draft: DraftArtifact | null = null;
     try {
       const claim = await step.do("claim generation job", stepConfig, () =>
         claimGenerationJob(this.env.DB, params),
       );
+      if (claim.disposition === "completed") {
+        return { jobId: params.jobId, status: "awaiting_review" };
+      }
+
+      await step.do("begin provider attempt", stepConfig, async () => {
+        await beginProviderAttempt(this.env.DB, {
+          workspaceId: params.workspaceId,
+          jobId: params.jobId,
+          attemptKey,
+        });
+      });
+      attemptStarted = true;
+
       draft = await step.do("produce synthetic draft", stepConfig, async () => {
         const runtime = generationRuntimeConfig(this.env);
+        if (
+          runtime.mode !== "simulation" ||
+          runtime.maxCostMinor > claim.maxCostMinor
+        ) {
+          throw new GenerationWorkflowStateError("GENERATION_KILL_SWITCH");
+        }
+        const [attemptRef, jobRef, workspaceRef] = await Promise.all([
+          pseudonymousGenerationRef("attempt", `${params.jobId}:${attemptKey}`),
+          pseudonymousGenerationRef("job", params.jobId),
+          pseudonymousGenerationRef("workspace", params.workspaceId),
+        ]);
+        const startedAt = Date.now();
         const generated = await createGenerationProvider(
           runtime.mode,
         ).generateDraft({
-          jobId: params.jobId,
-          inputSha256: claim.inputSha256,
+          attemptRef,
+          jobRef,
+          workspaceRef,
+          source: claim.source,
+          requirements: generationOutputRequirements,
         });
-        if (generated.actualCostMinor > claim.maxCostMinor) {
+        const durationMs = Math.max(0, Date.now() - startedAt);
+        if (
+          !Number.isSafeInteger(generated.providerCostUnits) ||
+          generated.providerCostUnits < 0
+        ) {
           throw new GenerationWorkflowStateError(
-            "GENERATION_COST_CAP_EXCEEDED",
+            "GENERATION_PROVIDER_RESULT_INVALID",
           );
         }
-        const contentType = validateAssetFileBytes(
-          "model",
-          generated.contentType,
-          generated.bytes,
-        );
+        await completeProviderAttempt(this.env.DB, {
+          workspaceId: params.workspaceId,
+          jobId: params.jobId,
+          attemptKey,
+          status: "succeeded",
+          costUnits: generated.providerCostUnits,
+          durationMs,
+        });
+        if (generated.providerCostUnits > claim.maxProviderCostUnits) {
+          const error = new GenerationWorkflowStateError(
+            "GENERATION_COST_CAP_EXCEEDED",
+          );
+          await recordValidationFailure(this.env.DB, params, attemptKey, error);
+          throw error;
+        }
+        let contentType: "model/gltf-binary";
+        let validation: GlbValidationReport;
+        try {
+          contentType = validateAssetFileBytes(
+            "model",
+            generated.contentType,
+            generated.bytes,
+          );
+          validation = validateGeneratedGlb(
+            generated.bytes,
+            generationOutputRequirements,
+          );
+        } catch (error) {
+          await recordValidationFailure(this.env.DB, params, attemptKey, error);
+          throw error;
+        }
         const objectKey = assetObjectKey(
           params.workspaceId,
           params.assetId,
           "model",
-          `simulation-${params.jobId}`,
+          `simulation-${params.jobId}-${attemptKey}`,
         );
         const sha256 = await sha256Hex(generated.bytes);
         await putPrivateObject(
@@ -460,11 +636,14 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
           contentType,
         );
         return {
-          actualCostMinor: generated.actualCostMinor,
+          attemptKey,
           contentType,
+          durationMs,
           objectKey,
+          providerCostUnits: generated.providerCostUnits,
           sha256,
           sizeBytes: generated.bytes.byteLength,
+          validation,
         };
       });
       await step.do("mark draft validating", stepConfig, () =>
@@ -483,17 +662,39 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
             !("body" in object) ||
             object.size > assetFileLimits.model
           ) {
-            throw new GenerationWorkflowStateError("GENERATION_OUTPUT_INVALID");
+            throw new GenerationWorkflowStateError("GENERATION_OUTPUT_MISSING");
           }
           const bytes = new Uint8Array(await object.arrayBuffer());
-          validateAssetFileBytes("model", draft.contentType, bytes);
-          if (
-            bytes.byteLength !== draft.sizeBytes ||
-            (await sha256Hex(bytes)) !== draft.sha256
-          ) {
-            throw new GenerationWorkflowStateError("GENERATION_OUTPUT_INVALID");
+          try {
+            validateAssetFileBytes("model", draft.contentType, bytes);
+            const validation = validateGeneratedGlb(
+              bytes,
+              generationOutputRequirements,
+            );
+            if (
+              bytes.byteLength !== draft.sizeBytes ||
+              (await sha256Hex(bytes)) !== draft.sha256
+            ) {
+              throw new GenerationWorkflowStateError(
+                "GENERATION_CHECKSUM_MISMATCH",
+              );
+            }
+            await recordProviderValidation(this.env.DB, {
+              workspaceId: params.workspaceId,
+              jobId: params.jobId,
+              attemptKey: draft.attemptKey,
+              validationCode: "GLB_VALID",
+            });
+            return { ...draft, validation };
+          } catch (error) {
+            await recordValidationFailure(
+              this.env.DB,
+              params,
+              draft.attemptKey,
+              error,
+            );
+            throw error;
           }
-          return draft;
         },
       );
       const staged = await step.do("stage review draft", stepConfig, () =>
@@ -507,20 +708,27 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
       );
       return { jobId: params.jobId, status: "awaiting_review" };
     } catch (error) {
-      const failureCode =
-        error instanceof GenerationProviderUnavailableError ||
-        (error instanceof GenerationWorkflowStateError &&
-          error.code === "GENERATION_KILL_SWITCH")
-          ? "GENERATION_KILL_SWITCH"
-          : error instanceof GenerationWorkflowStateError
-            ? error.code
-            : "GENERATION_WORKFLOW_FAILED";
+      const failureCode = generationFailureCode(error);
       await step.do("record generation failure", stepConfig, async () => {
         if (draft) {
           await deletePrivateObjectQuietly(
             this.env.PRIVATE_ASSETS,
             draft.objectKey,
           );
+        }
+        if (attemptStarted && !draft) {
+          try {
+            await completeProviderAttempt(this.env.DB, {
+              workspaceId: params.workspaceId,
+              jobId: params.jobId,
+              attemptKey,
+              status: "failed",
+              costUnits: 0,
+              durationMs: 0,
+            });
+          } catch {
+            // A succeeded or concurrently completed attempt must stay immutable.
+          }
         }
         await markGenerationFailed(this.env.DB, params, failureCode);
       });

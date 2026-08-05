@@ -66,6 +66,9 @@ function jobRow(overrides: Record<string, unknown> = {}) {
     requested_review_version: 2,
     output_object_key: null,
     failure_code: null,
+    entitlement_status: "reserved",
+    provider_cost_units: null,
+    validation_code: null,
     created_at: "2026-08-02 00:00:00",
     updated_at: "2026-08-02 00:00:00",
     ...overrides,
@@ -113,12 +116,22 @@ function request() {
 describe("generation job routes", () => {
   it("returns a disabled capability without exposing private job fields", async () => {
     const { db } = createD1Stub({
-      firstResults: [assetRow()],
+      firstResults: [
+        assetRow(),
+        {
+          available_units: 3,
+          reserved_units: 1,
+          settled_units: 2,
+          released_units: 4,
+        },
+      ],
       allResults: [
         [
           jobRow({
             status: "awaiting_review",
             output_object_key: "private/output",
+            provider_cost_units: 1,
+            validation_code: "GLB_VALID",
           }),
         ],
       ],
@@ -138,7 +151,16 @@ describe("generation job routes", () => {
 
     const body = await response.json();
     expect(body).toEqual({
-      capability: { mode: "disabled", maxCostMinor: 0 },
+      capability: {
+        mode: "disabled",
+        maxCostMinor: 0,
+        credits: {
+          availableUnits: 3,
+          reservedUnits: 1,
+          settledUnits: 2,
+          releasedUnits: 4,
+        },
+      },
       items: [
         {
           id: "generation-fixture",
@@ -147,6 +169,9 @@ describe("generation job routes", () => {
           kind: "simulation",
           outputReady: true,
           failureCode: null,
+          entitlementStatus: "reserved",
+          providerCostUnits: 1,
+          validationCode: "GLB_VALID",
           createdAt: "2026-08-02 00:00:00",
           updatedAt: "2026-08-02 00:00:00",
         },
@@ -184,8 +209,12 @@ describe("generation job routes", () => {
     const insert = calls.find((call) =>
       call.sql.includes("INSERT INTO generation_jobs"),
     );
+    const reservation = calls.find((call) =>
+      call.sql.includes("UPDATE generation_credit_accounts"),
+    );
     expect(insert?.values).toContain("workspace-fixture");
     expect(insert?.values).toContain(0);
+    expect(reservation?.values).toEqual([1, "workspace-fixture"]);
     expect(JSON.stringify(calls)).not.toContain("fixture@example.com");
     expect(JSON.stringify(calls)).not.toContain("private/source-fixture");
   });

@@ -1,8 +1,9 @@
 export type GenerationGuardState = {
   assetStatus: string;
+  entitlementStatus: string | null;
   inputSha256: string;
   jobStatus: string;
-  maxCostMinor: number;
+  maxProviderCostUnits: number;
   outputObjectKey: string | null;
   requestedReviewVersion: number;
   reviewVersion: number;
@@ -42,6 +43,9 @@ export function generationClaimDisposition(
   if (!["queued", "running", "validating"].includes(state.jobStatus)) {
     return { kind: "rejected", code: "GENERATION_JOB_NOT_RUNNABLE" };
   }
+  if (state.entitlementStatus !== "reserved") {
+    return { kind: "rejected", code: "GENERATION_ENTITLEMENT_MISSING" };
+  }
   return inputIsCurrent(state, requestedReviewVersion)
     ? { kind: "runnable" }
     : { kind: "rejected", code: "GENERATION_INPUT_STALE" };
@@ -50,12 +54,13 @@ export function generationClaimDisposition(
 export function generationStageFailure(
   state: GenerationGuardState,
   requestedReviewVersion: number,
-  actualCostMinor: number,
+  providerCostUnits: number,
 ): string | null {
-  if (actualCostMinor > state.maxCostMinor) {
+  if (providerCostUnits > state.maxProviderCostUnits) {
     return "GENERATION_COST_CAP_EXCEEDED";
   }
   return state.jobStatus === "validating" &&
+    state.entitlementStatus === "reserved" &&
     inputIsCurrent(state, requestedReviewVersion)
     ? null
     : "GENERATION_INPUT_STALE";

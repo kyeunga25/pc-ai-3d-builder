@@ -17,11 +17,13 @@ import {
 } from "react";
 
 import { fetchAssetFileBlob } from "../asset-review/asset-review-api";
+import { assetModelContentType } from "../../shared/domain/asset-files";
 import { componentSteps } from "../../shared/domain/mockData";
 import type {
   CatalogPart,
   ComponentCategory,
 } from "../../shared/domain/schemas";
+import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { formatHkd } from "../../shared/i18n/locale";
 
 type StepId = ComponentCategory | "summary";
@@ -42,6 +44,7 @@ export function BuilderViewport({
   selectedPart,
   workspaceId,
   isLocalPreview,
+  localApprovedAssetId,
 }: {
   selectedCategory: StepId;
   camera: string;
@@ -51,12 +54,19 @@ export function BuilderViewport({
   selectedPart: CatalogPart | null;
   workspaceId: string;
   isLocalPreview: boolean;
+  localApprovedAssetId: string | null;
 }) {
+  const isLocalSyntheticModel =
+    isLocalPreview &&
+    selectedPart?.assetId === localApprovedAssetId &&
+    selectedPart.assetStatus === "approved";
   const modelKey =
-    !isLocalPreview &&
-    selectedPart?.assetId &&
-    selectedPart.assetStatus === "approved"
-      ? `${workspaceId}:${selectedPart.assetId}`
+    selectedPart?.assetId && selectedPart.assetStatus === "approved"
+      ? isLocalSyntheticModel
+        ? `local:${selectedPart.assetId}`
+        : !isLocalPreview
+          ? `${workspaceId}:${selectedPart.assetId}`
+          : null
       : null;
   const [modelResource, setModelResource] = useState<{
     key: string;
@@ -75,6 +85,37 @@ export function BuilderViewport({
   useEffect(() => {
     if (!modelKey || !selectedPart?.assetId) {
       return;
+    }
+
+    if (isLocalSyntheticModel) {
+      let createdUrl: string | null = null;
+      let cancelled = false;
+      void Promise.resolve().then(() => {
+        if (cancelled) {
+          return;
+        }
+
+        const bytes = createSyntheticDraftGlb();
+        createdUrl = URL.createObjectURL(
+          new Blob(
+            [
+              bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength,
+              ) as ArrayBuffer,
+            ],
+            { type: assetModelContentType },
+          ),
+        );
+        setModelResource({ key: modelKey, state: "ready", url: createdUrl });
+      });
+
+      return () => {
+        cancelled = true;
+        if (createdUrl) {
+          URL.revokeObjectURL(createdUrl);
+        }
+      };
     }
 
     const controller = new AbortController();
@@ -109,7 +150,7 @@ export function BuilderViewport({
         URL.revokeObjectURL(createdUrl);
       }
     };
-  }, [modelKey, selectedPart?.assetId, workspaceId]);
+  }, [isLocalSyntheticModel, modelKey, selectedPart?.assetId, workspaceId]);
 
   const renderMode =
     displayMode === "線框"
@@ -194,7 +235,11 @@ export function BuilderViewport({
                 url={modelUrl}
               />
             </Suspense>
-            <figcaption>已核准私人 GLB · 只在目前瀏覽器工作階段解碼</figcaption>
+            <figcaption>
+              {isLocalSyntheticModel
+                ? "已核准本機合成 GLB · 不含真實供應商輸出"
+                : "已核准私人 GLB · 只在目前瀏覽器工作階段解碼"}
+            </figcaption>
           </figure>
         ) : (
           <figure className="pc-case-placeholder">
@@ -290,7 +335,11 @@ export function BuilderViewport({
       <div className="builder-viewport__footer">
         <span>
           <Image aria-hidden="true" />
-          {modelUrl ? "受保護的已核准組件預覽" : "提供靜態後備預覽"}
+          {modelUrl
+            ? isLocalSyntheticModel
+              ? "本機合成的已核准組件預覽"
+              : "受保護的已核准組件預覽"
+            : "提供靜態後備預覽"}
         </span>
         <span className="mono">場景 v1 · +Y 向上 · 單位：米</span>
       </div>

@@ -40,13 +40,13 @@ The builder may decode only the selected component's approved GLB. It uses the p
 
 Long-running jobs use a swappable provider boundary and an idempotent Workflow. A generation request is accepted only after its workspace-scoped job, initial event and audit record commit. The Workflow uses unique instance IDs, bounded retry/timeout settings and guarded D1 transitions.
 
-The current adapter creates a zero-cost synthetic GLB solely to exercise storage, validation and human-review transitions. Tracked production configuration disables it. A real provider requires another decision covering commercial terms, data rights, callbacks, cost reservation, settlement and a capped non-production test.
+The current adapter creates a zero-cost synthetic GLB solely to exercise storage, validation and human-review transitions. Tracked production configuration disables it. The local-development milestone reserves one non-monetary capability unit and caps provider work at one neutral cost unit. A real provider still requires another decision covering commercial terms, data rights, callbacks and a capped non-production test; capability accounting is not a payment ledger.
 
 ## Generated output remains review evidence
 
 The Workflow validates a private output object before it changes any review record. The asset source checksum, saved rights confirmation and optimistic review version must still match. Staging increments the review version and resets checklist, dimensions and approval fields. It never marks an asset approved or modifies compatibility evidence.
 
-Generation-job API records are provider-neutral and omit object keys, checksums, Workflow IDs, requester identity and cost details. Stable failure codes replace raw provider or platform errors.
+Generation-job API records are provider-neutral and omit object keys, checksums, Workflow IDs, requester identity, currency and price. They may expose a bounded neutral provider-cost unit and capability state so an authorized reviewer can understand reservation and settlement. Stable failure codes replace raw provider or platform errors.
 
 ## Payment remains a private future boundary
 

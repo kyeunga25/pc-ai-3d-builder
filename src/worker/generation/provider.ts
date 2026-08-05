@@ -1,18 +1,52 @@
-import { assetModelContentType } from "../../shared/domain/asset-files";
+import {
+  assetFileLimits,
+  assetModelContentType,
+  type AssetSourceContentType,
+} from "../../shared/domain/asset-files";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
+import { syntheticProviderCostLimitUnits } from "./accounting";
 
 export type GenerationRuntimeMode = "disabled" | "simulation";
 
 export type GeneratedDraft = {
   bytes: Uint8Array;
   contentType: typeof assetModelContentType;
-  actualCostMinor: number;
+  providerCostUnits: number;
+};
+
+export type GenerationOutputRequirements = {
+  format: "glb";
+  selfContained: true;
+  maxBytes: number;
+  maxDimensionMm: number;
+  maxTriangles: number;
+  maxTextures: number;
+  maxTextureBytes: number;
+};
+
+export type GenerationSourceDescriptor = {
+  contentType: AssetSourceContentType;
+  sha256: string;
+  sizeBytes: number;
 };
 
 export type GenerationProviderInput = {
-  jobId: string;
-  inputSha256: string;
+  attemptRef: string;
+  jobRef: string;
+  workspaceRef: string;
+  source: GenerationSourceDescriptor;
+  requirements: GenerationOutputRequirements;
 };
+
+export const generationOutputRequirements = {
+  format: "glb",
+  selfContained: true,
+  maxBytes: assetFileLimits.model,
+  maxDimensionMm: 10_000,
+  maxTriangles: 500_000,
+  maxTextures: 16,
+  maxTextureBytes: 16 * 1024 * 1024,
+} as const satisfies GenerationOutputRequirements;
 
 export interface GenerationProvider {
   generateDraft(input: GenerationProviderInput): Promise<GeneratedDraft>;
@@ -35,7 +69,29 @@ class DisabledGenerationProvider implements GenerationProvider {
 
 class SyntheticGenerationProvider implements GenerationProvider {
   generateDraft(input: GenerationProviderInput): Promise<GeneratedDraft> {
-    if (!input.jobId || !/^[a-f0-9]{64}$/u.test(input.inputSha256)) {
+    const refs = [input.attemptRef, input.jobRef, input.workspaceRef];
+    const validRequirements =
+      input.requirements.format === generationOutputRequirements.format &&
+      input.requirements.selfContained &&
+      input.requirements.maxBytes === generationOutputRequirements.maxBytes &&
+      input.requirements.maxDimensionMm ===
+        generationOutputRequirements.maxDimensionMm &&
+      input.requirements.maxTriangles ===
+        generationOutputRequirements.maxTriangles &&
+      input.requirements.maxTextures ===
+        generationOutputRequirements.maxTextures &&
+      input.requirements.maxTextureBytes ===
+        generationOutputRequirements.maxTextureBytes;
+    if (
+      refs.some((ref) => !/^gref_[a-f0-9]{32}$/u.test(ref)) ||
+      !/^[a-f0-9]{64}$/u.test(input.source.sha256) ||
+      input.source.sizeBytes <= 0 ||
+      input.source.sizeBytes > assetFileLimits.source ||
+      !["image/jpeg", "image/png", "image/webp"].includes(
+        input.source.contentType,
+      ) ||
+      !validRequirements
+    ) {
       return Promise.reject(
         new Error("Synthetic generation input is invalid."),
       );
@@ -43,7 +99,7 @@ class SyntheticGenerationProvider implements GenerationProvider {
     return Promise.resolve({
       bytes: createSyntheticDraftGlb(),
       contentType: assetModelContentType,
-      actualCostMinor: 0,
+      providerCostUnits: syntheticProviderCostLimitUnits,
     });
   }
 }
