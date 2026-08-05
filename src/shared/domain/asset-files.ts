@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GlbValidationError, validateGlbStructure } from "./glb-validation";
+
 export const assetFileKindSchema = z.enum(["source", "model"]);
 export const assetSourceContentTypeSchema = z.enum([
   "image/jpeg",
@@ -19,7 +21,10 @@ export type AssetSourceContentType = z.infer<
 >;
 
 export class AssetFileValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code = "ASSET_FILE_INVALID",
+  ) {
     super(message);
     this.name = "AssetFileValidationError";
   }
@@ -55,65 +60,14 @@ function inferImageContentType(
   return null;
 }
 
-function containsExternalUri(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(containsExternalUri);
-  }
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  return Object.entries(value).some(
-    ([key, child]) =>
-      (key === "uri" &&
-        (typeof child !== "string" ||
-          !child.toLowerCase().startsWith("data:"))) ||
-      containsExternalUri(child),
-  );
-}
-
 function validateGlb(bytes: Uint8Array): void {
-  if (bytes.length < 20 || !bytesEqual(bytes, 0, [0x67, 0x6c, 0x54, 0x46])) {
-    throw new AssetFileValidationError("GLB 檔頭無效。");
-  }
-
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const version = view.getUint32(4, true);
-  const declaredLength = view.getUint32(8, true);
-  const jsonChunkLength = view.getUint32(12, true);
-  const jsonChunkType = view.getUint32(16, true);
-  if (
-    version !== 2 ||
-    declaredLength !== bytes.byteLength ||
-    jsonChunkType !== 0x4e4f534a ||
-    jsonChunkLength === 0 ||
-    20 + jsonChunkLength > bytes.byteLength
-  ) {
-    throw new AssetFileValidationError("只接受完整的 glTF 2.0 GLB 檔案。");
-  }
-
   try {
-    const json = JSON.parse(
-      new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(
-        bytes.subarray(20, 20 + jsonChunkLength),
-      ),
-    ) as unknown;
-    if (
-      !json ||
-      typeof json !== "object" ||
-      !("asset" in json) ||
-      !json.asset ||
-      typeof json.asset !== "object" ||
-      !("version" in json.asset) ||
-      json.asset.version !== "2.0"
-    ) {
-      throw new Error("Unexpected glTF version.");
+    validateGlbStructure(bytes);
+  } catch (error) {
+    if (error instanceof GlbValidationError) {
+      throw new AssetFileValidationError(error.message, error.code);
     }
-    if (containsExternalUri(json)) {
-      throw new AssetFileValidationError("GLB 必須自包含，不可引用外部檔案。");
-    }
-  } catch {
-    throw new AssetFileValidationError("GLB 的 glTF 資料無效或並非自包含。");
+    throw error;
   }
 }
 

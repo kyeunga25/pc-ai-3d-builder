@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Box,
   Camera,
   Check,
@@ -22,7 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import {
@@ -101,6 +102,14 @@ type LocalAssetNavigationState = {
   sourceUrl?: string;
 };
 
+const syntheticSourcePngBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+function createSyntheticSourcePng(): Uint8Array {
+  const raw = atob(syntheticSourcePngBase64);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
 function assetKey(asset: AssetReviewItem): string {
   return `${asset.id}:${asset.version}`;
 }
@@ -164,6 +173,23 @@ const generationStatusLabels: Record<GenerationJob["status"], string> = {
   cancelled: "工作已取消",
 };
 
+const generationEntitlementLabels: Record<
+  NonNullable<GenerationJob["entitlementStatus"]>,
+  string
+> = {
+  reserved: "已保留，等待人工決定",
+  settled: "已結算",
+  released: "已釋放",
+};
+
+function generationStatusLabel(job: GenerationJob) {
+  if (job.status === "awaiting_review" && job.entitlementStatus === "settled") {
+    return "人工審核已核准";
+  }
+
+  return generationStatusLabels[job.status];
+}
+
 const qualityLabels: Record<AssetReviewItem["quality"], string> = {
   unreviewed: "未審核",
   draft: "草稿品質",
@@ -174,6 +200,7 @@ const qualityLabels: Record<AssetReviewItem["quality"], string> = {
 export function AssetReviewPage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isLocalPreview = import.meta.env.DEV;
   const targetAssetId = searchParams.get("asset");
@@ -226,6 +253,12 @@ export function AssetReviewPage() {
       capability: {
         mode: isLocalPreview ? "simulation" : "disabled",
         maxCostMinor: 0,
+        credits: {
+          availableUnits: isLocalPreview ? 2 : 0,
+          reservedUnits: 0,
+          settledUnits: 0,
+          releasedUnits: 0,
+        },
       },
       items: [],
     }));
@@ -343,7 +376,16 @@ export function AssetReviewPage() {
       .catch(() => {
         if (!controller.signal.aborted) {
           setGenerationState({
-            capability: { mode: "disabled", maxCostMinor: 0 },
+            capability: {
+              mode: "disabled",
+              maxCostMinor: 0,
+              credits: {
+                availableUnits: 0,
+                reservedUnits: 0,
+                settledUnits: 0,
+                releasedUnits: 0,
+              },
+            },
             items: [],
           });
         }
@@ -473,8 +515,11 @@ export function AssetReviewPage() {
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
   const latestGenerationJob = generationState.items[0] ?? null;
-  const generationActive = generationState.items.some((job) =>
-    ["queued", "running", "validating"].includes(job.status),
+  const generationActive = generationState.items.some(
+    (job) =>
+      ["queued", "running", "validating"].includes(job.status) ||
+      (job.status === "awaiting_review" &&
+        job.entitlementStatus === "reserved"),
   );
   const persistedChecks = new Set(asset.completedChecks);
   const reviewHasUnsavedChanges =
@@ -489,8 +534,120 @@ export function AssetReviewPage() {
     asset.sourceRightsConfirmed &&
     !reviewHasUnsavedChanges &&
     generationState.capability.mode === "simulation" &&
+    generationState.capability.credits.availableUnits >= 1 &&
     !generationActive &&
     !generationSubmitting;
+
+  const transitionLocalReservedGeneration = (
+    transition: "released" | "settled",
+    failureCode: string | null = null,
+  ) => {
+    if (!isLocalPreview) {
+      return;
+    }
+    setGenerationState((current) => {
+      let transitionedUnits = 0;
+      const items = current.items.map((job) => {
+        if (job.assetId !== asset.id || job.entitlementStatus !== "reserved") {
+          return job;
+        }
+        transitionedUnits += 1;
+        return {
+          ...job,
+          entitlementStatus: transition,
+          status: failureCode ? ("failed" as const) : job.status,
+          failureCode: failureCode ?? job.failureCode,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      if (transitionedUnits === 0) {
+        return current;
+      }
+      const credits = current.capability.credits;
+      return {
+        ...current,
+        capability: {
+          ...current.capability,
+          credits: {
+            ...credits,
+            availableUnits:
+              credits.availableUnits +
+              (transition === "released" ? transitionedUnits : 0),
+            reservedUnits: Math.max(
+              0,
+              credits.reservedUnits - transitionedUnits,
+            ),
+            settledUnits:
+              credits.settledUnits +
+              (transition === "settled" ? transitionedUnits : 0),
+            releasedUnits:
+              credits.releasedUnits +
+              (transition === "released" ? transitionedUnits : 0),
+          },
+        },
+        items,
+      };
+    });
+  };
+
+  const createLocalSyntheticSource = () => {
+    const currentForm = form;
+    if (!isLocalPreview || !currentForm || !canEdit || uploadingKind) {
+      return;
+    }
+    const bytes = createSyntheticSourcePng();
+    const contentType = validateAssetFileBytes("source", "image/png", bytes);
+    const objectUrl = URL.createObjectURL(
+      new Blob(
+        [
+          bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength,
+          ) as ArrayBuffer,
+        ],
+        { type: contentType },
+      ),
+    );
+    localObjectUrlsRef.current.add(objectUrl);
+    if (currentForm.asset.sourceKind === "generated") {
+      transitionLocalReservedGeneration(
+        "released",
+        "GENERATION_DRAFT_SUPERSEDED",
+      );
+    }
+    const updated: AssetReviewItem = {
+      ...currentForm.asset,
+      status: "draft",
+      quality: "unreviewed",
+      sourceKind: "synthetic",
+      completedChecks: [],
+      sourceRightsConfirmed: false,
+      dimensionsMm: { width: null, height: null, depth: null },
+      files: {
+        ...currentForm.asset.files,
+        source: { contentType, sizeBytes: bytes.byteLength },
+      },
+      version: currentForm.asset.version + 1,
+    };
+    setFileUrls((current) => {
+      if (current.source && localObjectUrlsRef.current.has(current.source)) {
+        URL.revokeObjectURL(current.source);
+        localObjectUrlsRef.current.delete(current.source);
+      }
+      return {
+        assetKey: assetKey(updated),
+        model:
+          current.assetKey === assetKey(currentForm.asset)
+            ? current.model
+            : null,
+        source: objectUrl,
+      };
+    });
+    setForm(createReviewForm(updated));
+    setReviewStatus(
+      "本機合成 PNG 已建立；請明確確認使用權並儲存後再建立 3D 草稿",
+    );
+  };
 
   const toggleCheck = (check: AssetReviewCheck) => {
     if (!canEdit) {
@@ -565,6 +722,12 @@ export function AssetReviewPage() {
 
       let updated: AssetReviewItem;
       if (isLocalPreview) {
+        if (currentForm.asset.sourceKind === "generated") {
+          transitionLocalReservedGeneration(
+            "released",
+            "GENERATION_DRAFT_SUPERSEDED",
+          );
+        }
         const objectUrl = URL.createObjectURL(file);
         localObjectUrlsRef.current.add(objectUrl);
         updated = {
@@ -696,11 +859,25 @@ export function AssetReviewPage() {
           kind: "simulation",
           outputReady: true,
           failureCode: null,
+          entitlementStatus: "reserved",
+          providerCostUnits: 1,
+          validationCode: "GLB_VALID",
           createdAt: now,
           updatedAt: now,
         };
         setGenerationState((current) => ({
           ...current,
+          capability: {
+            ...current.capability,
+            credits: {
+              ...current.capability.credits,
+              availableUnits: Math.max(
+                0,
+                current.capability.credits.availableUnits - 1,
+              ),
+              reservedUnits: current.capability.credits.reservedUnits + 1,
+            },
+          },
           items: [job, ...current.items].slice(0, 20),
         }));
         setForm(createReviewForm(updated));
@@ -736,6 +913,11 @@ export function AssetReviewPage() {
     if (!currentForm || submitting) {
       return;
     }
+    const hadReservedGeneration = generationState.items.some(
+      (job) =>
+        job.assetId === currentForm.asset.id &&
+        job.entitlementStatus === "reserved",
+    );
 
     const mutation: AssetReviewMutation = {
       action,
@@ -787,13 +969,25 @@ export function AssetReviewPage() {
             ? { ...current, assetKey: assetKey(updated) }
             : current,
         );
+        if (action === "approve") {
+          transitionLocalReservedGeneration("settled");
+        } else if (action === "reject") {
+          transitionLocalReservedGeneration(
+            "released",
+            "GENERATION_REVIEW_REJECTED",
+          );
+        }
       }
       setForm(createReviewForm(updated));
       setReviewStatus(
         action === "approve"
-          ? "素材已核准並記錄審核事件"
+          ? hadReservedGeneration
+            ? "素材已核准；已結算保留 credit 並記錄審核事件"
+            : "素材已核准並記錄審核事件"
           : action === "reject"
-            ? "素材已拒絕並記錄審核事件"
+            ? hadReservedGeneration
+              ? "素材已拒絕；已釋放保留 credit 並記錄審核事件"
+              : "素材已拒絕並記錄審核事件"
             : "審核草稿已儲存",
       );
     } catch (error) {
@@ -1039,19 +1233,32 @@ export function AssetReviewPage() {
                     : "JPEG、PNG 或 WebP · 最多 10 MiB"}
                 </span>
               </div>
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={!canEdit || uploadingKind !== null}
-                onClick={() => sourceInputRef.current?.click()}
-              >
-                <Upload aria-hidden="true" />
-                {uploadingKind === "source"
-                  ? "上載中…"
-                  : asset.files.source
-                    ? "取代圖片"
-                    : "上載圖片"}
-              </button>
+              <div className="asset-file-control__actions">
+                {isLocalPreview ? (
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    disabled={!canEdit || uploadingKind !== null}
+                    onClick={createLocalSyntheticSource}
+                  >
+                    <Sparkles aria-hidden="true" />
+                    合成圖片
+                  </button>
+                ) : null}
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={!canEdit || uploadingKind !== null}
+                  onClick={() => sourceInputRef.current?.click()}
+                >
+                  <Upload aria-hidden="true" />
+                  {uploadingKind === "source"
+                    ? "上載中…"
+                    : asset.files.source
+                      ? "取代圖片"
+                      : "上載圖片"}
+                </button>
+              </div>
             </div>
             <div className="asset-file-control">
               <div>
@@ -1102,8 +1309,44 @@ export function AssetReviewPage() {
                 <dt>最新狀態</dt>
                 <dd>
                   {latestGenerationJob
-                    ? generationStatusLabels[latestGenerationJob.status]
+                    ? generationStatusLabel(latestGenerationJob)
                     : "沒有工作"}
+                </dd>
+              </div>
+              <div>
+                <dt>Credit</dt>
+                <dd className="mono">
+                  {generationState.capability.credits.availableUnits} 可用 ·{" "}
+                  {generationState.capability.credits.reservedUnits} 保留
+                </dd>
+              </div>
+              <div>
+                <dt>累計</dt>
+                <dd className="mono">
+                  {generationState.capability.credits.settledUnits} 結算 ·{" "}
+                  {generationState.capability.credits.releasedUnits} 釋放
+                </dd>
+              </div>
+              <div>
+                <dt>權益狀態</dt>
+                <dd>
+                  {latestGenerationJob?.entitlementStatus
+                    ? generationEntitlementLabels[
+                        latestGenerationJob.entitlementStatus
+                      ]
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>模擬成本單位</dt>
+                <dd className="mono">
+                  {latestGenerationJob?.providerCostUnits ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>GLB 驗證</dt>
+                <dd className="mono">
+                  {latestGenerationJob?.validationCode ?? "—"}
                 </dd>
               </div>
             </dl>
@@ -1191,11 +1434,14 @@ export function AssetReviewPage() {
                   ? "只有 owner 或 admin 可建立生成工作"
                   : asset.files.source === null
                     ? "先上載私人來源圖片"
-                    : generationActive
-                      ? "已有進行中的生成工作"
-                      : !asset.sourceRightsConfirmed || reviewHasUnsavedChanges
-                        ? "先儲存來源圖片使用權確認及其他審核變更"
-                        : "建立零成本合成 GLB 草稿，不呼叫外部供應商"
+                    : generationState.capability.credits.availableUnits < 1
+                      ? "沒有可保留的本機測試 credit"
+                      : generationActive
+                        ? "已有進行中或等待人工決定的生成工作"
+                        : !asset.sourceRightsConfirmed ||
+                            reviewHasUnsavedChanges
+                          ? "先儲存來源圖片使用權確認及其他審核變更"
+                          : "建立零成本合成 GLB 草稿，不呼叫外部供應商"
             }
             onClick={() => void requestGeneration()}
           >
@@ -1208,29 +1454,46 @@ export function AssetReviewPage() {
           </button>
         </div>
         <div>
-          <button
-            className="button button--secondary"
-            type="button"
-            disabled={!canEdit || submitting}
-            onClick={() => void submitReview("save_draft")}
-          >
-            <Save aria-hidden="true" />
-            {submitting ? "儲存中…" : "儲存草稿"}
-          </button>
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={!approvalReady || !canDecide || submitting}
-            title={
-              asset.files.model
-                ? "所有清單及尺寸完成後可核准"
-                : "上載並檢查 GLB 模型後才可核准"
-            }
-            onClick={() => void submitReview("approve")}
-          >
-            <Check aria-hidden="true" />
-            核准素材
-          </button>
+          {isLocalPreview && asset.status === "approved" ? (
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() =>
+                void navigate("/builder", {
+                  state: { localApprovedAssetId: asset.id },
+                })
+              }
+            >
+              在 Builder 檢查
+              <ArrowRight aria-hidden="true" />
+            </button>
+          ) : (
+            <>
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={!canEdit || submitting}
+                onClick={() => void submitReview("save_draft")}
+              >
+                <Save aria-hidden="true" />
+                {submitting ? "儲存中…" : "儲存草稿"}
+              </button>
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={!approvalReady || !canDecide || submitting}
+                title={
+                  asset.files.model
+                    ? "所有清單及尺寸完成後可核准"
+                    : "上載並檢查 GLB 模型後才可核准"
+                }
+                onClick={() => void submitReview("approve")}
+              >
+                <Check aria-hidden="true" />
+                核准素材
+              </button>
+            </>
+          )}
         </div>
       </footer>
     </div>

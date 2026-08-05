@@ -8,6 +8,14 @@ The workspace is invite-only. The public landing page is static and does not req
 
 The browser preview uses synthetic data only. Do not enter real merchant, customer, payment or private asset data into a local or preview environment.
 
+## Public documentation boundary
+
+- Documentation, examples, screenshots and support material must use placeholders or clearly labelled synthetic data only.
+- Never publish AI-assistant prompts, conversation text, private operating notes, real application data, credentials, Access values, deployment coordinates, private URLs, database exports or internal operational topology.
+- Self-hosting values belong in Git-ignored local files or Cloudflare secrets. Treat resource names and identifiers as private even when they are not authentication credentials.
+- Public documents may describe the logical components required to understand and deploy the checked-in source, but must not claim to conceal implementation that is already visible in source code or migrations. Keep the repository private if the logical architecture itself is confidential.
+- Review generated or AI-assisted documentation as untrusted input before commit. Confirm every capability, dependency, model and data-source statement against the repository and official primary documentation.
+
 ## Security controls
 
 - Access JWT signature, issuer, audience, expiry and subject are verified in the Worker.

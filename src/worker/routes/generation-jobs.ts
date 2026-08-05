@@ -8,6 +8,12 @@ import {
 } from "../../shared/domain/generation-jobs";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
+import {
+  entitlementTransitionStatements,
+  generationCreditSummary,
+  generationCustomerCreditUnits,
+  syntheticProviderCostLimitUnits,
+} from "../generation/accounting";
 import { generationRuntimeConfig } from "../generation/provider";
 import { ApiError } from "../lib/api-error";
 import { readBoundedJson } from "../lib/request-body";
@@ -22,6 +28,9 @@ type GenerationJobRow = {
   requested_review_version: number;
   output_object_key: string | null;
   failure_code: string | null;
+  entitlement_status: "released" | "reserved" | "settled" | null;
+  provider_cost_units: number | null;
+  validation_code: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -34,6 +43,19 @@ type GenerationRouteEnv = {
 };
 
 const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/u;
+
+const generationJobSelect = `SELECT j.id, j.asset_id, j.status,
+                                    j.execution_mode,
+                                    j.workflow_instance_id,
+                                    j.requested_review_version,
+                                    j.output_object_key, j.failure_code,
+                                    j.provider_cost_units, j.validation_code,
+                                    e.status AS entitlement_status,
+                                    j.created_at, j.updated_at
+                             FROM generation_jobs AS j
+                             LEFT JOIN generation_job_entitlements AS e
+                               ON e.workspace_id = j.workspace_id
+                              AND e.job_id = j.id`;
 
 function generationRoleError(): ApiError {
   return new ApiError(
@@ -61,13 +83,22 @@ function mapGenerationJob(row: GenerationJobRow): GenerationJob {
     kind: row.execution_mode,
     outputReady: row.output_object_key !== null,
     failureCode: row.failure_code,
+    entitlementStatus: row.entitlement_status,
+    providerCostUnits: row.provider_cost_units,
+    validationCode: row.validation_code,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
 }
 
-function capability(env: GenerationRouteEnv): GenerationCapability {
-  return generationRuntimeConfig(env);
+async function capability(
+  env: GenerationRouteEnv,
+  workspaceId: string,
+): Promise<GenerationCapability> {
+  return {
+    ...generationRuntimeConfig(env),
+    credits: await generationCreditSummary(env.DB, workspaceId),
+  };
 }
 
 async function findGenerationJob(
@@ -78,11 +109,8 @@ async function findGenerationJob(
 ): Promise<GenerationJobRow | null> {
   return db
     .prepare(
-      `SELECT id, asset_id, status, execution_mode, workflow_instance_id,
-              requested_review_version, output_object_key, failure_code,
-              created_at, updated_at
-       FROM generation_jobs
-       WHERE workspace_id = ?1 AND ${clause} = ?2
+      `${generationJobSelect}
+       WHERE j.workspace_id = ?1 AND j.${clause} = ?2
        LIMIT 1`,
     )
     .bind(workspaceId, value)
@@ -96,14 +124,14 @@ async function findActiveGenerationJob(
 ): Promise<GenerationJobRow | null> {
   return db
     .prepare(
-      `SELECT id, asset_id, status, execution_mode, workflow_instance_id,
-              requested_review_version, output_object_key, failure_code,
-              created_at, updated_at
-       FROM generation_jobs
-       WHERE workspace_id = ?1
-         AND asset_id = ?2
-         AND status IN ('queued', 'running', 'validating')
-       ORDER BY created_at DESC, id DESC
+      `${generationJobSelect}
+       WHERE j.workspace_id = ?1
+         AND j.asset_id = ?2
+         AND (
+           j.status IN ('queued', 'running', 'validating')
+           OR (j.status = 'awaiting_review' AND e.status = 'reserved')
+         )
+       ORDER BY j.created_at DESC, j.id DESC
        LIMIT 1`,
     )
     .bind(workspaceId, assetId)
@@ -157,6 +185,12 @@ async function markStartFailure(
         jobId,
         failureCode,
       ),
+    ...entitlementTransitionStatements(db, {
+      workspaceId,
+      jobId,
+      transition: "released",
+      reasonCode: "start_failed",
+    }),
   ]);
 }
 
@@ -189,18 +223,15 @@ export async function generationJobListResponse(
     throw assetNotFound();
   }
   const result = await env.DB.prepare(
-    `SELECT id, asset_id, status, execution_mode, workflow_instance_id,
-              requested_review_version, output_object_key, failure_code,
-              created_at, updated_at
-       FROM generation_jobs
-       WHERE workspace_id = ?1 AND asset_id = ?2
-       ORDER BY created_at DESC, id DESC
+    `${generationJobSelect}
+       WHERE j.workspace_id = ?1 AND j.asset_id = ?2
+       ORDER BY j.created_at DESC, j.id DESC
        LIMIT 20`,
   )
     .bind(context.currentWorkspace.id, assetId)
     .all<GenerationJobRow>();
   const body = generationJobListResponseSchema.parse({
-    capability: capability(env),
+    capability: await capability(env, context.currentWorkspace.id),
     items: result.results.map(mapGenerationJob),
   });
   return Response.json(body, {
@@ -219,7 +250,7 @@ export async function generationJobStartResponse(
   if (!assetRecordIdPattern.test(assetId)) {
     throw assetNotFound();
   }
-  const runtime = capability(env);
+  const runtime = generationRuntimeConfig(env);
   if (runtime.mode !== "simulation") {
     throw new ApiError(
       409,
@@ -256,17 +287,19 @@ export async function generationJobStartResponse(
         "此 Idempotency-Key 已用於另一項生成要求。",
       );
     }
-    await ensureWorkflowStarted(
-      env.ASSET_GENERATION,
-      existing,
-      {
-        jobId: existing.id,
-        workspaceId,
-        assetId: existing.asset_id,
-        requestedReviewVersion: existing.requested_review_version,
-      },
-      false,
-    );
+    if (["queued", "running", "validating"].includes(existing.status)) {
+      await ensureWorkflowStarted(
+        env.ASSET_GENERATION,
+        existing,
+        {
+          jobId: existing.id,
+          workspaceId,
+          assetId: existing.asset_id,
+          requestedReviewVersion: existing.requested_review_version,
+        },
+        false,
+      );
+    }
     return Response.json(mapGenerationJob(existing), {
       headers: { "cache-control": "no-store" },
     });
@@ -276,7 +309,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       409,
       "GENERATION_ALREADY_ACTIVE",
-      "此素材已有進行中的生成工作。",
+      "此素材已有進行中或等待人工決定的生成工作。",
     );
   }
   const asset = await findAsset(env.DB, workspaceId, assetId);
@@ -310,19 +343,32 @@ export async function generationJobStartResponse(
 
   const jobId = `generation_${crypto.randomUUID()}`;
   const auditMetadata = JSON.stringify({
+    creditUnits: generationCustomerCreditUnits,
     kind: "simulation",
     maxCostMinor: runtime.maxCostMinor,
+    maxProviderCostUnits: syntheticProviderCostLimitUnits,
   });
+  let creditReservation: D1Result<unknown> | undefined;
   try {
-    await env.DB.batch([
+    [creditReservation] = await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE generation_credit_accounts
+           SET available_units = available_units - ?1,
+               reserved_units = reserved_units + ?1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE workspace_id = ?2 AND available_units >= ?1`,
+      ).bind(generationCustomerCreditUnits, workspaceId),
       env.DB.prepare(
         `INSERT INTO generation_jobs (
              id, workspace_id, asset_id, requested_by, status,
              execution_mode, idempotency_key, workflow_instance_id,
-             requested_review_version, input_sha256, max_cost_minor
-           ) VALUES (
-             ?1, ?2, ?3, ?4, 'queued', 'simulation', ?5, ?1, ?6, ?7, ?8
-           )`,
+             requested_review_version, input_sha256, max_cost_minor,
+             max_provider_cost_units
+           )
+           SELECT ?1, ?2, ?3, ?4, 'queued', 'simulation', ?5, ?1,
+                  ?6, ?7, ?8, ?9
+           FROM generation_credit_accounts
+           WHERE workspace_id = ?2 AND changes() = 1`,
       ).bind(
         jobId,
         workspaceId,
@@ -332,7 +378,24 @@ export async function generationJobStartResponse(
         parsed.data.expectedVersion,
         asset.source_sha256,
         runtime.maxCostMinor,
+        syntheticProviderCostLimitUnits,
       ),
+      env.DB.prepare(
+        `INSERT INTO generation_job_entitlements (
+           workspace_id, job_id, units, status
+         )
+         SELECT workspace_id, id, ?1, 'reserved'
+         FROM generation_jobs
+         WHERE workspace_id = ?2 AND id = ?3 AND changes() = 1`,
+      ).bind(generationCustomerCreditUnits, workspaceId, jobId),
+      env.DB.prepare(
+        `INSERT INTO generation_credit_events (
+           id, workspace_id, job_id, event_type, units, reason_code
+         )
+         SELECT ?1, workspace_id, job_id, 'reserve', units, 'generation_requested'
+         FROM generation_job_entitlements
+         WHERE workspace_id = ?2 AND job_id = ?3 AND changes() = 1`,
+      ).bind(crypto.randomUUID(), workspaceId, jobId),
       env.DB.prepare(
         `INSERT INTO generation_job_events (
              id, workspace_id, job_id, status, event_type, metadata_json
@@ -376,11 +439,19 @@ export async function generationJobStartResponse(
         throw new ApiError(
           409,
           "GENERATION_ALREADY_ACTIVE",
-          "此素材已有進行中的生成工作。",
+          "此素材已有進行中或等待人工決定的生成工作。",
         );
       }
     }
     throw error;
+  }
+
+  if (creditReservation?.meta.changes !== 1) {
+    throw new ApiError(
+      409,
+      "GENERATION_CREDITS_REQUIRED",
+      "目前沒有可保留的 3D 素材 credit；沒有建立工作或產生供應商成本。",
+    );
   }
 
   const created = await findGenerationJob(env.DB, workspaceId, "id", jobId);

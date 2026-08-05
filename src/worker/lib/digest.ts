@@ -8,3 +8,13 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
     .map((value) => value.toString(16).padStart(2, "0"))
     .join("");
 }
+
+export async function pseudonymousGenerationRef(
+  kind: "attempt" | "job" | "workspace",
+  value: string,
+): Promise<string> {
+  const bytes = new TextEncoder().encode(
+    `rigstage-generation:${kind}:${value}`,
+  );
+  return `gref_${(await sha256Hex(bytes)).slice(0, 32)}`;
+}

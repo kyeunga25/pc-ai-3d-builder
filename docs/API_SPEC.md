@@ -104,17 +104,47 @@ The conditional asset update, review event and audit event are submitted in one 
 
 ## `GET /api/assets/:assetId/generation-jobs`
 
-Returns the active generation capability and at most 20 recent jobs for one asset in the resolved workspace. Viewer roles may read status. Each public job contains only its ID, asset ID, provider-neutral simulation kind, stable status, output-ready flag, stable failure code and timestamps.
+Returns the active generation capability and at most 20 recent jobs for one asset in the resolved workspace. Viewer roles may read status. Capability includes the mode, zero monetary cap and the workspace's non-monetary available/reserved/settled/released generation units. Each public job contains only its ID, asset ID, provider-neutral simulation kind, stable status, output-ready flag, stable failure code, entitlement status, bounded provider cost units, stable validation code and timestamps.
 
-The response never contains the requester, idempotency key, Workflow instance ID, cost data, input or output checksum, R2 key, provider reference or raw error. A disabled capability is a valid `200` response and accurately represents the tracked production default.
+The response never contains the requester, idempotency key, Workflow instance ID, monetary/provider-specific cost data, input or output checksum, R2 key, provider reference or raw error. Provider cost units are abstract test accounting, not currency or a provider invoice. A disabled capability is a valid `200` response and accurately represents the tracked production default.
+
+```json
+{
+  "capability": {
+    "mode": "simulation",
+    "maxCostMinor": 0,
+    "credits": {
+      "availableUnits": 1,
+      "reservedUnits": 1,
+      "settledUnits": 0,
+      "releasedUnits": 0
+    }
+  },
+  "items": [
+    {
+      "id": "generation_synthetic_example",
+      "assetId": "asset_synthetic_example",
+      "status": "awaiting_review",
+      "kind": "simulation",
+      "outputReady": true,
+      "failureCode": null,
+      "entitlementStatus": "reserved",
+      "providerCostUnits": 1,
+      "validationCode": "GLB_VALID",
+      "createdAt": "synthetic-timestamp",
+      "updatedAt": "synthetic-timestamp"
+    }
+  ]
+}
+```
 
 ## `POST /api/assets/:assetId/generation-jobs`
 
-Creates a zero-cost simulation job only when the runtime capability is explicitly set to simulation. The route is restricted to owner or admin roles and requires a valid `Idempotency-Key`, an unapproved asset, its current `expectedVersion`, a stored private source image and a previously saved source-rights confirmation.
+Creates a zero-monetary-cost simulation job only when the runtime capability is explicitly set to simulation. The route is restricted to owner or admin roles and requires a valid `Idempotency-Key`, an unapproved asset, its current `expectedVersion`, a stored private source image, a previously saved source-rights confirmation and at least one available non-monetary generation credit.
 
-The queued job, initial event and minimal audit record are committed before the uniquely identified Workflow instance is created. Reusing an idempotency key for the same asset returns the original job without creating duplicate work; reusing it for another asset is rejected. Only one queued, running or validating job may exist for the asset.
+One D1 batch moves a credit from available to reserved and inserts the queued job, entitlement, reserve event, initial job event and minimal audit record before the uniquely identified Workflow instance is created. Reusing an idempotency key for the same asset returns the original job without another reservation or Workflow; reusing it for another asset is rejected. Another job is blocked while the asset has a queued, running, validating or awaiting-human-review job with a reserved entitlement.
 
-Successful creation returns `202`. The Workflow output remains a draft and resets all prior checklist and dimension evidence before its state becomes `awaiting_review`. Tracked production configuration returns `GENERATION_DISABLED` before any database write or external activity.
+Successful creation returns `202`. The Workflow output remains a draft and resets all prior checklist and dimension evidence before its state becomes `awaiting_review`. Approval settles the reservation. Rejection, terminal failure, Workflow-start failure or generated-draft replacement releases it once. Tracked production configuration returns `GENERATION_DISABLED` before any database write or external activity. An absent/empty credit account returns `GENERATION_CREDITS_REQUIRED` without creating a job or provider attempt.
 
 ## Errors
 
@@ -128,6 +158,6 @@ Successful creation returns `202`. The Workflow output remains a draft and reset
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_CREDITS_REQUIRED`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.

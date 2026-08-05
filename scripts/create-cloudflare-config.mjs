@@ -39,6 +39,8 @@ source.$schema = "../node_modules/wrangler/config-schema.json";
 source.name = workerName;
 source.main = "../src/worker/index.ts";
 source.assets = { ...source.assets, directory: "../dist" };
+source.workers_dev = false;
+source.preview_urls = false;
 
 source.d1_databases = [
   {

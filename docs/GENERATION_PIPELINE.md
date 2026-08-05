@@ -1,48 +1,89 @@
 # Generation pipeline
 
-RigStage v1.1 includes a provider-neutral generation-job foundation and a zero-cost synthetic adapter for local, test and explicitly controlled non-production validation. The tracked Cloudflare configuration keeps `GENERATION_MODE` set to `disabled`, so a normal production deployment does not call an external provider or create billable work.
+RigStage v1.1 includes a provider-neutral generation-job foundation. The current source also includes a local-development milestone with non-monetary credit accounting, immutable provider-attempt results, strict generated-GLB policy checks and Workers Runtime integration tests. Its only adapter is synthetic and zero monetary cost. The tracked Cloudflare configuration keeps `GENERATION_MODE` set to `disabled`, so a normal production deployment does not call an external provider or create billable work.
 
 ## Active boundary
 
 - An owner or admin may request a job only for an unapproved asset in the verified workspace.
 - The private source image must exist and its usage-rights check must already be saved at the current review version.
-- `Idempotency-Key` prevents duplicate job creation, while a partial unique index permits only one queued, running or validating job per asset.
-- The request commits the queued job, append-only job event and minimal audit event before the Workflow is triggered.
+- The workspace must have one available generation credit. Migration `0009` creates the schema only and grants no production credit.
+- `Idempotency-Key` prevents duplicate job creation. A new request is blocked while the same asset has an active job or an `awaiting_review` job with a reserved entitlement.
+- One D1 batch reserves one unit and commits the queued job, job entitlement, credit event, append-only job event and minimal audit event before the Workflow is triggered.
 - The current adapter creates a small synthetic GLB at runtime. It does not read the source-image bytes, contact an external service or incur provider cost.
-- Workflow steps claim the current input, enforce the zero-cost cap, store the draft under a deterministic private R2 key, read it back, validate the complete GLB and compare its checksum.
+- The adapter receives only pseudonymous workspace/job/attempt references, source MIME/size/checksum metadata and a fixed output policy. Raw internal IDs, R2 keys, source bytes and permanent URLs do not cross the provider boundary.
+- Workflow steps claim the current input and reserved entitlement, create one stable provider attempt, enforce the zero monetary and provider cost-unit caps, validate before storage, store the draft under a deterministic private R2 key, read it back, repeat validation and compare its checksum.
 - D1 stages valid output as a new asset-review version and resets all prior checklist and dimension evidence in the same batch that marks the job `awaiting_review`.
+- The reserved customer credit settles only after human approval. It releases once after rejection, terminal failure, Workflow-start failure or replacement of the generated draft.
 - A generated GLB remains a draft. It is unavailable to the Builder until an owner or admin completes the full human checklist and approves it.
+
+Generation credit, provider cost units and money are different concepts:
+
+- `generation_credit_accounts` and job entitlements represent product authorization units only.
+- `providerCostUnits` is a bounded abstract result used to test attempt/cap logic; the synthetic adapter reports `1`.
+- `maxCostMinor` remains `0`; there is no price, charge, order, invoice, wallet or payment event.
 
 ## State model
 
 ```text
-queued -> running -> validating -> awaiting_review
-   |         |           |
-   +---------+-----------+-> failed
+available credit
+      |
+      v
+reserved + queued -> running -> validating -> awaiting_review
+      |                |             |               |
+      +----------------+-------------+---------------+
+                             |                       |
+                         released                human decision
+                                                /              \
+                                         settled                released
+                                         (approve)              (reject)
 ```
 
-`cancelled` is reserved in the schema for a later explicit termination contract. The current public API does not expose cancellation or retry because no paid provider is active.
+`cancelled` is reserved in the schema for a later explicit termination contract. The current public API does not expose cancellation. Workflow step retries use the same attempt reference; completed steps are durable, matching terminal results are treated as duplicates, and conflicting, late or out-of-order results fail closed.
+
+## Generated GLB policy
+
+The output must be a complete, self-contained glTF 2.0 GLB and satisfy all of the following before it can be staged:
+
+- at most 25 MiB, with exact file/chunk lengths and valid UTF-8 JSON;
+- no external URI; embedded binary/data resources only;
+- valid buffer, bufferView and accessor byte ranges;
+- triangle primitives with valid POSITION bounds and index accessors;
+- nested node transform graph without matrix ambiguity, cycles or multiple parents;
+- at most 10,000 mm conservative geometry dimension;
+- at most 500,000 triangles;
+- at most 16 JPEG/PNG/WebP textures and 16 MiB combined texture data;
+- identical size and SHA-256 after the private R2 read-back.
+
+Stable validation codes are stored; raw parser/provider errors are not returned to the browser or audit metadata.
 
 ## Fail-closed controls
 
-- Any unrecognized mode or non-zero simulation cost configuration resolves to `disabled`.
+- Any unrecognized mode or non-zero monetary simulation cap resolves to `disabled`.
 - Production starts with the kill switch disabled in tracked configuration.
-- Source replacement, review-version changes, loss of rights confirmation or asset approval invalidate an in-flight job.
-- Output above the 25 MiB model limit, a malformed glTF header, external URI, length mismatch or checksum mismatch fails the job.
+- A missing/resolved entitlement, source replacement, review-version change, loss of rights confirmation or asset approval invalidates an in-flight job.
+- Dimension, triangle, texture, byte-range, self-containment, length or checksum failure rejects the output before approval.
 - Workflow and API responses expose no R2 key, checksum, provider reference, user identity or deployment coordinate.
 - Failure records use stable codes. Raw provider and platform errors are not returned or added to audit metadata.
 - No Cron trigger is configured; jobs start only from an authorized, explicit request.
+
+## Local verification
+
+The browser-only flow is available through `npm run local:ai:start`: create the built-in synthetic PNG in asset review, save explicit rights confirmation, generate the runtime GLB, complete human review and continue to Builder. This keeps all files in the current browser session.
+
+`npm run test:worker` runs the real migrations and Workflow locally under workerd/Miniflare with isolated D1 and R2 bindings. It forces one transient validation-step retry, proves a single provider attempt/reservation, reads and validates the private object, checks idempotent request replay, settles on approval, releases terminal failure once and runs `PRAGMA foreign_key_check`.
+
+`npm run local:ai:debug` applies migrations to Wrangler's local D1 and starts `wrangler dev --local` with simulation variables. It does not bypass Access authentication and never selects remote bindings.
 
 ## External-provider gate
 
 The synthetic adapter is not evidence that external 3D generation is production-ready. A real adapter requires a separate approval and must add, at minimum:
 
 1. reviewed input/output rights, retention, deletion, security and service terms;
-2. an explicit per-job cost cap, reservation and settlement rule;
+2. an explicit, pre-authorized per-job monetary cap plus separately reviewed customer entitlement reservation/settlement rules;
 3. signed and replay-protected callback or bounded polling behavior;
 4. provider-neutral server interfaces with secrets outside Git and the browser;
-5. success, failure, timeout, duplicate, out-of-order and kill-switch tests;
+5. success, failure, timeout, duplicate, out-of-order, callback-signature and kill-switch tests;
 6. a capped non-production run using authorized synthetic material;
 7. another production review before activation.
 
-Provider-specific identifiers, routing, quality targets and commercial terms must remain outside the public domain model, UI and export.
+Provider-specific identifiers, routing, quality targets and commercial terms must remain outside the public domain model, UI and export. The current pseudonymous descriptor interface is not an authorization to add source delivery, provider credentials or network egress.

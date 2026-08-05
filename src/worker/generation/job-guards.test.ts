@@ -11,9 +11,10 @@ function state(
 ): GenerationGuardState {
   return {
     assetStatus: "draft",
+    entitlementStatus: "reserved",
     inputSha256: "a".repeat(64),
     jobStatus: "queued",
-    maxCostMinor: 0,
+    maxProviderCostUnits: 1,
     outputObjectKey: null,
     requestedReviewVersion: 2,
     reviewVersion: 2,
@@ -67,12 +68,21 @@ describe("generation job guards", () => {
   it("enforces the cost cap and current input before staging", () => {
     const validating = state({ jobStatus: "validating" });
 
-    expect(generationStageFailure(validating, 2, 0)).toBeNull();
-    expect(generationStageFailure(validating, 2, 1)).toBe(
+    expect(generationStageFailure(validating, 2, 1)).toBeNull();
+    expect(generationStageFailure(validating, 2, 2)).toBe(
       "GENERATION_COST_CAP_EXCEEDED",
     );
     expect(
       generationStageFailure({ ...validating, sourceRightsConfirmed: 0 }, 2, 0),
     ).toBe("GENERATION_INPUT_STALE");
+  });
+
+  it("requires a reserved generation entitlement", () => {
+    expect(
+      generationClaimDisposition(state({ entitlementStatus: "released" }), 2),
+    ).toEqual({
+      kind: "rejected",
+      code: "GENERATION_ENTITLEMENT_MISSING",
+    });
   });
 });
