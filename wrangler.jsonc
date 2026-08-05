@@ -5,6 +5,8 @@
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat", "disallow_importable_env"],
+  "workers_dev": false,
+  "preview_urls": false,
   "send_metrics": false,
   "dependencies_instrumentation": {
     "enabled": false,
@@ -21,7 +23,18 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"],
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/dashboard",
+      "/dashboard/*",
+      "/catalogue",
+      "/catalogue/*",
+      "/asset-review",
+      "/asset-review/*",
+      "/builder",
+      "/builder/*",
+    ],
   },
   // Bindings are intentionally identifier-free in the public template.
   "d1_databases": [

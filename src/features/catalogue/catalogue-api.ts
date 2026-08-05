@@ -10,6 +10,7 @@ import {
   type CatalogueResponse,
   type CatalogPart,
 } from "../../shared/domain/schemas";
+import { apiFetch } from "../../shared/lib/api-fetch";
 
 export class CatalogueRequestError extends Error {
   readonly code: string;
@@ -59,7 +60,7 @@ export async function fetchCataloguePage(
     query.set("cursor", cursor);
   }
 
-  const response = await fetch(`/api/catalogue?${query.toString()}`, {
+  const response = await apiFetch(`/api/catalogue?${query.toString()}`, {
     credentials: "same-origin",
     headers: workspaceHeaders(workspaceId),
     signal,
@@ -77,7 +78,7 @@ export async function createCataloguePart(
   const body = cataloguePartInputSchema.parse(input);
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await fetch("/api/catalogue", {
+  const response = await apiFetch("/api/catalogue", {
     method: "POST",
     credentials: "same-origin",
     headers,
@@ -96,12 +97,15 @@ export async function mutateCataloguePart(
   const body = catalogueMutationSchema.parse(mutation);
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await fetch(`/api/catalogue/${encodeURIComponent(partId)}`, {
-    method: "PATCH",
-    credentials: "same-origin",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const response = await apiFetch(
+    `/api/catalogue/${encodeURIComponent(partId)}`,
+    {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify(body),
+    },
+  );
 
   await assertCatalogueResponse(response);
   if (response.status === 204) {
@@ -116,7 +120,7 @@ export async function importCatalogueCsv(
 ): Promise<CatalogueImportResponse> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "text/csv; charset=utf-8");
-  const response = await fetch("/api/catalogue/import", {
+  const response = await apiFetch("/api/catalogue/import", {
     method: "POST",
     credentials: "same-origin",
     headers,

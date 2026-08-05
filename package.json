@@ -9,7 +9,8 @@
     "build": "npm run typegen && npm run check:types && vite build",
     "check": "npm run typegen:check && npm run check:types && eslint . && prettier --check .",
     "check:types": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:owner-onboarding",
+    "test:owner-onboarding": "node --test scripts/onboard-owner.test.mjs",
     "test:watch": "vitest",
     "typegen": "WRANGLER_LOG_PATH=.wrangler/logs wrangler types",
     "typegen:check": "WRANGLER_LOG_PATH=.wrangler/logs wrangler types --check",
@@ -18,7 +19,8 @@
     "cf:dry-run": "WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy --dry-run",
     "prepare:deploy": "node scripts/create-cloudflare-config.mjs",
     "db:migrate:ci": "wrangler d1 migrations apply DB --remote --config .wrangler/deploy.jsonc",
-    "deploy:ci": "npm run prepare:deploy && npm run db:migrate:ci && wrangler deploy --config .wrangler/deploy.jsonc"
+    "deploy:ci": "npm run prepare:deploy && npm run db:migrate:ci && wrangler deploy --config .wrangler/deploy.jsonc",
+    "owner:onboard": "node scripts/onboard-owner.mjs"
   },
   "dependencies": {
     "jose": "6.2.4",
@@ -49,5 +51,10 @@
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "wrangler": "4.118.0"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.9",
+    "postcss": "8.5.25",
+    "undici": "7.29.0"
   }
 }

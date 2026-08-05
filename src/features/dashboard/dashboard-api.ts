@@ -2,12 +2,13 @@ import {
   dashboardResponseSchema,
   type DashboardResponse,
 } from "../../shared/domain/dashboard";
+import { apiFetch } from "../../shared/lib/api-fetch";
 
 export async function fetchDashboard(
   signal: AbortSignal,
   workspaceId: string,
 ): Promise<DashboardResponse> {
-  const response = await fetch("/api/dashboard", {
+  const response = await apiFetch("/api/dashboard", {
     credentials: "same-origin",
     headers: {
       accept: "application/json",
