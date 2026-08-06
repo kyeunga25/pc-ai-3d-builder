@@ -198,6 +198,25 @@ SELECT CASE WHEN EXISTS (
 `;
 }
 
+export function buildOwnerOnboardingVerificationSql(requestId) {
+  const request = sqlString(requestId);
+
+  return `SELECT CASE WHEN EXISTS (
+  SELECT 1
+  FROM audit_events AS event
+  INNER JOIN users AS u ON u.id = event.user_id
+  INNER JOIN workspace_memberships AS wm
+    ON wm.user_id = u.id AND wm.workspace_id = event.workspace_id
+  INNER JOIN workspaces AS w ON w.id = event.workspace_id
+  WHERE event.request_id = ${request}
+    AND event.action = 'owner.onboarded'
+    AND u.status = 'active'
+    AND wm.role = 'owner'
+    AND wm.status = 'active'
+    AND w.status = 'active'
+) THEN 1 ELSE 0 END AS onboarded`;
+}
+
 function privateChildEnvironment() {
   const environment = { ...process.env };
   delete environment.OWNER_LOGIN_IDENTITY;
@@ -368,23 +387,28 @@ async function main() {
   const sqlPath = join(temporaryDirectory, "onboarding.sql");
 
   try {
+    const requestId = stablePrivateId("onboarding");
     const sql = buildOwnerOnboardingSql({
       identity,
       userId: stablePrivateId("user"),
       workspaceId: stablePrivateId("workspace"),
       workspaceSlug: `owner-beta-${randomUUID().slice(0, 12)}`,
       auditId: stablePrivateId("audit"),
-      requestId: stablePrivateId("onboarding"),
+      requestId,
       includeCreditAccount: hasCreditTable,
       creditUnits,
     });
     await writeFile(sqlPath, sql, { mode: 0o600, flag: "wx" });
-    const output = runQuietly(wranglerPath, [
+    runQuietly(wranglerPath, [...baseArguments, "--file", sqlPath]);
+    const verificationOutput = runQuietly(wranglerPath, [
       ...baseArguments,
-      "--file",
-      sqlPath,
+      "--command",
+      buildOwnerOnboardingVerificationSql(requestId),
     ]);
-    const onboarded = findNumericResult(parseQuietJson(output), "onboarded");
+    const onboarded = findNumericResult(
+      parseQuietJson(verificationOutput),
+      "onboarded",
+    );
     if (onboarded !== 1) {
       throw new OnboardingError("PRIVATE_OPERATION_UNCONFIRMED");
     }
