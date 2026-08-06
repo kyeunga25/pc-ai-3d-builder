@@ -105,6 +105,8 @@ RIGSTAGE_RATE_NAMESPACE_ID=<your-account-unique-positive-integer>
 ```dotenv
 TEAM_DOMAIN=https://<your-team-subdomain>.cloudflareaccess.com
 POLICY_AUD=<your-access-application-audience>
+# Multiple private applications only:
+# POLICY_AUD=<audience-one>,<audience-two>
 ```
 
 這些檔案即使被 Git ignore 仍是敏感本機資料：限制讀取權限、不要同步到公開雲端硬碟、不要放入 screenshot，也不要把它們作為 support attachment。
@@ -146,7 +148,7 @@ Generator 會自動寫入以上 top-level fields，不需要手動修改 generat
 - 不要以寬鬆 Bypass policy 公開 workspace 或 API。
 - Edge Access 及 Worker JWT 驗證都要通過；只有其中一層成功並不足夠。
 - Access custom hostname 的 policy 不會自動保護另一個 `workers.dev` 或 preview hostname；production 應關閉這些入口。
-- `TEAM_DOMAIN` 與 `POLICY_AUD` 只存入 Worker secrets，不得出現在 Git。
+- `TEAM_DOMAIN` 與 `POLICY_AUD` 只存入 Worker secrets，不得出現在 Git。若 private paths 必須拆成多個 Access applications，`POLICY_AUD` 可使用逗號分隔、最多 16 個不重複 audience；不要加入 public health Bypass application 的 audience。
 - onboarding、邀請及 active workspace membership 必須使用獨立的私人操作程序；本公開 repository 故意不提供含真實 identity 或 seed data 的 SQL。
 
 ## 8. Dry-run、migration 與第一次部署

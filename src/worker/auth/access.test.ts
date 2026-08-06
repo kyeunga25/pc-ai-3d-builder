@@ -44,6 +44,31 @@ describe("Cloudflare Access identity", () => {
     });
   });
 
+  it("accepts a bounded comma-separated audience allowlist", async () => {
+    const verify = vi.fn().mockResolvedValue({
+      sub: "access-user-1",
+      email: "pilot@example.com",
+      type: "app",
+    });
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "signed-token" },
+    });
+
+    await authenticateAccessRequest(
+      request,
+      {
+        ...env,
+        POLICY_AUD: "workspace-audience, api-audience",
+      },
+      verify,
+    );
+
+    expect(verify).toHaveBeenCalledWith("signed-token", {
+      issuer: env.TEAM_DOMAIN,
+      audience: ["workspace-audience", "api-audience"],
+    });
+  });
+
   it("fails closed when token verification fails", async () => {
     const request = new Request("https://rigstage.test/api/session", {
       headers: { "Cf-Access-Jwt-Assertion": "invalid-token" },
@@ -100,6 +125,31 @@ describe("Cloudflare Access identity", () => {
       authenticateAccessRequest(
         request,
         { TEAM_DOMAIN: "", POLICY_AUD: "" },
+        verify,
+      ),
+    ).rejects.toMatchObject({
+      status: 503,
+      code: "AUTH_CONFIGURATION_MISSING",
+    });
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "workspace-audience,",
+    "workspace-audience,,api-audience",
+    "workspace-audience,workspace-audience",
+    Array.from({ length: 17 }, (_, index) => `audience-${index}`).join(","),
+    "a".repeat(257),
+  ])("fails closed for an invalid audience allowlist: %s", async (audience) => {
+    const request = new Request("https://rigstage.test/api/session", {
+      headers: { "Cf-Access-Jwt-Assertion": "signed-token" },
+    });
+    const verify = vi.fn();
+
+    await expect(
+      authenticateAccessRequest(
+        request,
+        { ...env, POLICY_AUD: audience },
         verify,
       ),
     ).rejects.toMatchObject({

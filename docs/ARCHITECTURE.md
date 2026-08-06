@@ -20,7 +20,7 @@ The Worker handles `/api/*` and each protected workspace parent/deep route befor
 
 ## Authentication and tenancy
 
-The Worker validates the Access assertion against the configured issuer and audience. It then resolves the active D1 user by bound subject or, for the first login only, by a verified invited email. Subject binding uses a conditional update and verifies the persisted winner before returning a context.
+The Worker validates the Access assertion against the configured issuer and a bounded allowlist of application audiences. A single audience remains the default; deployments that must split the documented private paths across multiple Access applications may store a comma-separated secret allowlist without publishing any audience value. It then resolves the active D1 user by bound subject or, for the first login only, by a verified invited email. Subject binding uses a conditional update and verifies the persisted winner before returning a context.
 
 A requested workspace header never grants access by itself. The selected workspace must be present in the caller's active membership set.
 
