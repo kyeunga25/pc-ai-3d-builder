@@ -8,6 +8,7 @@ import {
 
 import { BrandMark } from "../../shared/components/BrandMark";
 import {
+  demoEntryPath,
   heroProofPoints,
   landingCopy,
   trustPoints,
@@ -90,13 +91,13 @@ export function LandingPage() {
             <div className="landing-hero__actions">
               <a
                 className="landing-button landing-button--primary"
-                href={workspaceEntryPath}
+                href={demoEntryPath}
               >
-                <span>進入獲邀工作空間</span>
+                <span>立即試用合成 Demo</span>
                 <ArrowRight aria-hidden="true" />
               </a>
-              <a className="landing-text-link" href="#workflow">
-                <span>查看實際工作流程</span>
+              <a className="landing-text-link" href={workspaceEntryPath}>
+                <span>登入獲邀工作空間</span>
                 <ArrowDownRight aria-hidden="true" />
               </a>
             </div>

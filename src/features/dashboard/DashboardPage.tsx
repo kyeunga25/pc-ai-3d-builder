@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   EmptyState,
   ErrorState,
@@ -126,7 +127,7 @@ const localFixture = localDashboardFixture();
 
 export function DashboardPage() {
   const { currentWorkspace } = useAuthenticatedSession();
-  const isLocalPreview = import.meta.env.DEV;
+  const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<
     | { status: "loading"; data: null; workspaceId: string }

@@ -18,6 +18,7 @@ import {
   accountInitials,
   type WorkspaceRole,
 } from "../../shared/domain/session";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import "./merchant-shell.css";
 
 const navigation = [
@@ -37,6 +38,7 @@ const roleLabels: Record<WorkspaceRole, string> = {
 export function MerchantShell() {
   const { currentWorkspace, user, workspaces } = useAuthenticatedSession();
   const { selectWorkspace } = useSessionState();
+  const demoMode = isPublicDemoPath();
 
   return (
     <div className="merchant-shell">
@@ -62,7 +64,9 @@ export function MerchantShell() {
         </label>
         <div className="merchant-header__status">
           <span className="status-dot" aria-hidden="true" />
-          已驗證 · {roleLabels[currentWorkspace.role]}
+          {demoMode
+            ? "合成 Demo · 不連接正式資料"
+            : `已驗證 · ${roleLabels[currentWorkspace.role]}`}
         </div>
         <span
           className="account-button"
@@ -73,11 +77,11 @@ export function MerchantShell() {
         </span>
         <a
           className="merchant-header__logout"
-          href={accessLogoutPath}
-          aria-label="登出 Cloudflare Access"
+          href={demoMode ? "/" : accessLogoutPath}
+          aria-label={demoMode ? "離開公開 Demo" : "登出 Cloudflare Access"}
         >
           <LogOut aria-hidden="true" />
-          <span>登出</span>
+          <span>{demoMode ? "離開 Demo" : "登出"}</span>
         </a>
       </header>
 
@@ -100,7 +104,11 @@ export function MerchantShell() {
         <div className="merchant-nav__footer">
           <span>目前工作空間</span>
           <strong>{currentWorkspace.name}</strong>
-          <small>{roleLabels[currentWorkspace.role]} · 私人資料範圍</small>
+          <small>
+            {demoMode
+              ? "公開合成資料 · 重新載入即重設"
+              : `${roleLabels[currentWorkspace.role]} · 私人資料範圍`}
+          </small>
         </div>
       </aside>
 

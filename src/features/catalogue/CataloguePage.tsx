@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 
 import { createAssetFromSource } from "../asset-review/asset-review-api";
 import { useAuthenticatedSession } from "../auth/session-context";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   EmptyState,
   ErrorState,
@@ -88,7 +89,7 @@ function assetQualityLabel(quality: CatalogPart["assetQuality"]) {
 export function CataloguePage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const navigate = useNavigate();
-  const isLocalPreview = import.meta.env.DEV;
+  const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const canWrite = currentWorkspace.role !== "viewer";
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ComponentCategory | "all">("all");

@@ -11,6 +11,7 @@ import {
   type SessionResponse,
 } from "../../shared/domain/session";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   SessionContext,
   type SessionContextValue,
@@ -86,7 +87,7 @@ function isSessionError(value: unknown): value is SessionError {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const isLocalPreview = import.meta.env.DEV;
+  const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const [reloadToken, setReloadToken] = useState(0);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
     null,

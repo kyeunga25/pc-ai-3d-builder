@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import { fetchCataloguePage } from "../catalogue/catalogue-api";
 import {
   EmptyState,
@@ -102,7 +103,7 @@ function createLocalInitialBuild(parts: CatalogPart[]): BuildRecord {
 export function BuilderPage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const location = useLocation();
-  const isLocalPreview = import.meta.env.DEV;
+  const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const localApprovedAssetId = isLocalPreview
     ? ((location.state as LocalBuilderNavigationState | null)
         ?.localApprovedAssetId ?? null)

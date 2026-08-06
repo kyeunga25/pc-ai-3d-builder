@@ -25,10 +25,15 @@ function ProtectedWorkspace() {
   );
 }
 
-export function AppRouter() {
+export function AppRouter({ demoMode = false }: { demoMode?: boolean }) {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route
+        path="/"
+        element={
+          demoMode ? <Navigate replace to="/dashboard" /> : <LandingPage />
+        }
+      />
       <Route element={<ProtectedWorkspace />}>
         <Route element={<MerchantShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -46,7 +51,10 @@ export function AppRouter() {
           }
         />
       </Route>
-      <Route path="*" element={<Navigate replace to="/" />} />
+      <Route
+        path="*"
+        element={<Navigate replace to={demoMode ? "/dashboard" : "/"} />}
+      />
     </Routes>
   );
 }

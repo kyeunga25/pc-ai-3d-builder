@@ -26,6 +26,7 @@ import {
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
+import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   EmptyState,
   ErrorState,
@@ -202,7 +203,7 @@ export function AssetReviewPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const isLocalPreview = import.meta.env.DEV;
+  const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const targetAssetId = searchParams.get("asset");
   const localNavigationState =
     (location.state as LocalAssetNavigationState | null) ?? null;

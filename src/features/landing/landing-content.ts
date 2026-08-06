@@ -1,4 +1,5 @@
 export const workspaceEntryPath = "/dashboard";
+export const demoEntryPath = "/demo/dashboard";
 
 export const landingCopy = {
   heroTitle: "從零件資料到可交付組裝，讓每一步都有證據。",
