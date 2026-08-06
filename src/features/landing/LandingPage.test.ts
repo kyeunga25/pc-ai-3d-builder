@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  demoEntryPath,
   heroProofPoints,
   landingCopy,
   trustPoints,
@@ -47,5 +48,6 @@ describe("LandingPage", () => {
         ?.description,
     ).toContain("不以 3D 外觀作推斷");
     expect(workspaceEntryPath).toBe("/dashboard");
+    expect(demoEntryPath).toBe("/demo/dashboard");
   });
 });
