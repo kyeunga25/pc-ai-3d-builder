@@ -1,7 +1,9 @@
 .asset-review-page {
   display: grid;
-  min-height: calc(100dvh - 64px);
-  grid-template-rows: auto minmax(560px, 1fr) 74px;
+  height: calc(100dvh - 72px);
+  min-height: calc(100dvh - 72px);
+  overflow: hidden;
+  grid-template-rows: auto minmax(560px, 1fr) 84px;
   background: var(--bg-0);
 }
 
@@ -11,21 +13,23 @@
   justify-content: space-between;
   gap: 24px;
   border-bottom: 1px solid var(--border-subtle);
-  padding: 20px 24px;
+  padding: 24px 28px;
   background: var(--bg-1);
 }
 
 .asset-review-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 30px;
   letter-spacing: -0.025em;
+  line-height: 1.25;
 }
 
 .asset-review-header p {
   margin: 4px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .asset-review-header__meta {
@@ -34,14 +38,14 @@
   gap: 14px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .review-workspace {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: 156px minmax(420px, 1fr) 322px;
+  grid-template-columns: 180px minmax(440px, 1fr) 370px;
 }
 
 .source-filmstrip,
@@ -53,7 +57,7 @@
 
 .source-filmstrip {
   border-right: 1px solid var(--border-subtle);
-  padding: 14px 12px;
+  padding: 17px 14px;
 }
 
 .review-panel-heading {
@@ -72,19 +76,19 @@
 }
 
 .review-panel-heading strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .review-panel-heading span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .source-frame {
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 105px;
+  min-height: 116px;
   margin-top: 12px;
   place-items: center;
   border: 1px solid var(--border-subtle);
@@ -111,7 +115,7 @@
 .source-frame img {
   width: 100%;
   height: 100%;
-  min-height: 103px;
+  min-height: 114px;
   object-fit: cover;
 }
 
@@ -145,7 +149,7 @@
   bottom: 5px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .source-rights {
@@ -154,7 +158,8 @@
   gap: 7px;
   margin-top: 14px;
   color: var(--success);
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .source-rights svg {
@@ -165,7 +170,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 54px minmax(0, 1fr) 38px;
+  grid-template-rows: 60px minmax(0, 1fr) 42px;
   background: var(--bg-0);
 }
 
@@ -186,13 +191,13 @@
 }
 
 .review-viewport__toolbar button {
-  min-height: 32px;
+  min-height: 38px;
   border: 1px solid var(--border-subtle);
   border-radius: 2px;
   padding: 0 10px;
   background: var(--surface-1);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .review-viewport__toolbar button:hover,
@@ -220,7 +225,7 @@
 
 .review-viewport__toolbar > div:last-child button {
   display: grid;
-  width: 34px;
+  width: 38px;
   padding: 0;
   place-items: center;
 }
@@ -328,7 +333,7 @@
   display: grid;
   grid-template-columns: repeat(3, 22px);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   z-index: 3;
 }
 
@@ -355,7 +360,7 @@
   padding: 8px 10px;
   background: rgba(9, 13, 20, 0.88);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 13px;
   z-index: 3;
 }
 
@@ -367,7 +372,7 @@
   border-top: 1px solid var(--border-subtle);
   border-bottom: 0;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .review-inspector {
@@ -376,7 +381,7 @@
 
 .review-inspector__section {
   border-bottom: 1px solid var(--border-subtle);
-  padding: 16px;
+  padding: 19px;
 }
 
 .asset-file-controls {
@@ -390,7 +395,7 @@
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--border-subtle);
-  padding: 9px;
+  padding: 11px;
   background: var(--surface-1);
 }
 
@@ -401,20 +406,21 @@
 }
 
 .asset-file-control strong {
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .asset-file-control span,
 .asset-file-controls > small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .asset-file-control .button {
-  min-height: 32px;
+  min-height: 38px;
   flex: 0 0 auto;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .asset-file-control .button svg {
@@ -431,7 +437,7 @@
 
 .technical-list {
   display: grid;
-  gap: 7px;
+  gap: 9px;
   margin: 14px 0 0;
 }
 
@@ -443,20 +449,20 @@
 
 .technical-list dt {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .technical-list dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .generation-job-panel > small {
   display: block;
   margin-top: 10px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -471,7 +477,7 @@
   display: grid;
   gap: 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .dimension-grid label > span:last-child {
@@ -482,7 +488,7 @@
   background: var(--surface-1);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .dimension-grid input {
@@ -494,7 +500,7 @@
   background: transparent;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .review-checklist {
@@ -508,14 +514,15 @@
 
 .review-checklist label {
   display: flex;
-  min-height: 32px;
+  min-height: 40px;
   align-items: center;
   gap: 9px;
   border: 1px solid var(--border-subtle);
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: var(--surface-1);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .review-checklist input {
@@ -542,11 +549,13 @@
 
 @media (max-width: 1100px) {
   .asset-review-page {
-    grid-template-rows: auto auto 74px;
+    height: auto;
+    overflow: visible;
+    grid-template-rows: auto auto 84px;
   }
 
   .review-workspace {
-    grid-template-columns: 126px minmax(0, 1fr);
+    grid-template-columns: 148px minmax(0, 1fr);
     grid-template-rows: minmax(520px, 62vh) auto;
   }
 

@@ -2,6 +2,7 @@ import { authenticateAccessRequest } from "./auth/access";
 import {
   isProtectedWorkspacePath,
   privateWorkspaceAssetResponse,
+  protectedWorkspaceLoginRedirect,
 } from "./auth/protected-routes";
 import { resolveRequestContext } from "./auth/workspace";
 import { ApiError, apiErrorResponse } from "./lib/api-error";
@@ -355,8 +356,12 @@ export default {
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
+        const loginRedirect = protectedWorkspaceLoginRedirect(
+          request,
+          error.status,
+        );
         const response = withPublicSecurityHeaders(
-          apiErrorResponse(error, requestId),
+          loginRedirect ?? apiErrorResponse(error, requestId),
         );
         logRecord("info", {
           event: "request.denied",

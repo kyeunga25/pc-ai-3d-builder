@@ -1,4 +1,4 @@
-export const workspaceEntryPath = "/dashboard";
+export const workspaceEntryPath = "/login?next=%2Fdashboard";
 export const demoEntryPath = "/demo/dashboard";
 
 export const landingCopy = {
