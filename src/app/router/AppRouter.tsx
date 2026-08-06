@@ -5,6 +5,7 @@ import { MerchantShell } from "../shell/MerchantShell";
 import { AssetReviewPage } from "../../features/asset-review/AssetReviewPage";
 import { SessionGate } from "../../features/auth/SessionGate";
 import { SessionProvider } from "../../features/auth/SessionProvider";
+import { LoginPage } from "../../features/auth/LoginPage";
 import { CataloguePage } from "../../features/catalogue/CataloguePage";
 import { DashboardPage } from "../../features/dashboard/DashboardPage";
 import { LandingPage } from "../../features/landing/LandingPage";
@@ -32,6 +33,12 @@ export function AppRouter({ demoMode = false }: { demoMode?: boolean }) {
         path="/"
         element={
           demoMode ? <Navigate replace to="/dashboard" /> : <LandingPage />
+        }
+      />
+      <Route
+        path="/login"
+        element={
+          demoMode ? <Navigate replace to="/dashboard" /> : <LoginPage />
         }
       />
       <Route element={<ProtectedWorkspace />}>

@@ -47,7 +47,7 @@ describe("LandingPage", () => {
       trustPoints.find((point) => point.title === "相容性有結構化證據")
         ?.description,
     ).toContain("不以 3D 外觀作推斷");
-    expect(workspaceEntryPath).toBe("/dashboard");
+    expect(workspaceEntryPath).toBe("/login?next=%2Fdashboard");
     expect(demoEntryPath).toBe("/demo/dashboard");
   });
 });

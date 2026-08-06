@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   isProtectedWorkspacePath,
   privateWorkspaceAssetResponse,
+  protectedWorkspaceLoginRedirect,
   protectedWorkspaceRoutePatterns,
 } from "./protected-routes";
 
@@ -60,5 +61,57 @@ describe("protected workspace routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("content-type")).toBe("text/html");
     await expect(response.text()).resolves.toBe("private shell");
+  });
+
+  it.each([
+    [401, "access-required"],
+    [403, "not-authorized"],
+  ])(
+    "redirects a top-level HTML navigation after an authentication status %i",
+    (status, reason) => {
+      const response = protectedWorkspaceLoginRedirect(
+        new Request(
+          "https://rigstage.test/asset-review?asset=synthetic_example",
+          { headers: { accept: "text/html,application/xhtml+xml" } },
+        ),
+        status,
+      );
+
+      expect(response?.status).toBe(302);
+      expect(response?.headers.get("cache-control")).toBe("no-store");
+      expect(response?.headers.get("location")).toBe(
+        `https://rigstage.test/login?reason=${reason}&next=%2Fasset-review%3Fasset%3Dsynthetic_example`,
+      );
+    },
+  );
+
+  it("keeps API, AJAX and non-authentication failures as bounded responses", () => {
+    expect(
+      protectedWorkspaceLoginRedirect(
+        new Request("https://rigstage.test/api/session", {
+          headers: { accept: "application/json" },
+        }),
+        401,
+      ),
+    ).toBeNull();
+    expect(
+      protectedWorkspaceLoginRedirect(
+        new Request("https://rigstage.test/dashboard", {
+          headers: {
+            accept: "text/html",
+            "x-requested-with": "XMLHttpRequest",
+          },
+        }),
+        401,
+      ),
+    ).toBeNull();
+    expect(
+      protectedWorkspaceLoginRedirect(
+        new Request("https://rigstage.test/dashboard", {
+          headers: { accept: "text/html" },
+        }),
+        500,
+      ),
+    ).toBeNull();
   });
 });
