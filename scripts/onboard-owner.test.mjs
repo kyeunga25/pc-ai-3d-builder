@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   buildOwnerOnboardingSql,
+  buildOwnerOnboardingVerificationSql,
   normalizeOwnerIdentity,
 } from "./onboard-owner.mjs";
 
@@ -49,6 +50,19 @@ test("adds a bounded credit account only when the private schema supports it", (
   assert.match(sql, /generation_credit_accounts/u);
   assert.match(sql, /SELECT last_workspace_id, 2, 0, 0, 0/u);
   assert.match(sql, /ON CONFLICT\(workspace_id\) DO NOTHING/u);
+});
+
+test("verifies onboarding by private audit request without the identity", () => {
+  const sql = buildOwnerOnboardingVerificationSql(
+    "onboarding_synthetic_confirmation",
+  );
+
+  assert.match(sql, /event\.request_id = 'onboarding_synthetic_confirmation'/u);
+  assert.match(sql, /event\.action = 'owner\.onboarded'/u);
+  assert.match(sql, /wm\.role = 'owner'/u);
+  assert.match(sql, /wm\.status = 'active'/u);
+  assert.match(sql, /w\.status = 'active'/u);
+  assert.doesNotMatch(sql, /owner@example\.invalid/u);
 });
 
 test("executes idempotently across the complete D1 schema", async () => {
