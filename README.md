@@ -134,7 +134,7 @@ Cloudflare build 環境需要以下 secret 名稱，值只儲存在 Cloudflare�
 
 Cloudflare Workers Builds 會自動提供 Worker 名稱 override；其他 CI 環境須以私密 build value 提供 `RIGSTAGE_WORKER_NAME`，不可把實際名稱寫入版本庫。
 
-Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets。
+Access 的 `TEAM_DOMAIN` 與 `POLICY_AUD` 是獨立的 runtime secrets，不屬於 build secrets；多個私人 Access applications 可在同一個 `POLICY_AUD` secret 使用有界、逗號分隔的 audience allowlist，實際值不應進入 Git 或 log。
 
 私人 owner onboarding 只從 shell environment 讀取 `OWNER_LOGIN_IDENTITY`，並使用 Git 忽略、權限為 `0600` 且已關閉 `workers.dev`／preview URL 的 deployment config。工具不接受 command-line identity，也不輸出 identity、D1／Worker identifier 或 SQL；若日後已套用 generation credit migration，可由同一個私密流程建立不超過 1,000 單位的非貨幣 beta entitlement，現有記帳不會被重設。
 

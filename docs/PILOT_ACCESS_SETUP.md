@@ -27,6 +27,8 @@ npx wrangler secret put TEAM_DOMAIN --config <ignored-config>
 npx wrangler secret put POLICY_AUD --config <ignored-config>
 ```
 
+`POLICY_AUD` 接受一個 Access application audience；若管理介面或部署程序必須把同一個私人產品邊界拆成多個 application，則以逗號分隔最多 16 個不重複 audience。Worker 會把它們當作明確 allowlist 交給 JWT 驗證器，空白項目、重複值、超額或過長值均 fail closed。每個 application 仍須使用相同的精確 owner policy；不要把實際 audience 寫入 Git、log 或 issue。
+
 版本庫內的 `.env.example` 只有空值或文件用 placeholder。Workers Builds 使用 `npm run deploy:ci`，從平台提供的 Worker 名稱 override 及 Cloudflare build secrets 產生 `.wrangler/deploy.jsonc`；該檔案不會被 Git 追蹤。其他 CI 環境須以私密 build value 提供 `RIGSTAGE_WORKER_NAME`。
 
 ## 自動部署

@@ -16,6 +16,7 @@ Current unit tests cover:
 - synthetic session parsing;
 - Access JWT validation failures and accepted claims;
 - required application-token type and rejection of expired Access assertions;
+- one configured Access audience and a bounded multi-application audience allowlist, including fail-closed empty, duplicate, oversized and over-count values;
 - exact protected SPA parent/deep-route matching and Static Assets Worker-first configuration;
 - AJAX expiry signaling and top-level re-login/logout paths;
 - workspace membership selection and tampering rejection;

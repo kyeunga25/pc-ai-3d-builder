@@ -15,7 +15,7 @@ export type AccessIdentity = {
 
 type AccessConfig = {
   issuer: string;
-  audience: string;
+  audience: string | string[];
 };
 
 type AccessEnv = {
@@ -30,9 +30,41 @@ export type AccessTokenVerifier = (
 
 const jwksByIssuer = new Map<string, JWTVerifyGetKey>();
 
+const MAX_ACCESS_AUDIENCES = 16;
+const MAX_ACCESS_AUDIENCE_LENGTH = 256;
+
+function parseAccessAudiences(value: unknown): string | string[] {
+  if (typeof value !== "string") {
+    throw new ApiError(
+      503,
+      "AUTH_CONFIGURATION_MISSING",
+      "身份驗證服務尚未完成設定。",
+    );
+  }
+
+  const audiences = value.split(",").map((audience) => audience.trim());
+
+  if (
+    audiences.length === 0 ||
+    audiences.length > MAX_ACCESS_AUDIENCES ||
+    audiences.some(
+      (audience) =>
+        audience.length === 0 || audience.length > MAX_ACCESS_AUDIENCE_LENGTH,
+    ) ||
+    new Set(audiences).size !== audiences.length
+  ) {
+    throw new ApiError(
+      503,
+      "AUTH_CONFIGURATION_MISSING",
+      "身份驗證服務尚未完成設定。",
+    );
+  }
+
+  return audiences.length === 1 ? audiences[0]! : audiences;
+}
+
 function accessConfig(env: AccessEnv): AccessConfig {
-  const audience =
-    typeof env.POLICY_AUD === "string" ? env.POLICY_AUD.trim() : "";
+  const audience = parseAccessAudiences(env.POLICY_AUD);
   const teamDomain =
     typeof env.TEAM_DOMAIN === "string" ? env.TEAM_DOMAIN.trim() : "";
   let issuer: URL;
@@ -55,8 +87,7 @@ function accessConfig(env: AccessEnv): AccessConfig {
     issuer.hash !== "" ||
     issuer.username !== "" ||
     issuer.password !== "" ||
-    issuer.port !== "" ||
-    audience.length === 0
+    issuer.port !== ""
   ) {
     throw new ApiError(
       503,
