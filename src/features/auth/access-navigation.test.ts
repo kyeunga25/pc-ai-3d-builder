@@ -19,11 +19,9 @@ describe("Access navigation", () => {
     expect(
       createLoginPagePath(
         "session-expired",
-        "/asset-review?asset=synthetic_example",
+        "/asset-review/draft/private_asset?asset=private_asset",
       ),
-    ).toBe(
-      "/login?reason=session-expired&next=%2Fasset-review%3Fasset%3Dsynthetic_example",
-    );
+    ).toBe("/login?reason=session-expired&next=%2Fasset-review");
     expect(
       createLoginPagePath("access-required", "//example.com/builder"),
     ).toBe("/login?reason=access-required&next=%2Fdashboard");

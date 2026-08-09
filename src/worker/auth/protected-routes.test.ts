@@ -71,7 +71,7 @@ describe("protected workspace routes", () => {
     (status, reason) => {
       const response = protectedWorkspaceLoginRedirect(
         new Request(
-          "https://rigstage.test/asset-review?asset=synthetic_example",
+          "https://rigstage.test/asset-review/draft/private_asset?asset=private_asset",
           { headers: { accept: "text/html,application/xhtml+xml" } },
         ),
         status,
@@ -80,8 +80,9 @@ describe("protected workspace routes", () => {
       expect(response?.status).toBe(302);
       expect(response?.headers.get("cache-control")).toBe("no-store");
       expect(response?.headers.get("location")).toBe(
-        `https://rigstage.test/login?reason=${reason}&next=%2Fasset-review%3Fasset%3Dsynthetic_example`,
+        `https://rigstage.test/login?reason=${reason}&next=%2Fasset-review`,
       );
+      expect(response?.headers.get("location")).not.toContain("private_asset");
     },
   );
 

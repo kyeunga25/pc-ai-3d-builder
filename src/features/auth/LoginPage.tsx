@@ -12,7 +12,7 @@ import { Link, useSearchParams } from "react-router";
 
 import { BrandMark } from "../../shared/components/BrandMark";
 import {
-  safeWorkspaceReturnPath,
+  safeWorkspaceLoginReturnPath,
   workspaceDestinationLabel,
 } from "../../shared/domain/workspace-routes";
 import { apiFetch } from "../../shared/lib/api-fetch";
@@ -35,19 +35,19 @@ const loginReasonCopy: Record<
   "sign-in": {
     title: "準備安全登入",
     description:
-      "使用已獲邀的 Cloudflare Access 身份繼續；登入成功後會直接返回你的工作區。",
+      "使用已獲邀的 Cloudflare Access 身份繼續；登入成功後會返回相應的工作區區域。",
     tone: "neutral",
   },
   "access-required": {
     title: "需要先驗證 Access 身份",
     description:
-      "RigStage 尚未收到有效的 Cloudflare Access 登入憑證。請重新登入，再返回原本要開啟的工作頁面。",
+      "RigStage 尚未收到有效的 Cloudflare Access 登入憑證。請重新登入，再返回所需的工作區區域。",
     tone: "warning",
   },
   "session-expired": {
     title: "登入時段已結束",
     description:
-      "為保護工作區，已停止載入商戶資料。重新驗證後會返回剛才的頁面。",
+      "為保護工作區，已停止載入商戶資料。重新驗證後會返回相應的工作區區域。",
     tone: "warning",
   },
   "not-authorized": {
@@ -76,7 +76,7 @@ function reasonFromStatus(status: number): LoginReason {
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
-  const returnPath = safeWorkspaceReturnPath(searchParams.get("next"));
+  const returnPath = safeWorkspaceLoginReturnPath(searchParams.get("next"));
   const queryReason = parseLoginReason(searchParams.get("reason"));
   const [detectedReason, setDetectedReason] = useState<LoginReason | null>(
     null,

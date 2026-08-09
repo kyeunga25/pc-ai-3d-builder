@@ -33,6 +33,17 @@ export function safeWorkspaceReturnPath(candidate: string | null): string {
   }
 }
 
+export function safeWorkspaceLoginReturnPath(candidate: string | null): string {
+  const returnPath = safeWorkspaceReturnPath(candidate);
+  const pathname = new URL(returnPath, "https://rigstage.invalid").pathname;
+
+  return (
+    workspaceRouteRoots.find(
+      (root) => pathname === root || pathname.startsWith(`${root}/`),
+    ) ?? defaultWorkspacePath
+  );
+}
+
 export function workspaceDestinationLabel(pathname: string): string {
   if (pathname.startsWith("/catalogue")) {
     return "產品目錄";

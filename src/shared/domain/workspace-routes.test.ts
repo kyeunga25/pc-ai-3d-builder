@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultWorkspacePath,
   isProtectedWorkspacePath,
+  safeWorkspaceLoginReturnPath,
   safeWorkspaceReturnPath,
   workspaceDestinationLabel,
 } from "./workspace-routes";
@@ -39,5 +40,31 @@ describe("workspace routes", () => {
       "3D 素材審核",
     );
     expect(workspaceDestinationLabel("/unknown")).toBe("商戶儀表板");
+  });
+
+  it.each([
+    ["/dashboard/activity?member=private_user#recent", "/dashboard"],
+    ["/catalogue/part/private_part", "/catalogue"],
+    [
+      "/asset-review/draft/private_asset?workspace=private_workspace",
+      "/asset-review",
+    ],
+    ["/builder/build/private_build#inspector", "/builder"],
+  ])(
+    "removes dynamic identifiers from the public login return path %s",
+    (path, expected) => {
+      const returnPath = safeWorkspaceLoginReturnPath(path);
+
+      expect(returnPath).toBe(expected);
+      expect(returnPath).not.toContain("private_");
+      expect(returnPath).not.toContain("?");
+      expect(returnPath).not.toContain("#");
+    },
+  );
+
+  it("falls back to the dashboard for an unsafe public login return path", () => {
+    expect(
+      safeWorkspaceLoginReturnPath("https://example.com/asset-review"),
+    ).toBe(defaultWorkspacePath);
   });
 });
