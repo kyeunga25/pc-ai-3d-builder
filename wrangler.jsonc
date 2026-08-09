@@ -23,17 +23,18 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
+    // Route unexpected paths through the Worker so case variants cannot bypass
+    // workspace authentication. Explicit public pages and assets remain asset-first.
     "run_worker_first": [
-      "/api",
-      "/api/*",
-      "/dashboard",
-      "/dashboard/*",
-      "/catalogue",
-      "/catalogue/*",
-      "/asset-review",
-      "/asset-review/*",
-      "/builder",
-      "/builder/*",
+      "/*",
+      "!/",
+      "!/login",
+      "!/demo",
+      "!/demo/*",
+      "!/assets/*",
+      "!/landing/*",
+      "!/favicon.svg",
+      "!/index.html",
     ],
   },
   // Bindings are intentionally identifier-free in the public template.

@@ -35,9 +35,15 @@ describe("workspace routes", () => {
 
   it("keeps route matching and destination labels bounded", () => {
     expect(isProtectedWorkspacePath("/asset-review/draft/example")).toBe(true);
+    expect(isProtectedWorkspacePath("/Asset-Review/Draft/example")).toBe(true);
+    expect(isProtectedWorkspacePath("/DASHBOARD")).toBe(true);
     expect(isProtectedWorkspacePath("/asset-reviewer")).toBe(false);
+    expect(isProtectedWorkspacePath("/DASHBOARD-PUBLIC")).toBe(false);
     expect(workspaceDestinationLabel("/asset-review?asset=synthetic")).toBe(
       "3D 素材審核",
+    );
+    expect(workspaceDestinationLabel("/BUILDER#inspector")).toBe(
+      "電腦組裝工作台",
     );
     expect(workspaceDestinationLabel("/unknown")).toBe("商戶儀表板");
   });
@@ -50,6 +56,7 @@ describe("workspace routes", () => {
       "/asset-review",
     ],
     ["/builder/build/private_build#inspector", "/builder"],
+    ["/CaTaLoGuE/part/private_part", "/catalogue"],
   ])(
     "removes dynamic identifiers from the public login return path %s",
     (path, expected) => {

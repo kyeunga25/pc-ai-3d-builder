@@ -77,9 +77,10 @@ export function requestRouteTemplate(pathname: string): string {
     if (route.pattern.test(pathname)) return route.template;
   }
 
+  const normalizedPathname = pathname.toLowerCase();
   for (const root of workspaceRouteRoots) {
-    if (pathname === root) return root;
-    if (pathname.startsWith(`${root}/`)) return `${root}/*`;
+    if (normalizedPathname === root) return root;
+    if (normalizedPathname.startsWith(`${root}/`)) return `${root}/*`;
   }
 
   if (pathname.startsWith("/demo/")) return "/demo/*";

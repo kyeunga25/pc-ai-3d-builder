@@ -7,7 +7,6 @@ import {
   isProtectedWorkspacePath,
   privateWorkspaceAssetResponse,
   protectedWorkspaceLoginRedirect,
-  protectedWorkspaceRoutePatterns,
 } from "./protected-routes";
 
 describe("protected workspace routes", () => {
@@ -44,9 +43,15 @@ describe("protected workspace routes", () => {
     ) as { assets?: { run_worker_first?: unknown } };
 
     expect(config.assets?.run_worker_first).toEqual([
-      "/api",
-      "/api/*",
-      ...protectedWorkspaceRoutePatterns,
+      "/*",
+      "!/",
+      "!/login",
+      "!/demo",
+      "!/demo/*",
+      "!/assets/*",
+      "!/landing/*",
+      "!/favicon.svg",
+      "!/index.html",
     ]);
   });
 

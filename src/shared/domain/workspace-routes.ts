@@ -7,10 +7,17 @@ export const workspaceRouteRoots = [
   "/builder",
 ] as const;
 
-export function isProtectedWorkspacePath(pathname: string): boolean {
-  return workspaceRouteRoots.some(
-    (root) => pathname === root || pathname.startsWith(`${root}/`),
+function matchingWorkspaceRouteRoot(pathname: string): string | undefined {
+  const normalizedPathname = pathname.split(/[?#]/u, 1)[0]!.toLowerCase();
+
+  return workspaceRouteRoots.find(
+    (root) =>
+      normalizedPathname === root || normalizedPathname.startsWith(`${root}/`),
   );
+}
+
+export function isProtectedWorkspacePath(pathname: string): boolean {
+  return matchingWorkspaceRouteRoot(pathname) !== undefined;
 }
 
 export function safeWorkspaceReturnPath(candidate: string | null): string {
@@ -37,21 +44,19 @@ export function safeWorkspaceLoginReturnPath(candidate: string | null): string {
   const returnPath = safeWorkspaceReturnPath(candidate);
   const pathname = new URL(returnPath, "https://rigstage.invalid").pathname;
 
-  return (
-    workspaceRouteRoots.find(
-      (root) => pathname === root || pathname.startsWith(`${root}/`),
-    ) ?? defaultWorkspacePath
-  );
+  return matchingWorkspaceRouteRoot(pathname) ?? defaultWorkspacePath;
 }
 
 export function workspaceDestinationLabel(pathname: string): string {
-  if (pathname.startsWith("/catalogue")) {
+  const routeRoot = matchingWorkspaceRouteRoot(pathname);
+
+  if (routeRoot === "/catalogue") {
     return "產品目錄";
   }
-  if (pathname.startsWith("/asset-review")) {
+  if (routeRoot === "/asset-review") {
     return "3D 素材審核";
   }
-  if (pathname.startsWith("/builder")) {
+  if (routeRoot === "/builder") {
     return "電腦組裝工作台";
   }
   return "商戶儀表板";

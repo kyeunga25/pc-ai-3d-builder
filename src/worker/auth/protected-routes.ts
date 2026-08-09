@@ -3,17 +3,6 @@ import {
   safeWorkspaceLoginReturnPath,
 } from "../../shared/domain/workspace-routes";
 
-export const protectedWorkspaceRoutePatterns = [
-  "/dashboard",
-  "/dashboard/*",
-  "/catalogue",
-  "/catalogue/*",
-  "/asset-review",
-  "/asset-review/*",
-  "/builder",
-  "/builder/*",
-] as const;
-
 export { isProtectedWorkspacePath };
 
 export function protectedWorkspaceLoginRedirect(

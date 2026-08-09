@@ -27,6 +27,8 @@ describe("request log route templates", () => {
     ["/api/assets/asset_private_123", "/api/assets/:assetId"],
     ["/builder/build/build_private_123", "/builder/*"],
     ["/asset-review/draft/asset_private_123", "/asset-review/*"],
+    ["/DASHBOARD", "/dashboard"],
+    ["/Asset-Review/draft/asset_private_123", "/asset-review/*"],
     ["/demo/catalogue/part_private_123", "/demo/*"],
   ])("maps %s to %s", (pathname, expected) => {
     const template = requestRouteTemplate(pathname);
