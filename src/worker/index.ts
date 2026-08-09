@@ -6,7 +6,7 @@ import {
 } from "./auth/protected-routes";
 import { resolveRequestContext } from "./auth/workspace";
 import { ApiError, apiErrorResponse } from "./lib/api-error";
-import { logRecord } from "./lib/log";
+import { logRequestRecord } from "./lib/log";
 import { enforcePilotRateLimit } from "./lib/rate-limit";
 import { withPublicSecurityHeaders } from "./lib/security-headers";
 import {
@@ -339,17 +339,15 @@ export default {
   async fetch(request, env): Promise<Response> {
     const requestId = crypto.randomUUID();
     const startedAt = Date.now();
-    const url = new URL(request.url);
 
     try {
       const response = withPublicSecurityHeaders(
         await routeRequest(request, env, requestId),
       );
-      logRecord("info", {
+      logRequestRecord("info", request, {
         event: "request.complete",
         requestId,
         method: request.method,
-        path: url.pathname,
         status: response.status,
         durationMs: Date.now() - startedAt,
       });
@@ -363,11 +361,10 @@ export default {
         const response = withPublicSecurityHeaders(
           loginRedirect ?? apiErrorResponse(error, requestId),
         );
-        logRecord("info", {
+        logRequestRecord("info", request, {
           event: "request.denied",
           requestId,
           method: request.method,
-          path: url.pathname,
           status: response.status,
           durationMs: Date.now() - startedAt,
           error: error.code,
@@ -375,11 +372,10 @@ export default {
         return response;
       }
 
-      logRecord("error", {
+      logRequestRecord("error", request, {
         event: "request.failed",
         requestId,
         method: request.method,
-        path: url.pathname,
         status: 500,
         durationMs: Date.now() - startedAt,
         error: "UNEXPECTED_ERROR",
