@@ -193,6 +193,10 @@
 }
 
 .landing-hero h1 .landing-bilingual-copy > [lang="en"],
+.landing-section-heading h2 .landing-bilingual-copy > [lang="en"],
+.landing-workflow-case__copy h3 .landing-bilingual-copy > [lang="en"],
+.landing-use-cases__intro h2 .landing-bilingual-copy > [lang="en"],
+.landing-use-cases__list h3 .landing-bilingual-copy > [lang="en"],
 .landing-trust__statement h2 .landing-bilingual-copy > [lang="en"],
 .landing-signin__copy h2 .landing-bilingual-copy > [lang="en"] {
   font-family: var(--font-ui);
@@ -423,6 +427,19 @@
   letter-spacing: 0.05em;
 }
 
+.landing-workflow-case__label {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+}
+
+.landing-workflow-case__label .landing-bilingual-copy > [lang="en"] {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+
 .landing-section-heading h2,
 .landing-use-cases__intro h2,
 .landing-trust__statement h2,
@@ -499,6 +516,12 @@
   text-wrap: balance;
 }
 
+.landing-section-heading h2 .landing-bilingual-copy,
+.landing-workflow-case__copy h3 .landing-bilingual-copy,
+.landing-use-cases__intro h2 .landing-bilingual-copy {
+  gap: 10px;
+}
+
 .landing-workflow-case__copy > p {
   margin-bottom: 25px;
   color: var(--text-secondary);
@@ -529,6 +552,11 @@
   height: 18px;
   margin-top: 4px;
   color: var(--success);
+}
+
+.landing-workflow-case__copy li .landing-bilingual-copy {
+  min-width: 0;
+  gap: 4px;
 }
 
 .landing-use-cases {
@@ -599,6 +627,10 @@
   font-size: 16px;
   font-weight: 580;
   line-height: 1.75;
+}
+
+.landing-use-cases__list :is(h3, p, strong) .landing-bilingual-copy {
+  gap: 4px;
 }
 
 .landing-trust {

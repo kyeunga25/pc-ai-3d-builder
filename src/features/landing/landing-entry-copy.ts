@@ -85,12 +85,10 @@ export const landingEntryCopy = {
 
 export function landingScreenshotCaptionCopy(
   labelZhHant: string,
-  labelEnglish?: string,
+  labelEnglish: string,
 ): LandingBilingualCopy {
   return landingText(
     `${labelZhHant} · ${landingEntryCopy.screenshotSyntheticSuffix.zhHant}`,
-    labelEnglish
-      ? `${labelEnglish} · ${landingEntryCopy.screenshotSyntheticSuffix.english}`
-      : landingEntryCopy.screenshotSyntheticSuffix.english,
+    `${labelEnglish} · ${landingEntryCopy.screenshotSyntheticSuffix.english}`,
   );
 }

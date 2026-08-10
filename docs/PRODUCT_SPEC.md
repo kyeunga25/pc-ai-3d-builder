@@ -5,7 +5,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 ## Implemented behavior
 
 - Traditional Chinese interface with HKD formatting.
-- Traditional-Chinese-first bilingual public entry covering header navigation, hero value proposition, primary actions, three proof points, synthetic Builder screenshot context, four privacy/accuracy trust boundaries and invited sign-in recovery. Public links remain same-origin or tracked local assets, and compact copy wraps without implying that visual material proves compatibility.
+- Traditional-Chinese-first bilingual public entry covering header navigation, hero value proposition, primary actions, three proof points, three evidence-based workflow narratives, three merchant use cases, four synthetic workspace screenshot alternatives and captions, four privacy/accuracy trust boundaries and invited sign-in recovery. Public links remain same-origin or tracked local assets, and compact copy wraps without implying that visual material proves compatibility.
 - Workspace-scoped session resolution through Cloudflare Access and D1.
 - Traditional-Chinese-first bilingual login workflow covering the introduction, five fail-closed identity states, security boundaries, generic workspace destinations, Access continuation, unauthorized-identity logout and public-home recovery. Public return targets are limited to four fixed roots and omit dynamic identifiers; compact copy wraps without changing server authorization.
 - Live workspace dashboard plus catalogue, asset review and builder routes.

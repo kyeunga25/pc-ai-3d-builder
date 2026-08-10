@@ -18,15 +18,16 @@ import { LandingPage } from "./LandingPage";
 describe("LandingPage", () => {
   it("describes the product through verified workspace workflows", () => {
     expect(landingEntryCopy.heroTitle.zhHant).toContain("每一步都有證據");
-    expect(workflowCases.map((workflowCase) => workflowCase.label)).toEqual([
-      "每日工作入口",
-      "新貨與目錄維護",
-      "私人素材審核",
-    ]);
     expect(
-      workflowCases.flatMap((workflowCase) => workflowCase.points).join(" "),
+      workflowCases.map((workflowCase) => workflowCase.label.zhHant),
+    ).toEqual(["每日工作入口", "新貨與目錄維護", "私人素材審核"]);
+    expect(
+      workflowCases
+        .flatMap((workflowCase) => workflowCase.points)
+        .map((point) => point.zhHant)
+        .join(" "),
     ).toContain("相容性");
-    expect(useCases.map((useCase) => useCase.title)).toEqual([
+    expect(useCases.map((useCase) => useCase.title.zhHant)).toEqual([
       "新產品上架",
       "客製化配機",
       "素材交付與覆核",
@@ -79,11 +80,22 @@ describe("LandingPage", () => {
       "Private assets stay private",
       "Invited already? Continue from your workspace",
       "Workspace screens use synthetic demo data",
+      "See what is ready and what needs attention",
+      "Daily work overview · Synthetic demo workspace",
+      "RigStage merchant dashboard showing catalogue",
+      "Start with verifiable, traceable product records",
+      "Complete provenance, dimensions and quality approval",
+      "New product listing",
+      "Custom PC configuration",
+      "Asset delivery and review",
     ]) {
       expect(markup).toContain(expected);
     }
     expect(markup).toContain('aria-label="主頁導覽 / Homepage navigation"');
     expect(markup).toContain('aria-label="產品重點 / Product highlights"');
+    expect(markup).toContain(
+      'aria-label="放大查看介面 / Enlarge interface: 每日工作入口 / Daily work overview"',
+    );
   });
 
   it("keeps every public landing link local and identifier-free", () => {
@@ -114,6 +126,9 @@ describe("LandingPage", () => {
     );
     expect(styles).toMatch(
       /@media \(max-width:\s*680px\)[\s\S]*\.landing-button\s*\{[^}]*width:\s*100%;/u,
+    );
+    expect(styles).toMatch(
+      /\.landing-workflow-case__label\s*\{[^}]*grid-template-columns:\s*max-content minmax\(0,\s*1fr\);/u,
     );
     expect(styles).not.toContain(".landing-footer span:first-child");
     expect(styles).toContain(

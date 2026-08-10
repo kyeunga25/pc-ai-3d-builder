@@ -11,6 +11,7 @@ import {
   demoEntryPath,
   heroProofPoints,
   landingCopy,
+  landingUseCaseCopy,
   trustPoints,
   useCases,
   workflowCases,
@@ -43,7 +44,7 @@ function WorkspaceScreenshot({
   image: string;
   imageAlt: string;
   label: string;
-  labelEnglish?: string;
+  labelEnglish: string;
   priority?: boolean;
 }) {
   return (
@@ -72,7 +73,7 @@ function WorkspaceScreenshot({
           rel="noreferrer"
           aria-label={`${bilingualLandingTitle(
             landingEntryCopy.enlargeInterface,
-          )}: ${label}`}
+          )}: ${label} / ${labelEnglish}`}
         >
           <LandingText copy={landingEntryCopy.enlargeInterface} />
           <ExternalLink aria-hidden="true" />
@@ -184,8 +185,12 @@ export function LandingPage() {
           <div className="landing-section-shell landing-section-heading">
             <span className="landing-section-heading__index">01—03</span>
             <div>
-              <h2 id="workflow-title">{landingCopy.workflowTitle}</h2>
-              <p>{landingCopy.workflowSummary}</p>
+              <h2 id="workflow-title">
+                <LandingText copy={landingCopy.workflowTitle} />
+              </h2>
+              <p>
+                <LandingText copy={landingCopy.workflowSummary} />
+              </p>
             </div>
           </div>
 
@@ -196,24 +201,30 @@ export function LandingPage() {
                 key={workflowCase.number}
               >
                 <div className="landing-workflow-case__copy">
-                  <span className="landing-workflow-case__label">
-                    {workflowCase.number} / {workflowCase.label}
-                  </span>
-                  <h3>{workflowCase.title}</h3>
-                  <p>{workflowCase.description}</p>
+                  <div className="landing-workflow-case__label">
+                    <span>{workflowCase.number} /</span>
+                    <LandingText copy={workflowCase.label} />
+                  </div>
+                  <h3>
+                    <LandingText copy={workflowCase.title} />
+                  </h3>
+                  <p>
+                    <LandingText copy={workflowCase.description} />
+                  </p>
                   <ul>
                     {workflowCase.points.map((point) => (
-                      <li key={point}>
+                      <li key={point.zhHant}>
                         <Check aria-hidden="true" />
-                        <span>{point}</span>
+                        <LandingText copy={point} />
                       </li>
                     ))}
                   </ul>
                 </div>
                 <WorkspaceScreenshot
                   image={workflowCase.image}
-                  imageAlt={workflowCase.imageAlt}
-                  label={workflowCase.label}
+                  imageAlt={bilingualLandingTitle(workflowCase.imageAlt)}
+                  label={workflowCase.label.zhHant}
+                  labelEnglish={workflowCase.label.english}
                 />
               </article>
             ))}
@@ -227,20 +238,27 @@ export function LandingPage() {
         >
           <div className="landing-section-shell landing-use-cases__layout">
             <div className="landing-use-cases__intro">
-              <h2 id="use-cases-title">貼近商戶日常，而不是一張靜態 3D 圖。</h2>
+              <h2 id="use-cases-title">
+                <LandingText copy={landingUseCaseCopy.title} />
+              </h2>
               <p>
-                RigStage
-                把「資料是否可信、素材是否核准、組裝是否可交付」放在同一條可追蹤流程，適合需要多人協作及明確審核責任的團隊。
+                <LandingText copy={landingUseCaseCopy.description} />
               </p>
             </div>
             <ol className="landing-use-cases__list">
               {useCases.map((useCase, index) => (
-                <li key={useCase.title}>
+                <li key={useCase.title.zhHant}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <div>
-                    <h3>{useCase.title}</h3>
-                    <p>{useCase.situation}</p>
-                    <strong>{useCase.response}</strong>
+                    <h3>
+                      <LandingText copy={useCase.title} />
+                    </h3>
+                    <p>
+                      <LandingText copy={useCase.situation} />
+                    </p>
+                    <strong>
+                      <LandingText copy={useCase.response} />
+                    </strong>
                   </div>
                 </li>
               ))}
