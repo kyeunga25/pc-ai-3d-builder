@@ -27,6 +27,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Traditional-Chinese-first bilingual status and recovery copy for build creation, switching, saving, archiving and privacy-safe export, with semantic info/success/warning/error announcements and safe fallbacks for monolingual technical failures.
 - Deterministic compatibility findings from six verified structured-specification rules.
 - Traditional-Chinese-first bilingual Builder inspector for all tabs, empty guidance, known specification fields, verification states, finding severity and evidence, plus exhaustive asset-status and quality labels. Unknown custom fields retain their bounded source key without semantic guessing, and no private asset ID is shown.
+- Traditional-Chinese-first bilingual Builder component rail for all nine categories and summary, state precedence, candidate and selection counts, four stock states, empty guidance and the explicit-save boundary. Viewers remain unable to choose candidates, and private part or asset IDs are not displayed.
 - Protected preview of the selected component's approved GLB in the builder.
 - Traditional-Chinese-first bilingual Builder viewport controls, camera/mode readouts, selected-component summary, stock and category states, private/local/fallback model states and a wrapping evidence-boundary footer. Loading failures remain generic and expose no private identifier or parser detail.
 - Portable JSON export that fails closed and excludes identity, operational and private-asset fields.

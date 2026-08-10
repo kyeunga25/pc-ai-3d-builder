@@ -19,6 +19,8 @@ The Builder inspector shows its tabs, selected-component summary, structured spe
 
 The Builder viewport shows camera presets, display modes, fit-view control, scene readouts, selected component, stock state and model provenance in Traditional Chinese and English. Authorized private loading, local synthetic preparation, load failure and static fallback remain visibly distinct. The footer uses content-driven height and wrapping for preview provenance, the visual-evidence limitation and scene units; compact widths may hide secondary controls but retain bilingual accessible names.
 
+The Builder component rail shows all categories, step state, candidate count, stock state, current selection and persistence guidance in Traditional Chinese and English. Error, unknown, warning, pending and complete states use accessible text as well as the existing shape or colour. Desktop rows grow for bilingual labels; the compact step bar keeps bilingual short labels and a bilingual accessible state while hiding secondary status text. Low stock, unknown stock and out of stock remain visually distinct, and the rail scrolls internally instead of causing page-level overflow.
+
 ## States
 
 Every data-dependent screen must represent loading, empty and error states. Synthetic demo values must be visibly distinguishable from verified merchant data.
