@@ -358,6 +358,64 @@ describe("local generation Workflow", () => {
     }
   });
 
+  it("does not resolve or reserve against another workspace asset", async () => {
+    const protectedFixture: GenerationFixture = {
+      workspaceId: "workspace-local-isolation-protected",
+      userId: "user-local-isolation-protected",
+      partId: "part-local-isolation-protected",
+      assetId: "asset-local-isolation-protected",
+      sourceSha256: "d".repeat(64),
+      slug: "local-isolation-protected",
+      idempotencyKey: "local-isolation-protected-request-001",
+    };
+    const requesterFixture: GenerationFixture = {
+      workspaceId: "workspace-local-isolation-requester",
+      userId: "user-local-isolation-requester",
+      partId: "part-local-isolation-requester",
+      assetId: "asset-local-isolation-requester",
+      sourceSha256: "e".repeat(64),
+      slug: "local-isolation-requester",
+      idempotencyKey: "local-isolation-requester-request-001",
+    };
+    await seedGenerationFixture(protectedFixture);
+    await seedGenerationFixture(requesterFixture);
+    const introspector = await introspectWorkflow(env.ASSET_GENERATION);
+    try {
+      const foreignAssetRequest = generationRequest({
+        ...requesterFixture,
+        assetId: protectedFixture.assetId,
+      });
+
+      await expect(
+        generationJobStartResponse(
+          foreignAssetRequest,
+          env,
+          requestContextFor(requesterFixture),
+          protectedFixture.assetId,
+          "request-local-isolation",
+        ),
+      ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+
+      const requesterState = await env.DB.prepare(
+        `SELECT available_units, reserved_units,
+                (SELECT COUNT(*) FROM generation_jobs
+                 WHERE workspace_id = ?1) AS job_count
+         FROM generation_credit_accounts
+         WHERE workspace_id = ?1`,
+      )
+        .bind(requesterFixture.workspaceId)
+        .first();
+      expect(requesterState).toEqual({
+        available_units: 2,
+        reserved_units: 0,
+        job_count: 0,
+      });
+      expect(await introspector.get()).toHaveLength(0);
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
   it("releases a reserved credit exactly once after a terminal failure", async () => {
     const failedWorkspaceId = "workspace-local-failure";
     const failedUserId = "user-local-failure";

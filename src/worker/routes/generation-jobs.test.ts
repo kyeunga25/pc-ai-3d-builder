@@ -75,7 +75,7 @@ function jobRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function workflowStub() {
+function workflowStub(instanceStatus = "unknown") {
   const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
     [];
   const workflow = {
@@ -91,7 +91,7 @@ function workflowStub() {
       return {
         id,
         async status() {
-          return { status: "unknown" as const };
+          return { status: instanceStatus };
         },
       } as WorkflowInstance;
     },
@@ -237,6 +237,181 @@ describe("generation job routes", () => {
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+    expect(creates).toHaveLength(0);
+  });
+
+  it("replays the original job without another reservation or Workflow", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [jobRow({ status: "running" })],
+    });
+    const { creates, workflow } = workflowStub("running");
+
+    const response = await generationJobStartResponse(
+      request(),
+      {
+        ASSET_GENERATION: workflow,
+        DB: db,
+        GENERATION_MODE: "simulation",
+        GENERATION_MAX_COST_MINOR: "0",
+      },
+      context(),
+      "asset-fixture",
+      "request-replay",
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "generation-fixture",
+      assetId: "asset-fixture",
+      status: "running",
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("recovers a missing Workflow by its existing fixed identifier", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [jobRow()] });
+    const { creates, workflow } = workflowStub();
+
+    const response = await generationJobStartResponse(
+      request(),
+      {
+        ASSET_GENERATION: workflow,
+        DB: db,
+        GENERATION_MODE: "simulation",
+        GENERATION_MAX_COST_MINOR: "0",
+      },
+      context(),
+      "asset-fixture",
+      "request-recovery",
+    );
+
+    expect(response.status).toBe(200);
+    expect(creates).toEqual([
+      {
+        id: "generation-fixture",
+        params: {
+          jobId: "generation-fixture",
+          workspaceId: "workspace-fixture",
+          assetId: "asset-fixture",
+          requestedReviewVersion: 2,
+        },
+      },
+    ]);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("blocks a second key while the same asset has an active job", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [null, jobRow({ id: "generation-active" })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
+        request(),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+        },
+        context(),
+        "asset-fixture",
+        "request-concurrent",
+      ),
+    ).rejects.toMatchObject({ code: "GENERATION_ALREADY_ACTIVE" });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("rejects a stale asset version before reserving credit", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [null, null, assetRow({ review_version: 3 })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
+        request(),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+        },
+        context(),
+        "asset-fixture",
+        "request-stale",
+      ),
+    ).rejects.toMatchObject({ code: "ASSET_VERSION_CONFLICT" });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("rejects malformed and oversized input before database access", async () => {
+    const { calls, db } = createD1Stub();
+    const { creates, workflow } = workflowStub();
+    const env = {
+      ASSET_GENERATION: workflow,
+      DB: db,
+      GENERATION_MODE: "simulation",
+      GENERATION_MAX_COST_MINOR: "0",
+    };
+    const malformed = new Request(
+      "https://app.example/api/assets/asset-fixture/generation-jobs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "request-malformed",
+        },
+        body: JSON.stringify({ expectedVersion: -1 }),
+      },
+    );
+    const oversized = new Request(
+      "https://app.example/api/assets/asset-fixture/generation-jobs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "request-oversized",
+        },
+        body: JSON.stringify({
+          expectedVersion: 2,
+          padding: "x".repeat(32 * 1024),
+        }),
+      },
+    );
+
+    await expect(
+      generationJobStartResponse(
+        malformed,
+        env,
+        context(),
+        "asset-fixture",
+        "request-malformed",
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      generationJobStartResponse(
+        oversized,
+        env,
+        context(),
+        "asset-fixture",
+        "request-oversized",
+      ),
+    ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    expect(calls).toHaveLength(0);
     expect(creates).toHaveLength(0);
   });
 
