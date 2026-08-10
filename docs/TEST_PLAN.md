@@ -20,9 +20,9 @@ Current unit tests cover:
 - exact protected SPA parent/deep-route matching and Static Assets Worker-first configuration;
 - AJAX expiry signaling and top-level re-login/logout paths;
 - workspace membership selection and tampering rejection;
-- concurrent first-login subject binding, active-membership revocation at the binding boundary and guarded workspace-switch persistence;
+- concurrent first-login subject binding, active-membership revocation at the binding boundary, zero preference writes during bound-identity reads and guarded explicit workspace-switch persistence;
 - versioned subject-digest API rate limiting, including raw-identifier exclusion, deterministic replay/concurrency and distinct actor keys;
-- read-only session responses;
+- read-only session responses plus fixed-URL, header-only workspace-selection requests;
 - audit helper serialization;
 - health response and public security headers;
 - exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;

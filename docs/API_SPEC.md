@@ -22,13 +22,17 @@ No dependency, account, database or resource identifier is returned.
 
 Requires a valid Cloudflare Access assertion, an invited active user and at least one active workspace membership. The assertion is limited to 16 KiB before verification. A verified identity-based application token must contain a control-character-free subject of at most 256 characters and a syntactically valid email of at most 254 characters; its optional display name is limited to 128 characters. Invalid or oversized input returns bilingual `ACCESS_TOKEN_INVALID` without echoing the value or reaching Rate Limiting or D1. Before any protected D1 work, the verified subject is converted to a fixed-length, versioned SHA-256 rate-limit key; the raw subject is not passed to the binding or request log. It returns the current user display data, selected workspace and allowed workspace summaries.
 
-The request may include `X-RigStage-Workspace-Id`. The Worker treats it only as a request and accepts it only when D1 confirms active membership. First-login subject binding rechecks the active user, selected workspace and membership in the conditional D1 update; a concurrent revocation returns bilingual `INVITE_REQUIRED` without binding the subject, while a concurrent different-subject winner returns `IDENTITY_BINDING_CONFLICT`. Persisting a workspace switch uses the same active membership guard and returns `WORKSPACE_FORBIDDEN` without changing the previous selection if access was revoked. These failures can be retried after an authorized reactivation. Session reads do not write audit records.
+The request may include `X-RigStage-Workspace-Id`. The Worker treats it only as a transient request and accepts it only when D1 confirms active membership. For an already-bound identity, GET resolution does not update `last_workspace_id`, user timestamps or audit records, even when the requested active workspace differs from the persisted preference; ordinary dashboard, catalogue, asset and build reads share this no-preference-write resolver. First-login subject binding remains one bounded exception and rechecks the active user, selected workspace and membership in its conditional D1 update. A concurrent revocation returns bilingual `INVITE_REQUIRED` without binding the subject, while a concurrent different-subject winner returns `IDENTITY_BINDING_CONFLICT`.
+
+## `PUT /api/session/workspace`
+
+Explicitly persists the selected workspace for an already-bound identity and returns the resulting session representation. The fixed URL and empty body contain no workspace ID; the target is accepted only from the bounded `X-RigStage-Workspace-Id` header after Access verification, subject-keyed rate limiting and active membership resolution. The conditional D1 update repeats the bound subject, active user, target workspace and active membership checks at the write boundary. A concurrent revocation returns bilingual `WORKSPACE_FORBIDDEN` without changing the previous preference and can be retried after authorized reactivation. Repeated reads never call this mutation automatically; the browser uses it only for an explicit workspace-switch action.
 
 Browser API requests send `X-Requested-With: XMLHttpRequest`. An expired Access application session therefore returns `401`; the UI performs a top-level navigation to re-enter the Access login flow rather than adding an application bypass.
 
 ## `GET /api/workspaces`
 
-Uses the same authentication and workspace resolution path and returns only the caller's active workspace summaries.
+Uses the same read-only authentication and workspace resolution path and returns only the caller's active workspace summaries. It never persists the requested workspace for an already-bound identity.
 
 ## `GET /api/dashboard`
 

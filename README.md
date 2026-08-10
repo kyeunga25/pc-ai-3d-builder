@@ -18,6 +18,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 香港繁體中文介面及港幣格式。
 - 讀取真實 D1 聚合資料的 Dashboard，以及產品目錄、素材審核及 PC Builder 路由。
 - Cloudflare Access JWT 驗證、受限 assertion／身份欄位、邀請制用戶及 server-side workspace scope；畸形或超限身份會在 Rate Limiting 與 D1 前 fail closed。
+- 已綁定身份的一般讀取只解析 active workspace membership，不更新使用者列；只有使用者明確切換時，前端才以固定 `PUT` 端點及受保護 workspace 標頭持久化偏好。
 - Dashboard、產品目錄、素材審核及 Builder 的 parent／deep route 都以 Worker-first 驗證 Access JWT 與 active D1 membership，Static Assets 不可繞過私人 shell 授權。
 - 公開 health endpoint，以及受保護的 session／workspace endpoint。
 - 受 workspace 限制的分頁產品目錄 API；私人分頁游標只經受保護請求標頭傳送，不寫入瀏覽器 URL，production 介面亦具備載入、空白與錯誤狀態。
@@ -155,7 +156,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - 私人 SPA parent 及 deep route 在讀取 Static Assets 前同樣驗證 Access JWT、owner invite 及 active workspace membership。
 - Workspace 選擇必須由 D1 membership 重新核對。
 - 首次身份綁定採用條件更新，失敗後重新讀取持久化 subject。
-- 讀取 session 不會寫入 audit table。
+- 已綁定身份的 session 與其他讀取不會更新 workspace 偏好或寫入 audit table；明確切換使用固定 PUT 端點，並在 D1 write boundary 重查 subject、active user、workspace 及 membership。
 - Dashboard 只執行有界、workspace-scoped 讀取，不會建立記錄或寫入 audit table。
 - 目錄及素材查詢必須同時限制 workspace；審核及檔案更新使用版本條件，並在 D1 commit 邊界重查產品仍為 active，避免覆寫其他人變更或寫入已封存產品。
 - 組裝讀寫必須同時限制 workspace；讀取空清單不會建立資料，更新使用版本及一次性 mutation token。

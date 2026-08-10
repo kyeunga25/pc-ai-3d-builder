@@ -197,28 +197,6 @@ export async function resolveRequestContext(
         throw inviteRequired();
       }
     }
-  } else if (currentWorkspace.id !== user.last_workspace_id) {
-    const switchResult = await db
-      .prepare(
-        `UPDATE users
-         SET last_workspace_id = ?, last_seen_at = CURRENT_TIMESTAMP,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND access_subject = ? AND status = 'active'
-           AND EXISTS (
-             SELECT 1
-             FROM workspace_memberships AS wm
-             INNER JOIN workspaces AS w ON w.id = wm.workspace_id
-             WHERE wm.user_id = users.id
-               AND wm.workspace_id = ?1
-               AND wm.status = 'active'
-               AND w.status = 'active'
-           )`,
-      )
-      .bind(currentWorkspace.id, user.id, identity.subject)
-      .run();
-    if (switchResult.meta.changes !== 1) {
-      throw workspaceForbidden();
-    }
   }
 
   return {
@@ -231,4 +209,33 @@ export async function resolveRequestContext(
     currentWorkspace,
     workspaces,
   };
+}
+
+export async function persistWorkspaceSelection(
+  db: D1Database,
+  context: RequestContext,
+  accessSubject: string,
+): Promise<void> {
+  const switchResult = await db
+    .prepare(
+      `UPDATE users
+       SET last_workspace_id = ?, last_seen_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND access_subject = ? AND status = 'active'
+         AND EXISTS (
+           SELECT 1
+           FROM workspace_memberships AS wm
+           INNER JOIN workspaces AS w ON w.id = wm.workspace_id
+           WHERE wm.user_id = users.id
+             AND wm.workspace_id = ?1
+             AND wm.status = 'active'
+             AND w.status = 'active'
+         )`,
+    )
+    .bind(context.currentWorkspace.id, context.user.id, accessSubject)
+    .run();
+
+  if (switchResult.meta.changes !== 1) {
+    throw workspaceForbidden();
+  }
 }

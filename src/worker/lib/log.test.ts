@@ -8,6 +8,7 @@ afterEach(() => {
 
 describe("request log route templates", () => {
   it.each([
+    ["/api/session/workspace", "/api/session/workspace"],
     ["/api/build/export", "/api/build/export"],
     ["/api/build", "/api/build"],
     ["/api/builds/build_private_123", "/api/*"],
@@ -65,6 +66,35 @@ describe("request log route templates", () => {
     });
     expect(serialized).not.toContain("asset_private_123");
     expect(serialized).not.toContain("owner@example.test");
+    expect(serialized).not.toContain("workspace_private_456");
+  });
+
+  it("does not serialize the explicit workspace-selection target", () => {
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    const request = new Request(
+      "https://rigstage.invalid/api/session/workspace",
+      {
+        method: "PUT",
+        headers: {
+          "x-rigstage-workspace-id": "workspace_private_456",
+        },
+      },
+    );
+
+    logRequestRecord("info", request, {
+      event: "request.complete",
+      requestId: "request-public-safe",
+      method: "PUT",
+      status: 200,
+      durationMs: 2,
+    });
+
+    const serialized = String(consoleLog.mock.calls[0]?.[0]);
+    expect(JSON.parse(serialized)).toMatchObject({
+      method: "PUT",
+      path: "/api/session/workspace",
+      status: 200,
+    });
     expect(serialized).not.toContain("workspace_private_456");
   });
 

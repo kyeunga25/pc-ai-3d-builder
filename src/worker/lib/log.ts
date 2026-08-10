@@ -19,6 +19,7 @@ const fixedRouteTemplates = new Map<string, string>([
   ["/api", "/api"],
   ["/api/health", "/api/health"],
   ["/api/session", "/api/session"],
+  ["/api/session/workspace", "/api/session/workspace"],
   ["/api/workspaces", "/api/workspaces"],
   ["/api/dashboard", "/api/dashboard"],
   ["/api/catalogue", "/api/catalogue"],

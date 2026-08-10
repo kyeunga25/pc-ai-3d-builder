@@ -2,7 +2,10 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import type { AccessIdentity } from "../src/worker/auth/access";
-import { resolveRequestContext } from "../src/worker/auth/workspace";
+import {
+  persistWorkspaceSelection,
+  resolveRequestContext,
+} from "../src/worker/auth/workspace";
 
 type IdentityFixture = {
   email: string;
@@ -221,8 +224,23 @@ describe("workspace identity runtime binding", () => {
       },
     );
 
+    const selectedContext = await resolveRequestContext(
+      racingDb,
+      identity(target),
+      nextWorkspaceId,
+    );
+    expect(selectedContext.currentWorkspace).toMatchObject({
+      id: nextWorkspaceId,
+      role: "admin",
+    });
+    expect(
+      await env.DB.prepare("SELECT last_workspace_id FROM users WHERE id = ?1")
+        .bind(target.userId)
+        .first(),
+    ).toEqual({ last_workspace_id: target.workspaceId });
+
     await expect(
-      resolveRequestContext(racingDb, identity(target), nextWorkspaceId),
+      persistWorkspaceSelection(racingDb, selectedContext, target.subject),
     ).rejects.toMatchObject({
       status: 403,
       code: "WORKSPACE_FORBIDDEN",
@@ -240,11 +258,20 @@ describe("workspace identity runtime binding", () => {
     )
       .bind(nextWorkspaceId, target.userId)
       .run();
-    await expect(
-      resolveRequestContext(env.DB, identity(target), nextWorkspaceId),
-    ).resolves.toMatchObject({
+    const recoveredContext = await resolveRequestContext(
+      env.DB,
+      identity(target),
+      nextWorkspaceId,
+    );
+    expect(recoveredContext).toMatchObject({
       currentWorkspace: { id: nextWorkspaceId, role: "admin" },
     });
+    expect(
+      await env.DB.prepare("SELECT last_workspace_id FROM users WHERE id = ?1")
+        .bind(target.userId)
+        .first(),
+    ).toEqual({ last_workspace_id: target.workspaceId });
+    await persistWorkspaceSelection(env.DB, recoveredContext, target.subject);
     expect(
       await env.DB.prepare("SELECT last_workspace_id FROM users WHERE id = ?1")
         .bind(target.userId)

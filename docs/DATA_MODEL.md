@@ -12,7 +12,7 @@ Represents an isolated merchant workspace. Protected queries must derive the wor
 
 ## `users`
 
-Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. The update itself requires the user, selected workspace and membership to remain active. A zero-row result is accepted only when the persisted subject equals the requester and that selected membership is still active; a revoked membership leaves the subject and workspace selection unchanged. Later `last_workspace_id` changes are conditional on the same bound subject and active membership.
+Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. The update itself requires the user, selected workspace and membership to remain active. A zero-row result is accepted only when the persisted subject equals the requester and that selected membership is still active; a revoked membership leaves the subject and workspace selection unchanged. After binding, ordinary session and product reads never update this row. Later `last_workspace_id` changes occur only through the explicit workspace-selection mutation and are conditional on the same bound subject, active user, active workspace and active membership.
 
 ## `workspace_memberships`
 

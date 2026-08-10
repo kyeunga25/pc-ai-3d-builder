@@ -6,11 +6,7 @@ import {
   useState,
 } from "react";
 
-import {
-  sessionResponseSchema,
-  type SessionResponse,
-} from "../../shared/domain/session";
-import { apiFetch } from "../../shared/lib/api-fetch";
+import { sessionResponseSchema } from "../../shared/domain/session";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   SessionContext,
@@ -18,6 +14,7 @@ import {
   type SessionError,
   type SessionState,
 } from "./session-context";
+import { fetchSession, selectWorkspaceSession } from "./session-api";
 
 const mockSession = sessionResponseSchema.parse({
   user: {
@@ -44,36 +41,6 @@ const mockSession = sessionResponseSchema.parse({
     },
   ],
 });
-
-async function fetchSession(
-  signal: AbortSignal,
-  workspaceId: string | null,
-): Promise<SessionResponse> {
-  const headers = new Headers({ accept: "application/json" });
-
-  if (workspaceId) {
-    headers.set("x-rigstage-workspace-id", workspaceId);
-  }
-
-  const response = await apiFetch("/api/session", {
-    credentials: "same-origin",
-    headers,
-    signal,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { code?: unknown };
-    } | null;
-    const code =
-      typeof body?.error?.code === "string"
-        ? body.error.code
-        : "SESSION_UNAVAILABLE";
-    throw { status: response.status, code } satisfies SessionError;
-  }
-
-  return sessionResponseSchema.parse(await response.json());
-}
 
 function isSessionError(value: unknown): value is SessionError {
   return (
@@ -126,7 +93,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const controller = new AbortController();
 
-    void fetchSession(controller.signal, selectedWorkspaceId)
+    const sessionRequest = selectedWorkspaceId
+      ? selectWorkspaceSession(controller.signal, selectedWorkspaceId)
+      : fetchSession(controller.signal);
+
+    void sessionRequest
       .then((session) => {
         setState({ status: "authenticated", session, error: null });
       })

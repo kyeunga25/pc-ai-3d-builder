@@ -38,7 +38,11 @@ import {
   generationJobStartResponse,
 } from "./routes/generation-jobs";
 import { healthResponse } from "./routes/health";
-import { sessionResponse, workspacesResponse } from "./routes/session";
+import {
+  sessionResponse,
+  workspaceSelectionResponse,
+  workspacesResponse,
+} from "./routes/session";
 
 export { AssetGenerationWorkflow } from "./workflows/asset-generation";
 
@@ -58,11 +62,12 @@ function apiNotFound(requestId: string): Response {
 async function authenticateWorkspaceRequest(request: Request, env: Env) {
   const identity = await authenticateAccessRequest(request, env);
   await enforcePilotRateLimit(env.PILOT_RATE_LIMITER, identity.subject);
-  return resolveRequestContext(
+  const context = await resolveRequestContext(
     env.DB,
     identity,
     request.headers.get("x-rigstage-workspace-id"),
   );
+  return { accessSubject: identity.subject, context };
 }
 
 async function routeRequest(
@@ -84,7 +89,10 @@ async function routeRequest(
   }
 
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-    const context = await authenticateWorkspaceRequest(request, env);
+    const { accessSubject, context } = await authenticateWorkspaceRequest(
+      request,
+      env,
+    );
 
     if (url.pathname === "/api/session") {
       if (request.method !== "GET") {
@@ -95,6 +103,17 @@ async function routeRequest(
       }
 
       return sessionResponse(context);
+    }
+
+    if (url.pathname === "/api/session/workspace") {
+      if (request.method !== "PUT") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "PUT", "cache-control": "no-store" },
+        });
+      }
+
+      return workspaceSelectionResponse(env.DB, context, accessSubject);
     }
 
     if (url.pathname === "/api/workspaces") {

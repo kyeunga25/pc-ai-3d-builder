@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "../lib/api-error";
 import {
   chooseCurrentWorkspace,
+  persistWorkspaceSelection,
   resolveRequestContext,
   type WorkspaceMembershipRow,
 } from "./workspace";
@@ -234,5 +235,109 @@ describe("workspace scope resolution", () => {
     ).resolves.toMatchObject({
       user: { id: "user_pilot" },
     });
+  });
+
+  it("resolves a requested workspace without persisting from the read path", async () => {
+    const { db, writes } = fakeDatabase({
+      id: "user_pilot",
+      email: "pilot@example.com",
+      access_subject: "access-pilot",
+      display_name: "試行用戶",
+      last_workspace_id: "ws_alpha",
+    });
+
+    await expect(
+      resolveRequestContext(
+        db,
+        {
+          subject: "access-pilot",
+          email: "pilot@example.com",
+          displayName: null,
+        },
+        "ws_beta",
+      ),
+    ).resolves.toMatchObject({
+      currentWorkspace: { id: "ws_beta", role: "staff" },
+    });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("rejects a non-member workspace without a preference write", async () => {
+    const { db, writes } = fakeDatabase({
+      id: "user_pilot",
+      email: "pilot@example.com",
+      access_subject: "access-pilot",
+      display_name: "試行用戶",
+      last_workspace_id: "ws_alpha",
+    });
+
+    await expect(
+      resolveRequestContext(
+        db,
+        {
+          subject: "access-pilot",
+          email: "pilot@example.com",
+          displayName: null,
+        },
+        "ws_not_a_member",
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "WORKSPACE_FORBIDDEN" });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("persists an explicit workspace selection with the bound identity", async () => {
+    const { db, writes } = fakeDatabase({
+      id: "user_pilot",
+      email: "pilot@example.com",
+      access_subject: "access-pilot",
+      display_name: "試行用戶",
+      last_workspace_id: "ws_alpha",
+    });
+    const context = await resolveRequestContext(
+      db,
+      {
+        subject: "access-pilot",
+        email: "pilot@example.com",
+        displayName: null,
+      },
+      "ws_beta",
+    );
+
+    await expect(
+      persistWorkspaceSelection(db, context, "access-pilot"),
+    ).resolves.toBeUndefined();
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.values).toEqual([
+      "ws_beta",
+      "user_pilot",
+      "access-pilot",
+    ]);
+  });
+
+  it("fails closed when an explicit workspace selection loses its guard", async () => {
+    const { db } = fakeDatabase(
+      {
+        id: "user_pilot",
+        email: "pilot@example.com",
+        access_subject: "access-pilot",
+        display_name: "試行用戶",
+        last_workspace_id: "ws_alpha",
+      },
+      memberships,
+      { bindingChanges: 0 },
+    );
+    const context = await resolveRequestContext(
+      db,
+      {
+        subject: "access-pilot",
+        email: "pilot@example.com",
+        displayName: null,
+      },
+      "ws_beta",
+    );
+
+    await expect(
+      persistWorkspaceSelection(db, context, "access-pilot"),
+    ).rejects.toMatchObject({ status: 403, code: "WORKSPACE_FORBIDDEN" });
   });
 });
