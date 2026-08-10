@@ -16,7 +16,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Traditional-Chinese-first bilingual Asset Review progress, success, unsaved-warning and failure announcements for draft save, approval, rejection, private-file upload and simulated generation, including reload guidance when a response is lost after a possible write.
 - Two-step Asset Review rejection scoped to the current workspace and asset version, with a bilingual warning that reserved credit may be released but private files are not deleted; form, file, generation, workspace or version changes disarm confirmation before submission.
 - Optimistic asset versions and append-only review and audit events.
-- Private source-image and GLB upload with signature, MIME and size validation.
+- Private source-image and GLB upload with signature, MIME and size validation, plus Traditional-Chinese-first bilingual requirements, upload/replace/progress controls and Access-boundary guidance. Replacement warns that approval evidence is reset, only the selected file is superseded and the other private file remains private.
 - Authorized private-file reads and manual Three.js GLB inspection without permanent object URLs.
 - Explicit build creation, switching and optimistic persistence for one selected part per category.
 - Two-step logical archive for build drafts.

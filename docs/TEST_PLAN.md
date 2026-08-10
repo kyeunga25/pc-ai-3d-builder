@@ -38,6 +38,7 @@ Current unit tests cover:
 - abort-bound browser object URLs for remote private files, including no materialization after cancellation, immediate cleanup when cancellation wins during creation and exact-once revocation after abort or explicit release;
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
 - typed bilingual Asset Review progress/success/warning/error notices, status-versus-alert semantics, operation-specific ambiguous-result fallbacks, preservation of bounded bilingual API/file-validation messages and action-specific progress copy;
+- enumerated bilingual private source-image and GLB requirements plus upload, replace and progress labels; rendered Access-boundary and evidence-reset guidance; accurate selected-file replacement scope; and narrow-layout wrapping without page-level overflow;
 - rejection intent that arms without submitting on the first request, submits only on a second request for the same workspace and asset version, and re-arms without submission for a changed version;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
 - bounded JSON mutation bodies;

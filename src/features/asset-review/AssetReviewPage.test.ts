@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
@@ -115,5 +117,33 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("Zero-cost simulation");
     expect(markup).toContain("尚未有工作");
     expect(markup).toContain("No job yet");
+  });
+
+  it("explains private file controls and evidence reset bilingually", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("私人素材檔案");
+    expect(markup).toContain("Private asset files");
+    expect(markup).toContain("Access and workspace checks are required");
+    expect(markup).toContain("Create synthetic image");
+    expect(markup).toContain("Upload image");
+    expect(markup).toContain("3D model");
+    expect(markup).toContain("Upload GLB");
+    expect(markup).toContain("resets the approval checklist");
+    expect(markup).toContain("Only the selected file is replaced");
+    expect(markup).toContain("other private file remains private");
+  });
+
+  it("keeps private file actions readable in the narrow layout", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).not.toContain(".asset-file-control span,");
+    expect(styles).toContain(".asset-file-control > div > span,");
+    expect(styles).toMatch(
+      /@media[^]*?\.asset-file-control\s*\{[^}]*flex-direction:\s*column;/u,
+    );
   });
 });

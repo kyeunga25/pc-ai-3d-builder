@@ -440,6 +440,7 @@
 .asset-file-control {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--border-subtle);
@@ -457,7 +458,7 @@
   font-size: 14px;
 }
 
-.asset-file-control span,
+.asset-file-control > div > span,
 .asset-file-controls > small {
   color: var(--text-muted);
   font-size: 13px;
@@ -465,7 +466,7 @@
 }
 
 .asset-file-control .button {
-  min-height: 38px;
+  min-height: 48px;
   flex: 0 0 auto;
   padding: 0 9px;
   font-size: 13px;
@@ -481,6 +482,10 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.asset-file-control .review-action-label {
+  max-width: 112px;
 }
 
 .technical-list {
@@ -739,6 +744,25 @@
 
   .review-inspector {
     grid-template-columns: 1fr;
+  }
+
+  .asset-file-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .asset-file-control__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .asset-file-control__actions .button {
+    flex: 1 1 120px;
+  }
+
+  .asset-file-control > .button {
+    width: 100%;
+    flex: none;
   }
 
   .review-actions {

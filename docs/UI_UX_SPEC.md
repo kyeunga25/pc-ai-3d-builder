@@ -21,6 +21,8 @@ Every data-dependent screen must represent loading, empty and error states. Synt
 
 Asset status uses explicit text labels. A draft cannot be presented as approved. Compatibility errors, warnings and information use separate icons and text in addition to colour.
 
+Private source-image and GLB controls show Traditional Chinese and English requirements, upload/replace/progress actions and the Access boundary without exposing an asset identifier. Replacing a file visibly warns that the checklist and verified dimensions reset, only the selected file is superseded and the other private file remains private. At narrow widths, labels and controls wrap into a vertical layout without horizontal overflow.
+
 Generation status uses provider-neutral queued, running, validating, waiting-for-review, failed and cancelled labels. Simulation must be identified as zero-cost synthetic validation and never described as AI or professional provider output. A disabled production capability remains visibly disabled with an explanatory title.
 
 The generation action is available only to owner/admin roles after a private source image and saved usage-rights confirmation exist with no unsaved review changes. A completed job reloads the new draft version and visibly resets every approval check and dimension.

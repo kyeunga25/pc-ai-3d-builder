@@ -71,6 +71,10 @@ import {
   updateAssetReview,
 } from "./asset-review-api";
 import {
+  assetReviewFileActionCopy,
+  assetReviewFileControlCopy,
+} from "./asset-review-file-copy";
+import {
   assetReviewGenerationCreditHistoryCopy,
   assetReviewGenerationCreditSummaryCopy,
   assetReviewGenerationEntitlementCopy,
@@ -164,6 +168,15 @@ function BilingualInterfaceText({ copy }: { copy: BilingualCopy }) {
       <span>{copy.zhHant}</span>
       <span lang="en">{copy.english}</span>
     </span>
+  );
+}
+
+function BilingualStrongText({ copy }: { copy: BilingualCopy }) {
+  return (
+    <strong className="review-bilingual-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </strong>
   );
 }
 
@@ -638,6 +651,16 @@ export function AssetReviewPage() {
     submittingAction === "save_draft"
       ? reviewActionCopy.saving
       : reviewActionCopy.save;
+  const sourceFileActionLabel = assetReviewFileActionCopy(
+    "source",
+    asset.files.source !== null,
+    uploadingKind === "source",
+  );
+  const modelFileActionLabel = assetReviewFileActionCopy(
+    "model",
+    asset.files.model !== null,
+    uploadingKind === "model",
+  );
   const generationActionTitle =
     generationState.capability.mode !== "simulation"
       ? bilingualTitle(
@@ -1402,18 +1425,29 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <FileBox aria-hidden="true" />
               <div>
-                <strong>私人素材檔案</strong>
-                <span>Access 及 workspace 驗證後才可讀取</span>
+                <BilingualStrongText
+                  copy={assetReviewFileControlCopy.heading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewFileControlCopy.accessBoundary}
+                />
               </div>
             </div>
             <div className="asset-file-control">
               <div>
-                <strong>來源圖片</strong>
-                <span>
-                  {asset.files.source
-                    ? `${asset.files.source.contentType} · ${formatFileSize(asset.files.source.sizeBytes)}`
-                    : "JPEG、PNG 或 WebP · 最多 10 MiB"}
-                </span>
+                <BilingualStrongText
+                  copy={assetReviewFileControlCopy.sourceImage}
+                />
+                {asset.files.source ? (
+                  <span>
+                    {asset.files.source.contentType} ·{" "}
+                    {formatFileSize(asset.files.source.sizeBytes)}
+                  </span>
+                ) : (
+                  <BilingualInterfaceText
+                    copy={assetReviewFileControlCopy.sourceRequirements}
+                  />
+                )}
               </div>
               <div className="asset-file-control__actions">
                 {isLocalPreview ? (
@@ -1421,52 +1455,64 @@ export function AssetReviewPage() {
                     className="button button--secondary"
                     type="button"
                     disabled={!canEdit || uploadingKind !== null}
+                    title={bilingualTitle(
+                      assetReviewFileControlCopy.syntheticImageTitle.zhHant,
+                      assetReviewFileControlCopy.syntheticImageTitle.english,
+                    )}
                     onClick={createLocalSyntheticSource}
                   >
                     <Sparkles aria-hidden="true" />
-                    合成圖片
+                    <BilingualActionLabel
+                      copy={assetReviewFileControlCopy.syntheticImage}
+                    />
                   </button>
                 ) : null}
                 <button
                   className="button button--secondary"
                   type="button"
                   disabled={!canEdit || uploadingKind !== null}
+                  title={bilingualTitle(
+                    assetReviewFileControlCopy.sourceUploadTitle.zhHant,
+                    assetReviewFileControlCopy.sourceUploadTitle.english,
+                  )}
                   onClick={() => sourceInputRef.current?.click()}
                 >
                   <Upload aria-hidden="true" />
-                  {uploadingKind === "source"
-                    ? "上載中…"
-                    : asset.files.source
-                      ? "取代圖片"
-                      : "上載圖片"}
+                  <BilingualActionLabel copy={sourceFileActionLabel} />
                 </button>
               </div>
             </div>
             <div className="asset-file-control">
               <div>
-                <strong>3D 模型</strong>
-                <span>
-                  {asset.files.model
-                    ? `GLB · ${formatFileSize(asset.files.model.sizeBytes)}`
-                    : "自包含 glTF 2.0 GLB · 最多 25 MiB"}
-                </span>
+                <BilingualStrongText copy={assetReviewFileControlCopy.model} />
+                {asset.files.model ? (
+                  <span>
+                    GLB · {formatFileSize(asset.files.model.sizeBytes)}
+                  </span>
+                ) : (
+                  <BilingualInterfaceText
+                    copy={assetReviewFileControlCopy.modelRequirements}
+                  />
+                )}
               </div>
               <button
                 className="button button--secondary"
                 type="button"
                 disabled={!canEdit || uploadingKind !== null}
+                title={bilingualTitle(
+                  assetReviewFileControlCopy.modelUploadTitle.zhHant,
+                  assetReviewFileControlCopy.modelUploadTitle.english,
+                )}
                 onClick={() => modelInputRef.current?.click()}
               >
                 <Upload aria-hidden="true" />
-                {uploadingKind === "model"
-                  ? "上載中…"
-                  : asset.files.model
-                    ? "取代 GLB"
-                    : "上載 GLB"}
+                <BilingualActionLabel copy={modelFileActionLabel} />
               </button>
             </div>
             <small>
-              取代任何檔案會重設核准清單及已核實尺寸，避免沿用舊版本判斷。
+              <BilingualInterfaceText
+                copy={assetReviewFileControlCopy.replacementWarning}
+              />
             </small>
           </div>
 
