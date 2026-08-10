@@ -1,21 +1,27 @@
+import { landingText } from "./landing-entry-copy";
+
 export const workspaceEntryPath = "/login?next=%2Fdashboard";
 export const demoEntryPath = "/demo/dashboard";
 
 export const landingCopy = {
-  heroTitle: "從零件資料到可交付組裝，讓每一步都有證據。",
-  heroSummary:
-    "RigStage 為獲邀的電腦商戶及中小企團隊，把產品目錄、私人 3D 素材審核、九類組件選擇、可解釋相容性與安全匯出放在同一個工作空間。",
-  heroEnglish:
-    "A private, review-led workspace for PC catalogue, assets and assembly decisions.",
   workflowTitle: "一個實際工作天，可以這樣走。",
   workflowSummary:
     "以下畫面均來自 RigStage 現有工作區，以合成示範資料呈現；不包含真實商戶記錄、私人素材或部署資料。",
 } as const;
 
 export const heroProofPoints = [
-  "香港繁體中文工作流",
-  "每筆資料按 Workspace 隔離",
-  "素材經人手核准後才可使用",
+  landingText(
+    "香港繁體中文工作流",
+    "Traditional Chinese workflow for Hong Kong",
+  ),
+  landingText(
+    "每筆資料按 Workspace 隔離",
+    "Every record is isolated by workspace",
+  ),
+  landingText(
+    "素材經人手核准後才可使用",
+    "Assets require human approval before use",
+  ),
 ] as const;
 
 export const workflowCases = [
@@ -86,23 +92,34 @@ export const useCases = [
 
 export const trustPoints = [
   {
-    title: "邀請制工作空間",
-    description:
+    title: landingText("邀請制工作空間", "Invite-only workspaces"),
+    description: landingText(
       "沒有公開註冊。登入後仍需有效邀請及 active membership，才可讀取對應 Workspace。",
+      "There is no public registration. After sign-in, an active invitation and membership are still required before the matching workspace can be read.",
+    ),
   },
   {
-    title: "相容性有結構化證據",
-    description:
+    title: landingText(
+      "相容性有結構化證據",
+      "Compatibility uses structured evidence",
+    ),
+    description: landingText(
       "相容性只讀取已核實規格；缺少資料會顯示 unknown，不以 3D 外觀作推斷。",
+      "Compatibility reads only human-verified structured specifications; missing data remains unknown and is never inferred from 3D appearance.",
+    ),
   },
   {
-    title: "私人素材不公開",
-    description:
+    title: landingText("私人素材不公開", "Private assets stay private"),
+    description: landingText(
       "原始圖片、GLB、物件位置及 checksum 不會成為公開網址或出現在可攜匯出。",
+      "Original images, GLB files, object locations and checksums never become public URLs or appear in portable exports.",
+    ),
   },
   {
-    title: "匯出前先通過閘門",
-    description:
+    title: landingText("匯出前先通過閘門", "Export only after passing gates"),
+    description: landingText(
       "只有沒有 error 或 unknown 的組裝才可輸出安全 JSON，並排除身份、價格及私人素材欄位。",
+      "A build can export safe JSON only when no error or unknown remains; identity, price and private asset fields are excluded.",
+    ),
   },
 ] as const;

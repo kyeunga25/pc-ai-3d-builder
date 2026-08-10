@@ -13,6 +13,7 @@ npm audit --audit-level=high
 Current unit tests cover:
 
 - domain schema, locale formatting and safe splitting of combined bilingual error copy;
+- exhaustive typed bilingual landing-entry coverage for header navigation, hero, actions, proof points, synthetic screenshot context, four trust boundaries, final sign-in and footer; bilingual ARIA names; same-origin/root/section/local-image links; protected-identifier absence; reduced-motion preservation; and phone-width wrapping;
 - synthetic session parsing;
 - Access JWT validation failures, deterministic concurrent claim normalization and accepted boundary values;
 - required identity-based application-token type plus rejection of expired, oversized or malformed assertions and bounded subject, email and display-name claims before Rate Limiting or D1;

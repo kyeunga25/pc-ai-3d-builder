@@ -16,17 +16,34 @@ import {
   workflowCases,
   workspaceEntryPath,
 } from "./landing-content";
+import {
+  bilingualLandingTitle,
+  landingEntryCopy,
+  landingScreenshotCaptionCopy,
+  type LandingBilingualCopy,
+} from "./landing-entry-copy";
 import "./landing.css";
+
+function LandingText({ copy }: { copy: LandingBilingualCopy }) {
+  return (
+    <span className="landing-bilingual-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
 
 function WorkspaceScreenshot({
   image,
   imageAlt,
   label,
+  labelEnglish,
   priority = false,
 }: {
   image: string;
   imageAlt: string;
   label: string;
+  labelEnglish?: string;
   priority?: boolean;
 }) {
   return (
@@ -48,9 +65,16 @@ function WorkspaceScreenshot({
         />
       </a>
       <figcaption>
-        <span>{label} · 合成示範工作區</span>
-        <a href={image} target="_blank" rel="noreferrer">
-          放大查看介面
+        <LandingText copy={landingScreenshotCaptionCopy(label, labelEnglish)} />
+        <a
+          href={image}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${bilingualLandingTitle(
+            landingEntryCopy.enlargeInterface,
+          )}: ${label}`}
+        >
+          <LandingText copy={landingEntryCopy.enlargeInterface} />
           <ExternalLink aria-hidden="true" />
         </a>
       </figcaption>
@@ -65,17 +89,30 @@ export function LandingPage() {
         <a
           className="landing-header__brand"
           href="/"
-          aria-label="RigStage 主頁"
+          aria-label={bilingualLandingTitle(landingEntryCopy.brandHome)}
         >
           <BrandMark />
         </a>
-        <nav className="landing-header__nav" aria-label="主頁導覽">
-          <a href="#workflow">實際流程</a>
-          <a href="#use-cases">使用情境</a>
-          <a href="#security">資料邊界</a>
+        <nav
+          className="landing-header__nav"
+          aria-label={bilingualLandingTitle(landingEntryCopy.navLabel)}
+        >
+          <a href="#workflow">
+            <LandingText copy={landingEntryCopy.navWorkflow} />
+          </a>
+          <a href="#use-cases">
+            <LandingText copy={landingEntryCopy.navUseCases} />
+          </a>
+          <a href="#security">
+            <LandingText copy={landingEntryCopy.navSecurity} />
+          </a>
         </nav>
-        <a className="landing-login-link" href={workspaceEntryPath}>
-          <span>登入工作台</span>
+        <a
+          className="landing-login-link"
+          href={workspaceEntryPath}
+          aria-label={bilingualLandingTitle(landingEntryCopy.headerLogin)}
+        >
+          <LandingText copy={landingEntryCopy.headerLogin} />
           <ArrowRight aria-hidden="true" />
         </a>
       </header>
@@ -83,29 +120,43 @@ export function LandingPage() {
       <main>
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-hero__copy">
-            <h1 id="landing-title">{landingCopy.heroTitle}</h1>
-            <p className="landing-hero__summary">{landingCopy.heroSummary}</p>
-            <p className="landing-hero__english" lang="en">
-              {landingCopy.heroEnglish}
+            <h1 id="landing-title">
+              <LandingText copy={landingEntryCopy.heroTitle} />
+            </h1>
+            <p className="landing-hero__summary">
+              <LandingText copy={landingEntryCopy.heroSummary} />
+            </p>
+            <p className="landing-hero__tagline">
+              <LandingText copy={landingEntryCopy.heroTagline} />
             </p>
             <div className="landing-hero__actions">
               <a
                 className="landing-button landing-button--primary"
                 href={demoEntryPath}
+                aria-label={bilingualLandingTitle(landingEntryCopy.demoAction)}
               >
-                <span>立即試用合成 Demo</span>
+                <LandingText copy={landingEntryCopy.demoAction} />
                 <ArrowRight aria-hidden="true" />
               </a>
-              <a className="landing-text-link" href={workspaceEntryPath}>
-                <span>登入獲邀工作空間</span>
+              <a
+                className="landing-text-link"
+                href={workspaceEntryPath}
+                aria-label={bilingualLandingTitle(
+                  landingEntryCopy.inviteAction,
+                )}
+              >
+                <LandingText copy={landingEntryCopy.inviteAction} />
                 <ArrowDownRight aria-hidden="true" />
               </a>
             </div>
-            <ul className="landing-hero__proof" aria-label="產品重點">
+            <ul
+              className="landing-hero__proof"
+              aria-label={bilingualLandingTitle(landingEntryCopy.proofLabel)}
+            >
               {heroProofPoints.map((point) => (
-                <li key={point}>
+                <li key={point.zhHant}>
                   <Check aria-hidden="true" />
-                  {point}
+                  <LandingText copy={point} />
                 </li>
               ))}
             </ul>
@@ -114,12 +165,13 @@ export function LandingPage() {
           <div className="landing-hero__product">
             <WorkspaceScreenshot
               image="/landing/workspace-builder.jpg"
-              imageAlt="RigStage 電腦組裝工作台，顯示九類組件、3D 預覽、相容性證據及安全匯出"
-              label="電腦組裝與相容性"
+              imageAlt={bilingualLandingTitle(landingEntryCopy.builderImageAlt)}
+              label={landingEntryCopy.builderLabel.zhHant}
+              labelEnglish={landingEntryCopy.builderLabel.english}
               priority
             />
             <p className="landing-hero__product-note">
-              選擇九類組件、逐條查看相容性證據，通過閘門後才可安全匯出。
+              <LandingText copy={landingEntryCopy.builderNote} />
             </p>
           </div>
         </section>
@@ -205,22 +257,24 @@ export function LandingPage() {
             <div className="landing-trust__statement">
               <LockKeyhole aria-hidden="true" />
               <h2 id="trust-title">
-                公開介紹產品，私人工作仍然留在工作空間內。
+                <LandingText copy={landingEntryCopy.trustTitle} />
               </h2>
               <p>
-                首頁不讀取 session 或商戶資料。進入工作台後，API 仍會驗證 Access
-                身份、邀請及 active membership，再以 server-side Workspace
-                範圍處理每個受保護記錄。
+                <LandingText copy={landingEntryCopy.trustDescription} />
               </p>
             </div>
 
             <ul className="landing-trust__list">
               {trustPoints.map(({ title, description }) => (
-                <li key={title}>
+                <li key={title.zhHant}>
                   <Check aria-hidden="true" />
                   <div>
-                    <h3>{title}</h3>
-                    <p>{description}</p>
+                    <h3>
+                      <LandingText copy={title} />
+                    </h3>
+                    <p>
+                      <LandingText copy={description} />
+                    </p>
                   </div>
                 </li>
               ))}
@@ -231,17 +285,19 @@ export function LandingPage() {
         <section className="landing-signin" aria-labelledby="signin-title">
           <div className="landing-section-shell landing-signin__layout">
             <div className="landing-signin__copy">
-              <h2 id="signin-title">已獲邀？從你的工作空間繼續。</h2>
+              <h2 id="signin-title">
+                <LandingText copy={landingEntryCopy.signinTitle} />
+              </h2>
               <p>
-                沒有公開註冊。Beta Access
-                用戶可使用獲授權身份登入；商業使用或獨立部署安排，請先聯絡工作空間管理員。
+                <LandingText copy={landingEntryCopy.signinDescription} />
               </p>
             </div>
             <a
               className="landing-button landing-button--primary"
               href={workspaceEntryPath}
+              aria-label={bilingualLandingTitle(landingEntryCopy.signinAction)}
             >
-              <span>登入 RigStage 工作台</span>
+              <LandingText copy={landingEntryCopy.signinAction} />
               <ArrowRight aria-hidden="true" />
             </a>
           </div>
@@ -249,8 +305,8 @@ export function LandingPage() {
       </main>
 
       <footer className="landing-footer">
-        <span lang="en">RigStage · Invite-only workspace</span>
-        <span>工作區畫面使用合成示範資料</span>
+        <LandingText copy={landingEntryCopy.footerInviteOnly} />
+        <LandingText copy={landingEntryCopy.footerSynthetic} />
       </footer>
     </div>
   );
