@@ -317,12 +317,22 @@ svg {
   top: 50%;
   left: 50%;
   z-index: 2;
+  display: grid;
+  max-width: min(280px, calc(100% - 32px));
+  gap: 3px;
   border: 1px solid var(--border-strong);
   padding: 10px 12px;
   background: rgba(9, 13, 20, 0.92);
   color: var(--text-secondary);
   font-size: 13px;
+  text-align: center;
   transform: translate(-50%, -50%);
+}
+
+.asset-model-preview__state small {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.82;
 }
 
 .asset-model-preview__state.is-error {

@@ -173,4 +173,32 @@ describe("AssetReviewPage", () => {
       /@media \(max-width: 480px\)[^]*?\.dimension-grid\s*\{[^}]*grid-template-columns:\s*1fr;/u,
     );
   });
+
+  it("explains viewport controls, model state and evidence limits bilingually", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("3D asset review viewport");
+    expect(markup).toContain("Camera preset angles");
+    expect(markup).toContain("Front");
+    expect(markup).toContain("Left");
+    expect(markup).toContain("Top");
+    expect(markup).toContain("Isometric");
+    expect(markup).toContain("Fit model to view");
+    expect(markup).toContain("Toggle wireframe view");
+    expect(markup).toContain("Camera: Isometric");
+    expect(markup).toContain("No private GLB uploaded");
+    expect(markup).toContain("Visual material is not compatibility evidence");
+  });
+
+  it("lets bilingual viewport status wrap without a fixed footer row", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toContain("grid-template-rows: 64px minmax(0, 1fr) auto;");
+    expect(styles).toMatch(
+      /\.review-viewport__footer\s*\{[^}]*flex-wrap:\s*wrap;/u,
+    );
+  });
 });

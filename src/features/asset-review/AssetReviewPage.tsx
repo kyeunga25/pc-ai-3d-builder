@@ -104,6 +104,13 @@ import {
   type BilingualCopy,
 } from "./asset-review-status";
 import {
+  assetReviewCameraPresetCopy,
+  assetReviewCameraPresets,
+  assetReviewCameraReadoutCopy,
+  assetReviewViewportCopy,
+  type AssetReviewCameraPreset,
+} from "./asset-review-viewport-copy";
+import {
   targetAssetIdForWorkspace,
   useAssetReviewNavigation,
 } from "./asset-review-navigation";
@@ -115,7 +122,6 @@ const AssetModelPreview = lazy(async () => {
   return { default: module.AssetModelPreview };
 });
 
-const cameraPresets = ["正面", "左側", "頂部", "等角"];
 const sourceViews = ["正面", "背面", "左側", "三分之四角度"];
 
 type ReviewForm = {
@@ -250,7 +256,7 @@ export function AssetReviewPage() {
   const initialAsset = isLocalPreview
     ? (localNavigationState?.localAsset ?? reviewAsset)
     : null;
-  const [camera, setCamera] = useState("等角");
+  const [camera, setCamera] = useState<AssetReviewCameraPreset>("等角");
   const [modelRenderMode, setModelRenderMode] = useState<
     "shaded" | "wireframe"
   >("shaded");
@@ -1288,10 +1294,22 @@ export function AssetReviewPage() {
           </div>
         </aside>
 
-        <section className="review-viewport" aria-label="3D 素材審核視窗">
+        <section
+          className="review-viewport"
+          aria-label={bilingualTitle(
+            assetReviewViewportCopy.viewportLabel.zhHant,
+            assetReviewViewportCopy.viewportLabel.english,
+          )}
+        >
           <div className="review-viewport__toolbar">
-            <div role="group" aria-label="鏡頭預設角度">
-              {cameraPresets.map((preset) => (
+            <div
+              role="group"
+              aria-label={bilingualTitle(
+                assetReviewViewportCopy.cameraGroupLabel.zhHant,
+                assetReviewViewportCopy.cameraGroupLabel.english,
+              )}
+            >
+              {assetReviewCameraPresets.map((preset) => (
                 <button
                   className={camera === preset ? "is-active" : ""}
                   key={preset}
@@ -1300,14 +1318,23 @@ export function AssetReviewPage() {
                   disabled={!visibleFileUrls.model}
                   onClick={() => setCamera(preset)}
                 >
-                  {preset}
+                  <BilingualActionLabel
+                    copy={assetReviewCameraPresetCopy[preset]}
+                  />
                 </button>
               ))}
             </div>
             <div>
               <button
                 type="button"
-                aria-label="調整模型至合適視野"
+                aria-label={bilingualTitle(
+                  assetReviewViewportCopy.fitModel.zhHant,
+                  assetReviewViewportCopy.fitModel.english,
+                )}
+                title={bilingualTitle(
+                  assetReviewViewportCopy.fitModel.zhHant,
+                  assetReviewViewportCopy.fitModel.english,
+                )}
                 disabled={!visibleFileUrls.model}
                 onClick={() => {
                   setCamera("等角");
@@ -1318,7 +1345,14 @@ export function AssetReviewPage() {
               </button>
               <button
                 type="button"
-                aria-label="切換線框顯示"
+                aria-label={bilingualTitle(
+                  assetReviewViewportCopy.toggleWireframe.zhHant,
+                  assetReviewViewportCopy.toggleWireframe.english,
+                )}
+                title={bilingualTitle(
+                  assetReviewViewportCopy.toggleWireframe.zhHant,
+                  assetReviewViewportCopy.toggleWireframe.english,
+                )}
                 aria-pressed={modelRenderMode === "wireframe"}
                 disabled={!visibleFileUrls.model}
                 onClick={() =>
@@ -1337,7 +1371,9 @@ export function AssetReviewPage() {
               <Suspense
                 fallback={
                   <span className="asset-model-preview__state is-loading">
-                    正在載入 3D 預覽元件…
+                    <BilingualInterfaceText
+                      copy={assetReviewViewportCopy.loadingComponent}
+                    />
                   </span>
                 }
               >
@@ -1366,9 +1402,9 @@ export function AssetReviewPage() {
             </div>
             <div className="viewport-readout">
               <Rotate3D aria-hidden="true" />
-              <span>
-                鏡頭 <strong>{camera}</strong>
-              </span>
+              <BilingualInterfaceText
+                copy={assetReviewCameraReadoutCopy(camera)}
+              />
               <span className="mono">
                 {parsedDimensions.width ?? "—"} ×{" "}
                 {parsedDimensions.height ?? "—"} ×{" "}
@@ -1377,12 +1413,16 @@ export function AssetReviewPage() {
             </div>
           </div>
           <div className="review-viewport__footer">
-            <span>
-              {visibleFileUrls.model
-                ? "授權讀取的私人 GLB · 只在目前瀏覽器工作階段解碼"
-                : "尚未上載私人 GLB · 顯示合成幾何佔位"}
-            </span>
-            <span className="mono">視覺素材不構成相容性證明</span>
+            <BilingualInterfaceText
+              copy={
+                visibleFileUrls.model
+                  ? assetReviewViewportCopy.authorizedModel
+                  : assetReviewViewportCopy.missingModel
+              }
+            />
+            <BilingualInterfaceText
+              copy={assetReviewViewportCopy.evidenceLimit}
+            />
           </div>
         </section>
 
