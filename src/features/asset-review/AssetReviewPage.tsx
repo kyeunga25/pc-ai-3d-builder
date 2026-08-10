@@ -28,6 +28,10 @@ import { useLocation, useNavigate } from "react-router";
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
+  createAbortBoundObjectUrl,
+  type AbortBoundObjectUrl,
+} from "../../shared/lib/private-object-url";
+import {
   EmptyState,
   ErrorState,
   LoadingState,
@@ -412,7 +416,7 @@ export function AssetReviewPage() {
     const controller = new AbortController();
     const currentAsset = activeAsset;
     const currentAssetKey = assetKey(currentAsset);
-    const createdUrls: string[] = [];
+    const privateUrls: AbortBoundObjectUrl[] = [];
     const loadFile = async (kind: AssetFileKind, available: boolean) => {
       if (!available) {
         return null;
@@ -424,9 +428,12 @@ export function AssetReviewPage() {
           currentAsset.id,
           kind,
         );
-        const url = URL.createObjectURL(blob);
-        createdUrls.push(url);
-        return url;
+        const privateUrl = createAbortBoundObjectUrl(blob, controller.signal);
+        if (!privateUrl) {
+          return null;
+        }
+        privateUrls.push(privateUrl);
+        return privateUrl.url;
       } catch {
         return null;
       }
@@ -447,7 +454,7 @@ export function AssetReviewPage() {
 
     return () => {
       controller.abort();
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+      privateUrls.forEach((privateUrl) => privateUrl.revoke());
     };
   }, [activeAsset, currentWorkspace.id, isLocalPreview]);
 

@@ -25,6 +25,7 @@ import type {
 } from "../../shared/domain/schemas";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { formatHkd } from "../../shared/i18n/locale";
+import { createAbortBoundObjectUrl } from "../../shared/lib/private-object-url";
 
 type StepId = ComponentCategory | "summary";
 export type BuilderDisplayMode = "著色" | "線框" | "靜態預覽";
@@ -119,7 +120,7 @@ export function BuilderViewport({
     }
 
     const controller = new AbortController();
-    let createdUrl: string | null = null;
+    let privateUrl: ReturnType<typeof createAbortBoundObjectUrl> = null;
     void fetchAssetFileBlob(
       controller.signal,
       workspaceId,
@@ -127,11 +128,14 @@ export function BuilderViewport({
       "model",
     )
       .then((blob) => {
-        createdUrl = URL.createObjectURL(blob);
+        privateUrl = createAbortBoundObjectUrl(blob, controller.signal);
+        if (!privateUrl) {
+          return;
+        }
         setModelResource({
           key: modelKey,
           state: "ready",
-          url: createdUrl,
+          url: privateUrl.url,
         });
       })
       .catch(() => {
@@ -146,9 +150,7 @@ export function BuilderViewport({
 
     return () => {
       controller.abort();
-      if (createdUrl) {
-        URL.revokeObjectURL(createdUrl);
-      }
+      privateUrl?.revoke();
     };
   }, [isLocalSyntheticModel, modelKey, selectedPart?.assetId, workspaceId]);
 
