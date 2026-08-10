@@ -44,6 +44,7 @@ const sessionValue = {
 function renderPage(
   localAsset = reviewAsset,
   initialEntry = "/asset-review",
+  sourceUrl?: string,
 ): string {
   return renderToStaticMarkup(
     createElement(
@@ -55,7 +56,7 @@ function renderPage(
           initialEntries: [
             {
               pathname: initialEntry,
-              state: { localAsset },
+              state: { localAsset, sourceUrl },
             },
           ],
         },
@@ -200,5 +201,51 @@ describe("AssetReviewPage", () => {
     expect(styles).toMatch(
       /\.review-viewport__footer\s*\{[^}]*flex-wrap:\s*wrap;/u,
     );
+  });
+
+  it("renders source views, private loading state and usage rights bilingually", () => {
+    const missingMarkup = renderPage({
+      ...reviewAsset,
+      completedChecks: reviewAsset.completedChecks.filter(
+        (check) => check !== "source_rights",
+      ),
+      sourceRightsConfirmed: false,
+    });
+    const loadedMarkup = renderPage(
+      reviewAsset,
+      "/asset-review",
+      "blob:synthetic-private-source",
+    );
+
+    expect(missingMarkup).toContain("Source images");
+    expect(missingMarkup).toContain("No private source image loaded");
+    expect(missingMarkup).toContain("Front");
+    expect(missingMarkup).toContain("Back");
+    expect(missingMarkup).toContain("Left");
+    expect(missingMarkup).toContain("Three-quarter");
+    expect(missingMarkup).toContain("Image usage rights not confirmed");
+    expect(missingMarkup).toContain("source-rights is-missing");
+    expect(loadedMarkup).toContain("Loaded through the authorized API");
+    expect(loadedMarkup).toContain(
+      "Private source preview for RigStage Fixture 162 mm Tower Cooler",
+    );
+    expect(loadedMarkup).toContain(
+      "Commercial usage-rights confirmation recorded",
+    );
+    expect(loadedMarkup).toContain("source-rights is-confirmed");
+  });
+
+  it("bounds bilingual source-view labels inside phone thumbnails", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toMatch(
+      /\.source-frame small\s*\{[^}]*max-width:\s*calc\(100% - 14px\);/u,
+    );
+    expect(styles).toContain(".source-frame .review-bilingual-copy");
+    expect(styles).not.toContain(".review-panel-heading span {");
+    expect(styles).toContain(".review-panel-heading > div > span {");
   });
 });

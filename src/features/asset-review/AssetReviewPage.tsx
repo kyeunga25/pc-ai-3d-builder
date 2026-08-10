@@ -104,6 +104,13 @@ import {
   type BilingualCopy,
 } from "./asset-review-status";
 import {
+  assetReviewSourceCopy,
+  assetReviewSourceFrameCopy,
+  assetReviewSourcePreviewAltCopy,
+  assetReviewSourceViewCopy,
+  assetReviewSourceViews,
+} from "./asset-review-source-copy";
+import {
   assetReviewCameraPresetCopy,
   assetReviewCameraPresets,
   assetReviewCameraReadoutCopy,
@@ -121,8 +128,6 @@ const AssetModelPreview = lazy(async () => {
   const module = await import("../../shared/components/AssetModelPreview");
   return { default: module.AssetModelPreview };
 });
-
-const sourceViews = ["正面", "背面", "左側", "三分之四角度"];
 
 type ReviewForm = {
   asset: AssetReviewItem;
@@ -582,6 +587,7 @@ export function AssetReviewPage() {
   const canDecide =
     (currentWorkspace.role === "owner" || currentWorkspace.role === "admin") &&
     asset.status !== "approved";
+  const sourceRightsRecorded = form.checks.has("source_rights");
   const parsedDimensions = {
     width: parseDimension(form.dimensions.width),
     height: parseDimension(form.dimensions.height),
@@ -1243,54 +1249,80 @@ export function AssetReviewPage() {
       </header>
 
       <div className="review-workspace">
-        <aside className="source-filmstrip" aria-label="來源圖片">
+        <aside
+          className="source-filmstrip"
+          aria-label={bilingualTitle(
+            assetReviewSourceCopy.heading.zhHant,
+            assetReviewSourceCopy.heading.english,
+          )}
+        >
           <div className="review-panel-heading">
             <Image aria-hidden="true" />
             <div>
-              <strong>來源圖片</strong>
-              <span>
-                {visibleFileUrls.source
-                  ? "已透過授權 API 載入"
-                  : "尚未載入私人來源圖片"}
-              </span>
+              <BilingualStrongText copy={assetReviewSourceCopy.heading} />
+              <BilingualInterfaceText
+                copy={
+                  visibleFileUrls.source
+                    ? assetReviewSourceCopy.loaded
+                    : assetReviewSourceCopy.missing
+                }
+              />
             </div>
           </div>
-          {sourceViews.map((view, index) => (
-            <button
-              className={`source-frame${index === 0 ? " is-selected" : ""}`}
-              key={view}
-              type="button"
-              aria-label={
-                index === 0 && visibleFileUrls.source
-                  ? `${view}私人來源圖片`
-                  : `${view}來源圖片介面佔位`
-              }
-              disabled
-            >
-              {index === 0 && visibleFileUrls.source ? (
-                <img
-                  src={visibleFileUrls.source}
-                  alt={`${asset.part.manufacturer} ${asset.part.model} 私人來源預覽`}
-                />
-              ) : (
-                <span
-                  className={`source-frame__object source-frame__object--${index + 1}`}
-                >
-                  <Box aria-hidden="true" />
-                </span>
-              )}
-              <small>{view}</small>
-            </button>
-          ))}
-          <div className="source-rights">
-            {form.checks.has("source_rights") ? (
+          {assetReviewSourceViews.map((view, index) => {
+            const hasPrivateImage =
+              index === 0 && visibleFileUrls.source !== null;
+            const frameCopy = assetReviewSourceFrameCopy(view, hasPrivateImage);
+            const previewAltCopy = assetReviewSourcePreviewAltCopy(
+              asset.part.manufacturer,
+              asset.part.model,
+            );
+            return (
+              <button
+                className={`source-frame${index === 0 ? " is-selected" : ""}`}
+                key={view}
+                type="button"
+                aria-label={bilingualTitle(frameCopy.zhHant, frameCopy.english)}
+                disabled
+              >
+                {hasPrivateImage && visibleFileUrls.source ? (
+                  <img
+                    src={visibleFileUrls.source}
+                    alt={bilingualTitle(
+                      previewAltCopy.zhHant,
+                      previewAltCopy.english,
+                    )}
+                  />
+                ) : (
+                  <span
+                    className={`source-frame__object source-frame__object--${index + 1}`}
+                  >
+                    <Box aria-hidden="true" />
+                  </span>
+                )}
+                <small>
+                  <BilingualInterfaceText
+                    copy={assetReviewSourceViewCopy[view]}
+                  />
+                </small>
+              </button>
+            );
+          })}
+          <div
+            className={`source-rights is-${sourceRightsRecorded ? "confirmed" : "missing"}`}
+          >
+            {sourceRightsRecorded ? (
               <Check aria-hidden="true" />
             ) : (
               <X aria-hidden="true" />
             )}
-            {form.checks.has("source_rights")
-              ? "已記錄商業使用權確認"
-              : "尚未確認圖片使用權"}
+            <BilingualInterfaceText
+              copy={
+                sourceRightsRecorded
+                  ? assetReviewSourceCopy.rightsConfirmed
+                  : assetReviewSourceCopy.rightsMissing
+              }
+            />
           </div>
         </aside>
 

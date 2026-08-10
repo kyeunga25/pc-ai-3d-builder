@@ -127,7 +127,7 @@
   font-size: 14px;
 }
 
-.review-panel-heading span {
+.review-panel-heading > div > span {
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -195,9 +195,18 @@
   position: absolute;
   right: 7px;
   bottom: 5px;
+  max-width: calc(100% - 14px);
+  padding: 2px 4px;
+  background: rgba(9, 13, 20, 0.86);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 13px;
+  text-align: right;
+}
+
+.source-frame .review-bilingual-copy {
+  gap: 0;
+  line-height: 1.15;
 }
 
 .source-rights {
@@ -205,9 +214,16 @@
   align-items: flex-start;
   gap: 7px;
   margin-top: 14px;
-  color: var(--success);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.source-rights.is-confirmed {
+  color: var(--success);
+}
+
+.source-rights.is-missing {
+  color: var(--warning);
 }
 
 .source-rights svg {

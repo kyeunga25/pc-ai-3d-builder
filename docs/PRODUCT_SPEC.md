@@ -20,6 +20,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Private source-image and GLB upload with signature, MIME and size validation, plus Traditional-Chinese-first bilingual requirements, upload/replace/progress controls and Access-boundary guidance. Replacement warns that approval evidence is reset, only the selected file is superseded and the other private file remains private.
 - Authorized private-file reads and manual Three.js GLB inspection without permanent object URLs.
 - Traditional-Chinese-first bilingual Asset Review viewport labels for all four camera presets, fit/wireframe tools, selected-camera readout, authorized or missing model state, lazy-load/decode failures and the explicit boundary that visual material is not compatibility evidence.
+- Traditional-Chinese-first bilingual source filmstrip with four canonical view labels, authorized or missing private-image state, bounded preview alternative text, placeholder accessibility names and distinct confirmed/missing usage-rights evidence.
 - Explicit build creation, switching and optimistic persistence for one selected part per category.
 - Two-step logical archive for build drafts.
 - Traditional-Chinese-first bilingual status and recovery copy for build creation, switching, saving, archiving and privacy-safe export, with semantic info/success/warning/error announcements and safe fallbacks for monolingual technical failures.

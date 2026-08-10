@@ -25,6 +25,8 @@ Every approval-check and verified-dimension label is shown in Traditional Chines
 
 Private source-image and GLB controls show Traditional Chinese and English requirements, upload/replace/progress actions and the Access boundary without exposing an asset identifier. Replacing a file visibly warns that the checklist and verified dimensions reset, only the selected file is superseded and the other private file remains private. At narrow widths, labels and controls wrap into a vertical layout without horizontal overflow.
 
+The source filmstrip labels each canonical view, authorized or missing private-image state, real preview and placeholder, and confirmed or missing usage-rights evidence in both languages. Rights state uses an icon and text in addition to success or warning colour. At phone width, bilingual view badges stay bounded inside each thumbnail while the filmstrip remains an internally scrollable row.
+
 The Asset Review viewport shows each camera preset, tool accessibility name, selected-camera readout, private-model state and visual-evidence limitation in both languages. Its footer uses content-driven height and wrapping instead of clipping bilingual text. Shared private-GLB loading and decode-failure overlays remain centred, bounded to the viewport and readable without exposing parser detail.
 
 Generation status uses provider-neutral queued, running, validating, waiting-for-review, failed and cancelled labels. Simulation must be identified as zero-cost synthetic validation and never described as AI or professional provider output. A disabled production capability remains visibly disabled with an explanatory title.

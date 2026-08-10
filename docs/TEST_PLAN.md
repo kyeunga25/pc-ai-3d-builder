@@ -41,6 +41,7 @@ Current unit tests cover:
 - enumerated bilingual private source-image and GLB requirements plus upload, replace and progress labels; rendered Access-boundary and evidence-reset guidance; accurate selected-file replacement scope; and narrow-layout wrapping without page-level overflow;
 - exhaustive bilingual coverage and canonical ordering for every domain approval check, typed width/height/depth labels, rendered human-verification guidance, singular/plural progress copy and one-column phone-width dimension fields;
 - exhaustive bilingual coverage for the four canonical Asset Review camera presets, tool accessibility names, selected-camera and model-availability states, the visual-evidence boundary, generic shared GLB loading/failure copy and a wrapping auto-height viewport footer;
+- exhaustive bilingual coverage for all four source-image views, authorized/missing states, private preview and placeholder accessibility text, confirmed/missing usage-rights states, semantic success/warning presentation and bounded phone-thumbnail labels;
 - rejection intent that arms without submitting on the first request, submits only on a second request for the same workspace and asset version, and re-arms without submission for a changed version;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
 - bounded JSON mutation bodies;
