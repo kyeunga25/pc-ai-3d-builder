@@ -156,7 +156,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - 首次身份綁定採用條件更新，失敗後重新讀取持久化 subject。
 - 讀取 session 不會寫入 audit table。
 - Dashboard 只執行有界、workspace-scoped 讀取，不會建立記錄或寫入 audit table。
-- 目錄及素材查詢必須同時限制 workspace；審核更新使用版本條件避免覆寫其他人變更。
+- 目錄及素材查詢必須同時限制 workspace；審核及檔案更新使用版本條件，並在 D1 commit 邊界重查產品仍為 active，避免覆寫其他人變更或寫入已封存產品。
 - 組裝讀寫必須同時限制 workspace；讀取空清單不會建立資料，更新使用版本及一次性 mutation token。
 - 匯出在有嚴重錯誤或未知相容性結果時會停止，並排除身份、營運及私人素材欄位。
 - Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。

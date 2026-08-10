@@ -19,7 +19,7 @@ type WorkspaceFixture = {
 
 const protectedFixture: WorkspaceFixture = {
   partId: "part-file-isolation-protected",
-  role: "viewer",
+  role: "staff",
   slug: "file-isolation-protected",
   userId: "user-file-isolation-protected",
   workspaceId: "workspace-file-isolation-protected",
@@ -38,6 +38,9 @@ const sourceBytes = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
 ]);
 const sourceDigest = await sha256Hex(sourceBytes);
+const replacementBytes = sourceBytes.slice();
+replacementBytes[replacementBytes.byteLength - 1] = 0x02;
+const replacementDigest = await sha256Hex(replacementBytes);
 const sourceObjectKey =
   "workspaces/workspace-file-isolation-protected/assets/asset-file-isolation-protected/source/fixture";
 
@@ -58,6 +61,36 @@ function context(fixture: WorkspaceFixture): RequestContext {
     },
     workspaces: [],
   };
+}
+
+function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
+  let pending = true;
+  return {
+    prepare(query: string) {
+      return env.DB.prepare(query);
+    },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      if (pending) {
+        pending = false;
+        await beforeBatch();
+      }
+      return env.DB.batch<T>(statements);
+    },
+  } as D1Database;
+}
+
+function replacementRequest(expectedVersion = 0): Request {
+  return new Request(
+    `https://local.invalid/api/assets/${assetId}/files/source`,
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "image/png",
+        "x-rigstage-expected-version": String(expectedVersion),
+      },
+      body: replacementBytes.buffer as ArrayBuffer,
+    },
+  );
 }
 
 async function seedWorkspace(fixture: WorkspaceFixture): Promise<void> {
@@ -254,5 +287,118 @@ describe("private asset file workspace isolation", () => {
         .first(),
     ).toEqual({ count: 0 });
     expect(await env.PRIVATE_ASSETS.get(sourceObjectKey)).not.toBeNull();
+
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, protectedFixture.partId)
+        .run();
+    });
+    await expect(
+      assetFileUploadResponse(
+        replacementRequest(),
+        racingDb,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        assetId,
+        "source",
+        "request-file-archive-race",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(
+      await env.DB.prepare(
+        `SELECT review_version, source_object_key, source_sha256,
+                (SELECT COUNT(*) FROM audit_events AS ae
+                 WHERE ae.workspace_id = a.workspace_id AND ae.target_id = a.id)
+                  AS audit_events
+         FROM product_assets AS a
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, assetId)
+        .first(),
+    ).toEqual({
+      review_version: 0,
+      source_object_key: sourceObjectKey,
+      source_sha256: sourceDigest,
+      audit_events: 0,
+    });
+    expect(await env.PRIVATE_ASSETS.head(sourceObjectKey)).not.toBeNull();
+    expect(
+      await env.PRIVATE_ASSETS.list({
+        prefix: `workspaces/${protectedFixture.workspaceId}/`,
+      }),
+    ).toMatchObject({
+      objects: [expect.objectContaining({ key: sourceObjectKey })],
+    });
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'active'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedFixture.workspaceId, protectedFixture.partId)
+      .run();
+    const recoveredUpload = await assetFileUploadResponse(
+      replacementRequest(),
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      assetId,
+      "source",
+      "request-file-archive-recovery",
+    );
+    expect(recoveredUpload.status).toBe(200);
+    await expect(recoveredUpload.json()).resolves.toMatchObject({
+      id: assetId,
+      version: 1,
+      files: {
+        source: {
+          contentType: "image/png",
+          sizeBytes: replacementBytes.length,
+        },
+      },
+    });
+    await expect(
+      assetFileUploadResponse(
+        replacementRequest(),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        assetId,
+        "source",
+        "request-file-archive-stale-replay",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_VERSION_CONFLICT",
+    });
+    const recoveredState = await env.DB.prepare(
+      `SELECT review_version, source_object_key, source_sha256,
+              (SELECT COUNT(*) FROM audit_events AS ae
+               WHERE ae.workspace_id = a.workspace_id AND ae.target_id = a.id)
+                AS audit_events
+       FROM product_assets AS a
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedFixture.workspaceId, assetId)
+      .first<{
+        audit_events: number;
+        review_version: number;
+        source_object_key: string;
+        source_sha256: string;
+      }>();
+    expect(recoveredState).toMatchObject({
+      review_version: 1,
+      source_sha256: replacementDigest,
+      audit_events: 1,
+    });
+    expect(recoveredState?.source_object_key).not.toBe(sourceObjectKey);
+    expect(await env.PRIVATE_ASSETS.head(sourceObjectKey)).toBeNull();
+    expect(
+      await env.PRIVATE_ASSETS.list({
+        prefix: `workspaces/${protectedFixture.workspaceId}/`,
+      }),
+    ).toMatchObject({ objects: [expect.any(Object)] });
   });
 });

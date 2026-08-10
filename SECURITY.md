@@ -29,8 +29,8 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Catalogue CSV imports validate the complete document before one transactional D1 batch.
 - Private image and GLB uploads enforce role, workspace, MIME, binary signature and bounded-size checks; GLB files cannot reference external resources.
 - R2 object keys and checksums remain server-only; authorized reads use `private, no-store` responses.
-- File replacement requires the current review version and resets prior approval evidence.
-- Asset review mutations use bounded JSON bodies, role checks and optimistic version conditions.
+- File replacement requires the current review version, an active catalogue part at the D1 write boundary and resets prior approval evidence.
+- Asset review mutations use bounded JSON bodies, role checks, optimistic version conditions and an active-catalogue database trigger.
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
 - Build reads and writes are workspace-scoped; explicit writes use bounded selections, optimistic versions and guarded D1 batches.
 - Build export fails closed on hard errors or unknown compatibility results and excludes identities, workspace identifiers, prices, stock, private assets and deployment data.

@@ -92,7 +92,7 @@ The validated object is stored under an opaque private R2 key, with its computed
 
 Replaces `source` or `model` for a non-approved asset. Viewer roles cannot mutate. The `X-RigStage-Expected-Version` header is required. Source files use the same image rules as creation. Models must be a complete, self-contained glTF 2.0 GLB with a matching binary header and declared length, at most 25 MiB. External resource URIs are rejected before storage.
 
-A successful replacement increments the review version and resets the checklist, dimensions and approval state. The new R2 object is stored with its SHA-256 integrity check before the conditional D1 batch; a failed D1 transition removes only that new object. After a committed transition, the previous private object is removed separately.
+A successful replacement increments the review version and resets the checklist, dimensions and approval state. The new R2 object is stored with its SHA-256 integrity check before the conditional D1 batch. A database trigger rechecks that the linked catalogue part is still active at this write boundary. If an archive wins the race, the whole D1 batch rolls back, the new object is removed, the previous object remains and workspace-safe `ASSET_NOT_FOUND` is returned. Reactivating the part permits a retry with the unchanged asset version. After a committed transition, the previous private object is removed separately.
 
 ## `GET /api/assets/:assetId/files/:kind`
 
@@ -102,7 +102,7 @@ Streams a private `source` or `model` file only after Access verification and ac
 
 Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles cannot mutate. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item, three positive dimensions of at most 10,000 mm and a private GLB whose R2 object still exists with the recorded byte size and `model/gltf-binary` metadata. Before committing approval, the Worker bounds the object to 25 MiB, reads it back, repeats the GLB structure and self-containment validation, and compares its SHA-256 with D1. Missing, invalid or same-metadata checksum-drifted storage returns bilingual `ASSET_MODEL_REQUIRED` without a review or audit write; restoring the exact validated object permits a retry at the same asset version. An R2 read or cryptographic operational failure remains an internal failure and can be retried.
 
-The conditional asset update, review event and audit event are submitted in one D1 batch. A stale `expectedVersion` fails without overwriting the newer record.
+The conditional asset update, review event and audit event are submitted in one D1 batch. A database trigger requires the linked catalogue part to remain active when the asset update executes. If a concurrent archive commits first, the review, audit and any generation-credit transition all roll back, workspace-safe `ASSET_NOT_FOUND` is returned and the original asset version can be retried after reactivation. A stale `expectedVersion` fails without overwriting the newer record.
 
 ## `GET /api/assets/:assetId/generation-jobs`
 

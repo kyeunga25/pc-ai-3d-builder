@@ -91,6 +91,22 @@ function reviewRequest(
   });
 }
 
+function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
+  let pending = true;
+  return {
+    prepare(query: string) {
+      return env.DB.prepare(query);
+    },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      if (pending) {
+        pending = false;
+        await beforeBatch();
+      }
+      return env.DB.batch<T>(statements);
+    },
+  } as D1Database;
+}
+
 async function seedFixtures(): Promise<string> {
   const modelSha256 = await sha256Hex(modelBytes);
   await env.DB.batch([
@@ -157,6 +173,77 @@ async function seedFixtures(): Promise<string> {
 describe("asset review runtime boundaries", () => {
   it("allows a staff draft and applies one workspace-scoped admin approval", async () => {
     const modelSha256 = await seedFixtures();
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'archived'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedWorkspaceId, partId)
+      .run();
+    await expect(
+      env.DB.prepare(
+        `UPDATE product_assets SET quality = 'reviewed'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedWorkspaceId, assetId)
+        .run(),
+    ).rejects.toThrow(/ASSET_CATALOGUE_INACTIVE/u);
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'active'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedWorkspaceId, partId)
+      .run();
+
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedWorkspaceId, partId)
+        .run();
+    });
+    await expect(
+      assetReviewMutationResponse(
+        reviewRequest("save_draft", 0, ["model_identity"], {
+          width: 129,
+          height: null,
+          depth: null,
+        }),
+        racingDb,
+        env.PRIVATE_ASSETS,
+        context(staffFixture),
+        assetId,
+        "request-asset-review-archive-race",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(
+      await env.DB.prepare(
+        `SELECT status, quality, review_version,
+                (SELECT COUNT(*) FROM asset_review_events AS re
+                 WHERE re.workspace_id = a.workspace_id AND re.asset_id = a.id)
+                  AS review_events,
+                (SELECT COUNT(*) FROM audit_events AS ae
+                 WHERE ae.workspace_id = a.workspace_id AND ae.target_id = a.id)
+                  AS audit_events
+         FROM product_assets AS a
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedWorkspaceId, assetId)
+        .first(),
+    ).toEqual({
+      status: "draft",
+      quality: "draft",
+      review_version: 0,
+      review_events: 0,
+      audit_events: 0,
+    });
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'active'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedWorkspaceId, partId)
+      .run();
 
     const draft = await assetReviewMutationResponse(
       reviewRequest("save_draft", 0, ["model_identity", "source_rights"], {

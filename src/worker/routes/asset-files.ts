@@ -428,6 +428,12 @@ export async function assetFileUploadResponse(
     [updateResult] = await db.batch(statements);
   } catch (error) {
     await deletePrivateObjectQuietly(bucket, objectKey);
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw assetNotFound();
+    }
     throw error;
   }
 

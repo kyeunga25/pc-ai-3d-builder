@@ -65,6 +65,10 @@ function assetModelRequired(): ApiError {
   );
 }
 
+function assetNotFound(): ApiError {
+  return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+}
+
 export function resolveReviewTransition(
   role: WorkspaceRole,
   input: AssetReviewMutation,
@@ -399,7 +403,18 @@ export async function assetReviewMutationResponse(
     );
   }
 
-  const [updateResult] = await db.batch(statements);
+  let updateResult: D1Result<unknown> | undefined;
+  try {
+    [updateResult] = await db.batch(statements);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw assetNotFound();
+    }
+    throw error;
+  }
   if (updateResult?.meta.changes !== 1) {
     const existing = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!existing) {
