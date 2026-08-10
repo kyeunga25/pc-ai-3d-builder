@@ -8,6 +8,7 @@ import {
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { assetTargetHeader } from "../../shared/lib/asset-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   findReservedGenerationForAsset,
@@ -72,7 +73,11 @@ function assetModelRequired(): ApiError {
 }
 
 function assetNotFound(): ApiError {
-  return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  return new ApiError(
+    404,
+    "ASSET_NOT_FOUND",
+    "找不到所要求的素材。 / The requested asset was not found.",
+  );
 }
 
 export function resolveReviewTransition(
@@ -193,16 +198,17 @@ export async function findAsset(
 }
 
 export async function assetDetailResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
-  assetId: string,
 ): Promise<Response> {
-  if (!assetRecordIdPattern.test(assetId)) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
+    throw assetNotFound();
   }
   const asset = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!asset) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+    throw assetNotFound();
   }
 
   return Response.json(mapAssetReviewRow(asset), {
@@ -239,12 +245,12 @@ export async function assetReviewMutationResponse(
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
   requestId: string,
 ): Promise<Response> {
   assertReviewMutationRole(context.currentWorkspace.role);
-  if (!assetRecordIdPattern.test(assetId)) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
+    throw assetNotFound();
   }
 
   const parsed = assetReviewMutationSchema.safeParse(
@@ -263,7 +269,7 @@ export async function assetReviewMutationResponse(
   if (input.action === "approve" || input.action === "reject") {
     current = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!current) {
-      throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+      throw assetNotFound();
     }
     if (input.action === "approve") {
       if (
@@ -423,7 +429,7 @@ export async function assetReviewMutationResponse(
   if (updateResult?.meta.changes !== 1) {
     const existing = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!existing) {
-      throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+      throw assetNotFound();
     }
 
     throw new ApiError(

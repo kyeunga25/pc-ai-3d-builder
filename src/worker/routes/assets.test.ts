@@ -173,12 +173,11 @@ describe("asset review business rules", () => {
 describe("asset review routes", () => {
   it("returns safe asset detail from a workspace-bound lookup", async () => {
     const { db, prepared } = fakeDatabase();
+    const request = new Request("https://app.example/api/assets/item", {
+      headers: { "x-rigstage-asset-id": "asset-fixture" },
+    });
 
-    const response = await assetDetailResponse(
-      db,
-      context("viewer"),
-      "asset-fixture",
-    );
+    const response = await assetDetailResponse(request, db, context("viewer"));
     const text = await response.text();
 
     expect(response.status).toBe(200);
@@ -191,12 +190,36 @@ describe("asset review routes", () => {
 
   it("treats an asset outside the resolved workspace as not found", async () => {
     const { db, prepared } = fakeDatabase({ rows: [] });
+    const request = new Request("https://app.example/api/assets/item", {
+      headers: { "x-rigstage-asset-id": "asset-foreign" },
+    });
 
     await expect(
-      assetDetailResponse(db, context("viewer"), "asset-foreign"),
+      assetDetailResponse(request, db, context("viewer")),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
     expect(prepared[0]?.values).toEqual(["workspace-fixture", "asset-foreign"]);
   });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed asset target before detail database work: %s",
+    async (assetId) => {
+      const { db, prepared } = fakeDatabase();
+      const headers = new Headers();
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const request = new Request("https://app.example/api/assets/item", {
+        headers,
+      });
+
+      await expect(
+        assetDetailResponse(request, db, context("viewer")),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(prepared).toHaveLength(0);
+    },
+  );
 
   it("returns only the verified workspace review queue", async () => {
     const { db, prepared } = fakeDatabase({
@@ -234,14 +257,11 @@ describe("asset review routes", () => {
         return null;
       },
     } as unknown as R2Bucket;
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: "{malformed",
-      },
-    );
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{malformed",
+    });
 
     await expect(
       assetReviewMutationResponse(
@@ -249,7 +269,6 @@ describe("asset review routes", () => {
         db,
         privateAssetsSpy,
         context("viewer"),
-        "asset-fixture",
         "request-viewer-denied",
       ),
     ).rejects.toMatchObject({
@@ -263,23 +282,64 @@ describe("asset review routes", () => {
     expect(privateReads).toBe(0);
   });
 
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed review target before body, D1 or R2 work: %s",
+    async (assetId) => {
+      const { batches, db, prepared } = fakeDatabase();
+      let privateReads = 0;
+      const privateAssetsSpy = {
+        async get() {
+          privateReads += 1;
+          return null;
+        },
+      } as unknown as R2Bucket;
+      const headers = new Headers({ "content-type": "application/json" });
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const request = new Request(
+        "https://app.example/api/assets/item/review",
+        {
+          method: "PATCH",
+          headers,
+          body: "{malformed",
+        },
+      );
+
+      await expect(
+        assetReviewMutationResponse(
+          request,
+          db,
+          privateAssetsSpy,
+          context("staff"),
+          "request-target-denied",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(prepared).toHaveLength(0);
+      expect(batches).toHaveLength(0);
+      expect(privateReads).toBe(0);
+    },
+  );
+
   it("updates the asset, review history and audit log in one workspace-bound batch", async () => {
     const { batches, db } = fakeDatabase();
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     const response = await assetReviewMutationResponse(
       request,
       db,
       privateAssets,
       context(),
-      "asset-fixture",
       "request-fixture",
     );
 
@@ -301,14 +361,14 @@ describe("asset review routes", () => {
     const { db } = fakeDatabase({
       rows: [{ ...assetRow, model_object_key: null }],
     });
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     await expect(
       assetReviewMutationResponse(
@@ -316,7 +376,6 @@ describe("asset review routes", () => {
         db,
         privateAssets,
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({
@@ -332,14 +391,14 @@ describe("asset review routes", () => {
         throw new Error("Synthetic R2 lookup unavailable.");
       },
     } as unknown as R2Bucket;
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     await expect(
       assetReviewMutationResponse(
@@ -347,7 +406,6 @@ describe("asset review routes", () => {
         db,
         unavailableAssets,
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toThrowError("Synthetic R2 lookup unavailable.");
@@ -356,14 +414,14 @@ describe("asset review routes", () => {
 
   it("rejects a stale review version without appending state transitions", async () => {
     const { batchChanges, db } = fakeDatabase({ changes: 0 });
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     await expect(
       assetReviewMutationResponse(
@@ -371,7 +429,6 @@ describe("asset review routes", () => {
         db,
         privateAssets,
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({

@@ -23,7 +23,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 受 workspace 限制的分頁產品目錄 API；私人分頁游標只經受保護請求標頭傳送，不寫入瀏覽器 URL，production 介面亦具備載入、空白與錯誤狀態。
 - Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
-- 素材審核佇列、草稿保存、角色限制、樂觀鎖及原子 audit 記錄。
+- 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。
 - 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；可上載最多 10 MiB 的 JPEG／PNG／WebP 來源圖片，上載前會核對 MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF frame 結構，以及每邊最多 32,768 px、總像素最多 100 MP 的安全上限。
 - 上載最多 25 MiB 的自包含 glTF 2.0 GLB，經授權 API 讀取後在審核室及 Builder 以 Three.js 人手預覽。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。回滾及取代只清理單一明確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交狀態。

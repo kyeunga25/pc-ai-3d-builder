@@ -220,6 +220,33 @@ async function routeRequest(
       return assetReviewQueueResponse(env.DB, context);
     }
 
+    if (url.pathname === "/api/assets/item/review") {
+      if (request.method !== "PATCH") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "PATCH", "cache-control": "no-store" },
+        });
+      }
+
+      return assetReviewMutationResponse(
+        request,
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context,
+        requestId,
+      );
+    }
+
+    if (url.pathname === "/api/assets/item") {
+      if (request.method !== "GET") {
+        return new Response(null, {
+          status: 405,
+          headers: { allow: "GET", "cache-control": "no-store" },
+        });
+      }
+      return assetDetailResponse(request, env.DB, context);
+    }
+
     const assetFileMatch = /^\/api\/assets\/([^/]+)\/files\/([^/]+)$/u.exec(
       url.pathname,
     );
@@ -250,27 +277,6 @@ async function routeRequest(
       });
     }
 
-    const assetReviewMatch = /^\/api\/assets\/([^/]+)\/review$/u.exec(
-      url.pathname,
-    );
-    if (assetReviewMatch) {
-      if (request.method !== "PATCH") {
-        return new Response(null, {
-          status: 405,
-          headers: { allow: "PATCH", "cache-control": "no-store" },
-        });
-      }
-
-      return assetReviewMutationResponse(
-        request,
-        env.DB,
-        env.PRIVATE_ASSETS,
-        context,
-        assetReviewMatch[1]!,
-        requestId,
-      );
-    }
-
     const generationJobsMatch =
       /^\/api\/assets\/([^/]+)\/generation-jobs$/u.exec(url.pathname);
     if (generationJobsMatch) {
@@ -290,17 +296,6 @@ async function routeRequest(
         status: 405,
         headers: { allow: "GET, POST", "cache-control": "no-store" },
       });
-    }
-
-    const assetDetailMatch = /^\/api\/assets\/([^/]+)$/u.exec(url.pathname);
-    if (assetDetailMatch) {
-      if (request.method !== "GET") {
-        return new Response(null, {
-          status: 405,
-          headers: { allow: "GET", "cache-control": "no-store" },
-        });
-      }
-      return assetDetailResponse(env.DB, context, assetDetailMatch[1]!);
     }
 
     return apiNotFound(requestId);

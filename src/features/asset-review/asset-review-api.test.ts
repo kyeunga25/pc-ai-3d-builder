@@ -5,8 +5,10 @@ import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
   createAssetFromSource,
+  fetchAssetReview,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
+  updateAssetReview,
 } from "./asset-review-api";
 
 const leaseInput = {
@@ -141,6 +143,52 @@ describe("catalogue source target API", () => {
     expect(headers.get("x-rigstage-catalogue-part-id")).toBe(
       "part-private-fixture",
     );
+    expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
+    expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+  });
+});
+
+describe("asset review target API", () => {
+  it("keeps the private asset ID out of the detail URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchAssetReview(
+        new AbortController().signal,
+        "workspace-fixture",
+        "asset-private-fixture",
+      ),
+    ).resolves.toEqual(reviewAsset);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item");
+    expect(url).not.toContain("asset-private-fixture");
+    expect(init.body).toBeUndefined();
+    expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
+    expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
+  });
+
+  it("keeps the private asset ID out of the review URL and body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateAssetReview("workspace-fixture", "asset-private-fixture", {
+        action: "save_draft",
+        expectedVersion: reviewAsset.version,
+        completedChecks: [],
+        dimensionsMm: { width: null, height: null, depth: null },
+      }),
+    ).resolves.toEqual(reviewAsset);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/review");
+    expect(url).not.toContain("asset-private-fixture");
+    expect(String(init.body)).not.toContain("asset-private-fixture");
+    expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
     expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
     expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
   });

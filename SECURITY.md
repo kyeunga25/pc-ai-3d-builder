@@ -24,14 +24,14 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - First-login identity binding rejects conflicting concurrent subjects.
 - Protected API requests are rate-limited by a versioned, domain-separated SHA-256 key derived from the verified Access subject; the raw subject is not sent to the Rate Limiting binding or request logs.
 - Session and workspace reads do not append audit events; first identity binding and an explicit workspace switch may update bounded user metadata.
-- Catalogue and asset queries include the resolved workspace in every database predicate.
+- Catalogue and asset queries include the resolved workspace in every database predicate; selected asset detail and review targets use a bounded protected header with fixed URLs.
 - Catalogue mutations and source-asset creation use fixed URLs plus a bounded protected part-ID header; role and target checks precede request-body, D1 and R2 work, while updates retain bounded bodies, optimistic versions and logical archive.
 - Catalogue CSV imports validate the complete document before one transactional D1 batch.
 - JSON and CSV mutations require an exact, case-insensitive media-type token with optional parameters; prefix lookalikes fail before body materialization or mutation-route database work.
 - Private image and GLB uploads enforce role, workspace, MIME and bounded-size checks. Source images also require bounded dimensions and structurally complete PNG chunks with CRCs, JPEG marker sequences or WebP RIFF chunks with still/animation bitstream headers; animated WebP is capped at 120 frames and 100 MP aggregate frame area. GLB files cannot reference external resources. These structural checks do not fully decode pixels and are not image-authenticity or visual-content moderation.
 - R2 object keys and checksums remain server-only; authorized reads use `private, no-store` responses.
 - File replacement requires the current review version, an active catalogue part at the D1 write boundary and resets prior approval evidence.
-- Asset review mutations use bounded JSON bodies, role checks, optimistic version conditions and an active-catalogue database trigger.
+- Asset review mutations reject viewers before target/body/D1/R2 work, validate a bounded protected target before the JSON body, and retain optimistic version conditions plus an active-catalogue database trigger.
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
 - Build reads and writes are workspace-scoped; selected build IDs use a bounded protected header with fixed API URLs, and explicit writes use bounded selections, optimistic versions and guarded D1 batches.
 - Build export fails closed on hard errors or unknown compatibility results and excludes identities, workspace identifiers, prices, stock, private assets and deployment data.

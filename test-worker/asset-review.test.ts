@@ -79,9 +79,12 @@ function reviewRequest(
     depth: number | null;
   },
 ): Request {
-  return new Request(`https://local.invalid/api/assets/${assetId}/review`, {
+  return new Request("https://local.invalid/api/assets/item/review", {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-rigstage-asset-id": assetId,
+    },
     body: JSON.stringify({
       action,
       expectedVersion,
@@ -213,7 +216,6 @@ describe("asset review runtime boundaries", () => {
         racingDb,
         env.PRIVATE_ASSETS,
         context(staffFixture),
-        assetId,
         "request-asset-review-archive-race",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
@@ -254,7 +256,6 @@ describe("asset review runtime boundaries", () => {
       env.DB,
       env.PRIVATE_ASSETS,
       context(staffFixture),
-      assetId,
       "request-asset-review-draft",
     );
     const draftText = await draft.text();
@@ -287,7 +288,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(staffFixture),
-        assetId,
         "request-asset-review-staff-approval",
       ),
     ).rejects.toMatchObject({ status: 403, code: "ROLE_FORBIDDEN" });
@@ -297,7 +297,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(foreignFixture),
-        assetId,
         "request-asset-review-foreign",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
@@ -309,7 +308,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(adminFixture),
-        assetId,
         "request-asset-review-missing-model",
       ),
     ).rejects.toMatchObject({
@@ -332,7 +330,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(adminFixture),
-        assetId,
         "request-asset-review-model-mismatch",
       ),
     ).rejects.toMatchObject({
@@ -355,7 +352,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(adminFixture),
-        assetId,
         "request-asset-review-model-invalid-bytes",
       ),
     ).rejects.toMatchObject({
@@ -379,7 +375,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(adminFixture),
-        assetId,
         "request-asset-review-model-checksum-drift",
       ),
     ).rejects.toMatchObject({
@@ -398,7 +393,6 @@ describe("asset review runtime boundaries", () => {
       env.DB,
       env.PRIVATE_ASSETS,
       context(adminFixture),
-      assetId,
       "request-asset-review-approval",
     );
     expect(approval.status).toBe(200);
@@ -417,7 +411,6 @@ describe("asset review runtime boundaries", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(adminFixture),
-        assetId,
         "request-asset-review-replay",
       ),
     ).rejects.toMatchObject({

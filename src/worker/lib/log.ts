@@ -29,6 +29,8 @@ const fixedRouteTemplates = new Map<string, string>([
   ["/api/build/export", "/api/build/export"],
   ["/api/builds", "/api/builds"],
   ["/api/assets/review-queue", "/api/assets/review-queue"],
+  ["/api/assets/item/review", "/api/assets/item/review"],
+  ["/api/assets/item", "/api/assets/item"],
 ]);
 
 const dynamicRouteTemplates = [
@@ -37,16 +39,8 @@ const dynamicRouteTemplates = [
     template: "/api/assets/:assetId/files/:fileKind",
   },
   {
-    pattern: /^\/api\/assets\/[^/]+\/review$/u,
-    template: "/api/assets/:assetId/review",
-  },
-  {
     pattern: /^\/api\/assets\/[^/]+\/generation-jobs$/u,
     template: "/api/assets/:assetId/generation-jobs",
-  },
-  {
-    pattern: /^\/api\/assets\/[^/]+$/u,
-    template: "/api/assets/:assetId",
   },
 ] as const;
 

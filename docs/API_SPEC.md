@@ -80,9 +80,9 @@ Targets the draft through `X-RigStage-Build-Id` and returns a schema-2 portable 
 
 Returns at most 50 draft or in-review assets from the resolved workspace, with their catalogue identity, fixed checklist identifiers, source-rights flag, human-verified dimensions, review version and safe file metadata. It never returns private object keys, checksums or provider responses.
 
-## `GET /api/assets/:assetId`
+## `GET /api/assets/item`
 
-Returns one active catalogue asset from the resolved workspace, including approved records. The response uses the same safe representation as the review queue.
+Requires one bounded asset ID in `X-RigStage-Asset-Id` and returns the matching active catalogue asset from the resolved workspace, including approved records. The fixed URL contains no private asset ID; a missing or malformed target returns bilingual `ASSET_NOT_FOUND` before D1. The response uses the same safe representation as the review queue.
 
 ## `POST /api/catalogue/part/source`
 
@@ -100,9 +100,9 @@ A successful replacement increments the review version and resets the checklist,
 
 Streams a private `source` or `model` file only after Access verification and active workspace membership resolution. Before streaming, the R2 object's byte size, content type and SHA-256 must still match the validated D1 metadata. New objects use R2's stored SHA-256 metadata for the streaming path; an older object without that metadata receives a bounded read-back, file validation and digest comparison before any bytes are returned. A missing, invalid or mismatched object returns bilingual `ASSET_FILE_NOT_FOUND` without writing state; an R2 or cryptographic operational failure remains an internal failure and can be retried. A successful response is `private, no-store` with a generic filename. Permanent object URLs and keys are never returned.
 
-## `PATCH /api/assets/:assetId/review`
+## `PATCH /api/assets/item/review`
 
-Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles receive bilingual `ROLE_FORBIDDEN` before the Worker reads the body or performs D1/R2 work. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item, three positive dimensions of at most 10,000 mm and a private GLB whose R2 object still exists with the recorded byte size and `model/gltf-binary` metadata. Before committing approval, the Worker bounds the object to 25 MiB, reads it back, repeats the GLB structure and self-containment validation, and compares its SHA-256 with D1. Missing, invalid or same-metadata checksum-drifted storage returns bilingual `ASSET_MODEL_REQUIRED` without a review or audit write; restoring the exact validated object permits a retry at the same asset version. An R2 read or cryptographic operational failure remains an internal failure and can be retried.
+Targets one asset through `X-RigStage-Asset-Id` and accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`; neither the fixed URL nor body contains the private asset ID. Viewer roles receive bilingual `ROLE_FORBIDDEN` before the Worker reads the target or body or performs D1/R2 work. For a write-capable role, a missing or malformed target returns bilingual `ASSET_NOT_FOUND` before the body, D1 or R2. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item, three positive dimensions of at most 10,000 mm and a private GLB whose R2 object still exists with the recorded byte size and `model/gltf-binary` metadata. Before committing approval, the Worker bounds the object to 25 MiB, reads it back, repeats the GLB structure and self-containment validation, and compares its SHA-256 with D1. Missing, invalid or same-metadata checksum-drifted storage returns bilingual `ASSET_MODEL_REQUIRED` without a review or audit write; restoring the exact validated object permits a retry at the same asset version. An R2 read or cryptographic operational failure remains an internal failure and can be retried. Legacy dynamic detail and review paths are not routed.
 
 The conditional asset update, review event and audit event are submitted in one D1 batch. A database trigger requires the linked catalogue part to remain active when the asset update executes. If a concurrent archive commits first, the review, audit and any generation-credit transition all roll back, workspace-safe `ASSET_NOT_FOUND` is returned and the original asset version can be retried after reactivation. A stale `expectedVersion` fails without overwriting the newer record.
 

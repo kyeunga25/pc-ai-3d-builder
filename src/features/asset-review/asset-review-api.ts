@@ -17,6 +17,7 @@ import {
   type GenerationJobStartInput,
 } from "../../shared/domain/generation-jobs";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { assetTargetHeader } from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
 const apiErrorSchema = z.object({
@@ -111,14 +112,13 @@ export async function fetchAssetReview(
   workspaceId: string,
   assetId: string,
 ): Promise<AssetReviewItem> {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -132,15 +132,13 @@ export async function updateAssetReview(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/review`,
-    {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(mutation),
-    },
-  );
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/review", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(mutation),
+  });
 
   if (!response.ok) {
     throw await apiError(response);

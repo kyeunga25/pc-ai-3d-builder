@@ -89,9 +89,12 @@ function archiveRequest(targetPartId: string, expectedVersion = 0): Request {
 }
 
 function rejectionRequest(assetId: string, expectedVersion: number): Request {
-  return new Request(`https://local.invalid/api/assets/${assetId}/review`, {
+  return new Request("https://local.invalid/api/assets/item/review", {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-rigstage-asset-id": assetId,
+    },
     body: JSON.stringify({
       action: "reject",
       expectedVersion,
@@ -467,7 +470,6 @@ describe("catalogue write runtime constraints", () => {
       env.DB,
       env.PRIVATE_ASSETS,
       context(fixture.actor),
-      fixture.assetId,
       "request-catalogue-generation-reject",
     );
     expect(rejection.status).toBe(200);

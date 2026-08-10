@@ -86,9 +86,12 @@ function reviewRequest(
   action: "approve" | "reject",
   fixture: GenerationFixture = defaultFixture,
 ): Request {
-  return new Request(`https://local.invalid/api/assets/${fixture.assetId}`, {
+  return new Request("https://local.invalid/api/assets/item/review", {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-rigstage-asset-id": fixture.assetId,
+    },
     body: JSON.stringify({
       action,
       expectedVersion: 3,
@@ -337,7 +340,6 @@ describe("local generation Workflow", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context,
-        assetId,
         "request-local-approval",
       );
       expect(approval.status).toBe(200);
@@ -348,7 +350,6 @@ describe("local generation Workflow", () => {
           env.DB,
           env.PRIVATE_ASSETS,
           context,
-          assetId,
           "request-local-approval-repeat",
         ),
       ).rejects.toMatchObject({
@@ -1421,7 +1422,6 @@ describe("local generation Workflow", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         rejectionContext,
-        rejectionFixture.assetId,
         "request-local-rejection",
       );
       expect(rejection.status).toBe(200);
@@ -1432,7 +1432,6 @@ describe("local generation Workflow", () => {
           env.DB,
           env.PRIVATE_ASSETS,
           rejectionContext,
-          rejectionFixture.assetId,
           "request-local-rejection-repeat",
         ),
       ).rejects.toMatchObject({
