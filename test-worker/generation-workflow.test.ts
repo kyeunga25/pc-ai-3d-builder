@@ -69,17 +69,15 @@ function generationRequest(
   fixture: GenerationFixture = defaultFixture,
   expectedVersion = 2,
 ): Request {
-  return new Request(
-    `https://local.invalid/api/assets/${fixture.assetId}/generation-jobs`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": fixture.idempotencyKey,
-      },
-      body: JSON.stringify({ expectedVersion }),
+  return new Request("https://local.invalid/api/assets/item/generation-jobs", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": fixture.idempotencyKey,
+      "x-rigstage-asset-id": fixture.assetId,
     },
-  );
+    body: JSON.stringify({ expectedVersion }),
+  });
 }
 
 function reviewRequest(
@@ -222,7 +220,6 @@ describe("local generation Workflow", () => {
         generationRequest(),
         env,
         context,
-        assetId,
         "request-local-generation",
       );
       expect(response.status).toBe(202);
@@ -298,7 +295,6 @@ describe("local generation Workflow", () => {
         generationRequest(),
         env,
         context,
-        assetId,
         "request-local-generation-repeat",
       );
       expect(repeated.status).toBe(200);
@@ -310,7 +306,6 @@ describe("local generation Workflow", () => {
           generationRequest(defaultFixture, 3),
           env,
           context,
-          assetId,
           "request-local-generation-version-reuse",
         ),
       ).rejects.toMatchObject({
@@ -446,7 +441,6 @@ describe("local generation Workflow", () => {
           foreignAssetRequest,
           env,
           requestContextFor(requesterFixture),
-          protectedFixture.assetId,
           "request-local-isolation",
         ),
       ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
@@ -524,7 +518,6 @@ describe("local generation Workflow", () => {
         generationRequest(sourceFixture),
         routeEnv,
         sourceContext,
-        sourceFixture.assetId,
         "request-local-source-missing",
       ),
     ).rejects.toMatchObject({
@@ -541,7 +534,6 @@ describe("local generation Workflow", () => {
         generationRequest(sourceFixture),
         routeEnv,
         sourceContext,
-        sourceFixture.assetId,
         "request-local-source-size-drift",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
@@ -554,7 +546,6 @@ describe("local generation Workflow", () => {
         generationRequest(sourceFixture),
         routeEnv,
         sourceContext,
-        sourceFixture.assetId,
         "request-local-source-type-drift",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
@@ -569,7 +560,6 @@ describe("local generation Workflow", () => {
         generationRequest(sourceFixture),
         routeEnv,
         sourceContext,
-        sourceFixture.assetId,
         "request-local-source-checksum-drift",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
@@ -601,7 +591,6 @@ describe("local generation Workflow", () => {
       generationRequest(sourceFixture),
       routeEnv,
       sourceContext,
-      sourceFixture.assetId,
       "request-local-source-recovered",
     );
     expect(recovered.status).toBe(202);
@@ -610,7 +599,6 @@ describe("local generation Workflow", () => {
       generationRequest(sourceFixture),
       routeEnv,
       sourceContext,
-      sourceFixture.assetId,
       "request-local-source-replay",
     );
     expect(replay.status).toBe(200);
@@ -693,7 +681,6 @@ describe("local generation Workflow", () => {
         generationRequest(raceFixture),
         routeEnv,
         requestContextFor(raceFixture),
-        raceFixture.assetId,
         "request-local-catalogue-reservation-race",
       ),
     ).rejects.toMatchObject({
@@ -734,7 +721,6 @@ describe("local generation Workflow", () => {
       generationRequest(raceFixture),
       { ...routeEnv, DB: env.DB },
       requestContextFor(raceFixture),
-      raceFixture.assetId,
       "request-local-catalogue-reservation-recovered",
     );
     expect(recovered.status).toBe(202);
@@ -743,7 +729,6 @@ describe("local generation Workflow", () => {
       generationRequest(raceFixture),
       { ...routeEnv, DB: env.DB },
       requestContextFor(raceFixture),
-      raceFixture.assetId,
       "request-local-catalogue-reservation-replay",
     );
     expect(replay.status).toBe(200);
@@ -792,7 +777,6 @@ describe("local generation Workflow", () => {
           PRIVATE_ASSETS: env.PRIVATE_ASSETS,
         },
         requestContextFor(raceFixture),
-        raceFixture.assetId,
         "request-local-catalogue-claim-race",
       );
       expect(response.status).toBe(202);
@@ -846,7 +830,6 @@ describe("local generation Workflow", () => {
         generationRequest(raceFixture),
         env,
         requestContextFor(raceFixture),
-        raceFixture.assetId,
         "request-local-catalogue-claim-race-replay",
       );
       expect(replay.status).toBe(200);
@@ -1024,7 +1007,6 @@ describe("local generation Workflow", () => {
           PRIVATE_ASSETS: racingBucket,
         },
         requestContextFor(raceFixture),
-        raceFixture.assetId,
         "request-local-source-race",
       );
       expect(response.status).toBe(202);
@@ -1069,7 +1051,6 @@ describe("local generation Workflow", () => {
         generationRequest(raceFixture),
         env,
         requestContextFor(raceFixture),
-        raceFixture.assetId,
         "request-local-source-race-replay",
       );
       expect(replay.status).toBe(200);
@@ -1136,7 +1117,6 @@ describe("local generation Workflow", () => {
         generationRequest(startFailureFixture),
         routeEnv,
         startFailureContext,
-        startFailureFixture.assetId,
         "request-local-start-failure",
       ),
     ).rejects.toMatchObject({
@@ -1186,7 +1166,6 @@ describe("local generation Workflow", () => {
       generationRequest(startFailureFixture),
       routeEnv,
       startFailureContext,
-      startFailureFixture.assetId,
       "request-local-start-failure-repeat",
     );
     expect(repeated.status).toBe(200);
@@ -1245,7 +1224,6 @@ describe("local generation Workflow", () => {
             generationRequest(noCreditFixture),
             env,
             noCreditContext,
-            noCreditFixture.assetId,
             requestId,
           ),
         ).rejects.toMatchObject({
@@ -1406,7 +1384,6 @@ describe("local generation Workflow", () => {
         generationRequest(rejectionFixture),
         env,
         rejectionContext,
-        rejectionFixture.assetId,
         "request-local-rejection-generation",
       );
       expect(response.status).toBe(202);

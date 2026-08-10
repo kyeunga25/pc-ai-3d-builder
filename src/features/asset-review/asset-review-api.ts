@@ -223,14 +223,13 @@ export async function fetchGenerationJobs(
   workspaceId: string,
   assetId: string,
 ) {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/generation-jobs", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -246,15 +245,13 @@ export async function startGenerationJob(
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
   headers.set("idempotency-key", idempotencyKey);
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(input),
-    },
-  );
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/generation-jobs", {
+    method: "POST",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(input),
+  });
   if (!response.ok) {
     throw await apiError(response);
   }

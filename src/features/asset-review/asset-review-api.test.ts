@@ -6,6 +6,7 @@ import {
   AssetReviewApiError,
   createAssetFromSource,
   fetchAssetFileBlob,
+  fetchGenerationJobs,
   fetchAssetReview,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
@@ -114,9 +115,47 @@ describe("generation request API", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/generation-jobs");
+    expect(url).not.toContain(leaseInput.assetId);
+    expect(headers.get("x-rigstage-asset-id")).toBe(leaseInput.assetId);
     expect(headers.get("idempotency-key")).toBe("request-stable-001");
     expect(url).not.toContain("request-stable-001");
     expect(String(init.body)).not.toContain("request-stable-001");
+    expect(String(init.body)).not.toContain(leaseInput.assetId);
+  });
+
+  it("keeps the private asset ID out of the job-list URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        capability: {
+          mode: "disabled",
+          maxCostMinor: 0,
+          credits: {
+            availableUnits: 0,
+            reservedUnits: 0,
+            settledUnits: 0,
+            releasedUnits: 0,
+          },
+        },
+        items: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchGenerationJobs(
+        new AbortController().signal,
+        leaseInput.workspaceId,
+        leaseInput.assetId,
+      ),
+    ).resolves.toMatchObject({ items: [] });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/generation-jobs");
+    expect(url).not.toContain(leaseInput.assetId);
+    expect(init.body).toBeUndefined();
+    expect(headers.get("x-rigstage-asset-id")).toBe(leaseInput.assetId);
   });
 });
 

@@ -266,20 +266,12 @@ async function routeRequest(
       });
     }
 
-    const generationJobsMatch =
-      /^\/api\/assets\/([^/]+)\/generation-jobs$/u.exec(url.pathname);
-    if (generationJobsMatch) {
+    if (url.pathname === "/api/assets/item/generation-jobs") {
       if (request.method === "GET") {
-        return generationJobListResponse(env, context, generationJobsMatch[1]!);
+        return generationJobListResponse(request, env, context);
       }
       if (request.method === "POST") {
-        return generationJobStartResponse(
-          request,
-          env,
-          context,
-          generationJobsMatch[1]!,
-          requestId,
-        );
+        return generationJobStartResponse(request, env, context, requestId);
       }
       return new Response(null, {
         status: 405,

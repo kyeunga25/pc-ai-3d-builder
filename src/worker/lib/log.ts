@@ -32,14 +32,8 @@ const fixedRouteTemplates = new Map<string, string>([
   ["/api/assets/item/review", "/api/assets/item/review"],
   ["/api/assets/item", "/api/assets/item"],
   ["/api/assets/item/file", "/api/assets/item/file"],
+  ["/api/assets/item/generation-jobs", "/api/assets/item/generation-jobs"],
 ]);
-
-const dynamicRouteTemplates = [
-  {
-    pattern: /^\/api\/assets\/[^/]+\/generation-jobs$/u,
-    template: "/api/assets/:assetId/generation-jobs",
-  },
-] as const;
 
 const workspaceRouteRoots = [
   "/dashboard",
@@ -51,10 +45,6 @@ const workspaceRouteRoots = [
 export function requestRouteTemplate(pathname: string): string {
   const fixedTemplate = fixedRouteTemplates.get(pathname);
   if (fixedTemplate) return fixedTemplate;
-
-  for (const route of dynamicRouteTemplates) {
-    if (route.pattern.test(pathname)) return route.template;
-  }
 
   const normalizedPathname = pathname.toLowerCase();
   for (const root of workspaceRouteRoots) {

@@ -42,7 +42,7 @@ Current unit tests cover:
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links and schema rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft.
-- generation capability fail-closed parsing and disabled-provider behavior;
+- fixed-URL header-only generation targets, malformed-target rejection before body/D1/R2/Workflow, generic legacy-path logging, capability fail-closed parsing and disabled-provider behavior;
 - runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;
 - owner/admin generation role checks, saved source-rights requirement, current review version and matching R2 source size, content type and SHA-256 before reservation;
 - generation reservation, Workflow claim and draft staging fail closed when the catalogue part is archived at each D1 boundary;

@@ -7,6 +7,7 @@ import {
   type GenerationJob,
 } from "../../shared/domain/generation-jobs";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { assetTargetHeader } from "../../shared/lib/asset-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   entitlementTransitionStatements,
@@ -63,7 +64,7 @@ function generationRoleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "只有工作空間 owner 或 admin 可建立生成工作。",
+    "只有工作空間 owner 或 admin 可建立生成工作。 / Only workspace owners or admins can create generation jobs.",
   );
 }
 
@@ -74,7 +75,11 @@ function assertGenerationRole(role: WorkspaceRole): void {
 }
 
 function assetNotFound(): ApiError {
-  return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  return new ApiError(
+    404,
+    "ASSET_NOT_FOUND",
+    "找不到所要求的素材。 / The requested asset was not found.",
+  );
 }
 
 function generationSourceRequired(): ApiError {
@@ -237,11 +242,12 @@ async function ensureWorkflowStarted(
 }
 
 export async function generationJobListResponse(
+  request: Request,
   env: GenerationRouteEnv,
   context: RequestContext,
-  assetId: string,
 ): Promise<Response> {
-  if (!assetRecordIdPattern.test(assetId)) {
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
     throw assetNotFound();
   }
   const asset = await findAsset(env.DB, context.currentWorkspace.id, assetId);
@@ -269,11 +275,11 @@ export async function generationJobStartResponse(
   request: Request,
   env: GenerationRouteEnv,
   context: RequestContext,
-  assetId: string,
   requestId: string,
 ): Promise<Response> {
   assertGenerationRole(context.currentWorkspace.role);
-  if (!assetRecordIdPattern.test(assetId)) {
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
     throw assetNotFound();
   }
   const runtime = generationRuntimeConfig(env);
@@ -281,7 +287,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       409,
       "GENERATION_DISABLED",
-      "生成工作目前未啟用；沒有呼叫任何外部供應商。",
+      "生成工作目前未啟用；沒有呼叫任何外部供應商。 / Generation is disabled; no external provider was called.",
     );
   }
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
@@ -289,14 +295,18 @@ export async function generationJobStartResponse(
     throw new ApiError(
       400,
       "VALIDATION_ERROR",
-      "生成要求必須包含有效的 Idempotency-Key。",
+      "生成要求必須包含有效的 Idempotency-Key。 / The generation request must include a valid Idempotency-Key.",
     );
   }
   const parsed = generationJobStartInputSchema.safeParse(
     await readBoundedJson(request),
   );
   if (!parsed.success) {
-    throw new ApiError(400, "VALIDATION_ERROR", "生成工作內容無效。");
+    throw new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "生成工作內容無效。 / The generation job input is invalid.",
+    );
   }
   const workspaceId = context.currentWorkspace.id;
   const existing = await findGenerationJob(
@@ -334,7 +344,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       409,
       "GENERATION_ALREADY_ACTIVE",
-      "此素材已有進行中或等待人工決定的生成工作。",
+      "此素材已有進行中或等待人工決定的生成工作。 / This asset already has an active or awaiting-review generation job.",
     );
   }
   const asset = await findAsset(env.DB, workspaceId, assetId);
@@ -342,7 +352,11 @@ export async function generationJobStartResponse(
     throw assetNotFound();
   }
   if (asset.status === "approved") {
-    throw new ApiError(409, "ASSET_LOCKED", "已核准素材不可建立生成工作。");
+    throw new ApiError(
+      409,
+      "ASSET_LOCKED",
+      "已核准素材不可建立生成工作。 / An approved asset cannot start a generation job.",
+    );
   }
   if (asset.review_version !== parsed.data.expectedVersion) {
     throw assetVersionConflict();
@@ -361,7 +375,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       409,
       "GENERATION_RIGHTS_REQUIRED",
-      "必須先儲存來源圖片使用權確認。",
+      "必須先儲存來源圖片使用權確認。 / Save the source-image rights confirmation before generating.",
     );
   }
   if (
@@ -481,7 +495,7 @@ export async function generationJobStartResponse(
         throw new ApiError(
           409,
           "GENERATION_ALREADY_ACTIVE",
-          "此素材已有進行中或等待人工決定的生成工作。",
+          "此素材已有進行中或等待人工決定的生成工作。 / This asset already has an active or awaiting-review generation job.",
         );
       }
     }
@@ -492,7 +506,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       409,
       "GENERATION_CREDITS_REQUIRED",
-      "目前沒有可保留的 3D 素材 credit；沒有建立工作或產生供應商成本。",
+      "目前沒有可保留的 3D 素材 credit；沒有建立工作或產生供應商成本。 / No generation credit is available; no job or provider cost was created.",
     );
   }
 
@@ -517,7 +531,7 @@ export async function generationJobStartResponse(
     throw new ApiError(
       503,
       "GENERATION_START_FAILED",
-      "生成工作未能啟動；沒有產生供應商費用。",
+      "生成工作未能啟動；沒有產生供應商費用。 / The generation job did not start; no provider cost was incurred.",
     );
   }
   return Response.json(mapGenerationJob(created), {

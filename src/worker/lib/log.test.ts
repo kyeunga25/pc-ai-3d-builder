@@ -18,11 +18,9 @@ describe("request log route templates", () => {
     ["/api/assets/item/review", "/api/assets/item/review"],
     ["/api/assets/item", "/api/assets/item"],
     ["/api/assets/item/file", "/api/assets/item/file"],
+    ["/api/assets/item/generation-jobs", "/api/assets/item/generation-jobs"],
     ["/api/assets/asset_private_123/files/source-private-key", "/api/*"],
-    [
-      "/api/assets/asset_private_123/generation-jobs",
-      "/api/assets/:assetId/generation-jobs",
-    ],
+    ["/api/assets/asset_private_123/generation-jobs", "/api/*"],
     ["/api/assets/asset_private_123/review", "/api/*"],
     ["/api/assets/asset_private_123", "/api/*"],
     ["/builder/build/build_private_123", "/builder/*"],
@@ -40,8 +38,11 @@ describe("request log route templates", () => {
   it("logs only a stable route without URL query or dynamic identifiers", () => {
     const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
     const request = new Request(
-      "https://rigstage.invalid/api/assets/asset_private_123/generation-jobs?email=owner%40example.test&workspace=workspace_private_456",
-      { method: "POST" },
+      "https://rigstage.invalid/api/assets/item/generation-jobs?email=owner%40example.test&workspace=workspace_private_456",
+      {
+        method: "POST",
+        headers: { "x-rigstage-asset-id": "asset_private_123" },
+      },
     );
 
     logRequestRecord("info", request, {
@@ -60,7 +61,7 @@ describe("request log route templates", () => {
       method: "POST",
       requestId: "request-public-safe",
       status: 202,
-      path: "/api/assets/:assetId/generation-jobs",
+      path: "/api/assets/item/generation-jobs",
     });
     expect(serialized).not.toContain("asset_private_123");
     expect(serialized).not.toContain("owner@example.test");
