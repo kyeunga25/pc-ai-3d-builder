@@ -47,7 +47,7 @@ Current unit tests cover:
 - workspace-scoped build list, fixed-URL header-only build targets, malformed-target rejection before D1, generic logging of legacy dynamic paths, role checks, guarded optimistic mutations and portable export;
 - enumerated bilingual Builder create/switch/save/archive/export states, safe replacement of monolingual technical errors, versioned success messages, semantic status/alert tones and bilingual Save/Export controls;
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
-- read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links, schema-required bounded Traditional Chinese/English work detail and status, bilingual relative-time boundaries, and rejection of asset IDs embedded in URLs;
+- read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links, schema-required bounded Traditional Chinese/English work detail and status, bilingual relative-time boundaries, exhaustive static interface copy, singular/plural metric summaries, empty/complete/incomplete readiness guidance, and rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft;
 - fixed-URL header-only generation targets, malformed-target rejection before body/D1/R2/Workflow, generic legacy-path logging, capability fail-closed parsing and disabled-provider behavior;
 - exhaustive bilingual generation-inspector mappings for every mode, job and entitlement enum, settled human-review distinction, non-monetary available/reserved and settled/released credit summaries, and bilingual absent-value copy;
@@ -105,7 +105,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - an explicitly created empty build produces unknown results and blocks export;
 - the first archive action arms confirmation, the second produces the empty state, and explicit creation restores a draft;
 - camera, wireframe and fit controls are disabled when no approved GLB is available;
-- dashboard metrics and recent-work links use explicit synthetic local data without fixed operational claims; recent-work detail, relative time and status remain bilingual at desktop widths, while the 390 px icon status stays accessible without horizontal overflow;
+- dashboard metrics and recent-work links use explicit synthetic local data without fixed operational claims; heading, primary actions, metric summaries, recent-work detail/time/status and readiness guidance remain bilingual at desktop widths, while the 390 px icon status stays accessible and all surrounding copy wraps without horizontal overflow;
 - dashboard and builder have no page-level horizontal overflow at 390 px;
 - the 390 px builder layout exposes the inspector drawer.
 

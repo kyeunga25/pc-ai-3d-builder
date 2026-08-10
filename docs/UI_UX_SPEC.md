@@ -3,6 +3,7 @@
 ## Language and accessibility
 
 - Traditional Chinese for Hong Kong is the primary interface language.
+- Dashboard headings, primary actions, operational metrics, recent work and readiness guidance show Traditional Chinese first with a smaller visible English companion; proper workspace and product names are not machine-translated.
 - Text and numerical values must remain readable on the dark surface palette.
 - Controls require visible keyboard focus and accessible labels.
 - Status must not depend on colour alone.
@@ -24,7 +25,7 @@ Generation status uses provider-neutral queued, running, validating, waiting-for
 
 The generation action is available only to owner/admin roles after a private source image and saved usage-rights confirmation exist with no unsaved review changes. A completed job reloads the new draft version and visibly resets every approval check and dimension.
 
-The production dashboard must use protected workspace data and must not present fixed catalogue, review, timing or readiness claims. Controls without an available model or permitted action remain visibly disabled. Logical archive requires a separate confirmation action and never masquerades as permanent deletion.
+The production dashboard must use protected workspace data and must not present fixed catalogue, review, timing or readiness claims. Metric and readiness counts preserve their authoritative numeric value while bilingual labels handle English singular/plural forms. At narrow widths, the recent-work badge may become icon-led but its bilingual text remains accessible, and no Dashboard copy may create page-level horizontal overflow. Controls without an available model or permitted action remain visibly disabled. Logical archive requires a separate confirmation action and never masquerades as permanent deletion.
 
 ## Performance
 

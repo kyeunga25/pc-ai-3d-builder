@@ -62,6 +62,16 @@ describe("DashboardPage", () => {
     expect(markup).toContain("9 components · Synthetic demo build");
     expect(markup).toContain("Export ready");
     expect(markup).toContain("Earlier update");
+    expect(markup).toContain("Merchant dashboard");
+    expect(markup).toContain("Add catalogue product");
+    expect(markup).toContain("Open PC Builder");
+    expect(markup).toContain("Catalogue components");
+    expect(markup).toContain("11 specifications verified");
+    expect(markup).toContain("Live workspace metrics");
+    expect(markup).toContain("Recent work");
+    expect(markup).toContain("Data readiness");
+    expect(markup).toContain("Catalogue data readiness: 55%");
+    expect(markup).toContain("5 catalogue records still need completion.");
     expect(markup).not.toContain("?asset=");
   });
 });

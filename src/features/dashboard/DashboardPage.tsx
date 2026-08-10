@@ -37,7 +37,19 @@ import {
   reviewAsset,
 } from "../../shared/domain/mockData";
 import { fetchDashboard } from "./dashboard-api";
-import { relativeDashboardUpdateCopy } from "./dashboard-copy";
+import {
+  dashboardApprovedAssetCopy,
+  dashboardAttentionBuildCopy,
+  dashboardEvaluatedBuildCopy,
+  dashboardInterfaceCopy,
+  dashboardReadinessAriaCopy,
+  dashboardReadinessNoteCopy,
+  dashboardUsableCatalogueCopy,
+  dashboardVerifiedCatalogueCopy,
+  dashboardWorkCountCopy,
+  relativeDashboardUpdateCopy,
+  type DashboardBilingualCopy,
+} from "./dashboard-copy";
 import "./dashboard.css";
 
 function localDashboardFixture(): DashboardResponse {
@@ -113,6 +125,19 @@ function workIcon(item: DashboardWorkItem) {
 }
 
 const localFixture = localDashboardFixture();
+
+function DashboardBilingualText({ copy }: { copy: DashboardBilingualCopy }) {
+  return (
+    <span className="dashboard-bilingual-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
+
+function bilingualTitle(copy: DashboardBilingualCopy): string {
+  return `${copy.zhHant} / ${copy.english}`;
+}
 
 export function DashboardPage() {
   const { currentWorkspace } = useAuthenticatedSession();
@@ -205,10 +230,22 @@ export function DashboardPage() {
   }
 
   const metrics = data.metrics;
-  const evaluatedLabel =
-    metrics.evaluatedBuildCount === metrics.draftBuildCount
-      ? `${metrics.readyBuildCount} 個草稿通過匯出閘門`
-      : `最近 ${metrics.evaluatedBuildCount} 個草稿中有 ${metrics.readyBuildCount} 個通過`;
+  const evaluatedLabel = dashboardEvaluatedBuildCopy(metrics);
+  const verifiedCatalogueLabel = dashboardVerifiedCatalogueCopy(
+    metrics.verifiedCatalogueCount,
+  );
+  const approvedAssetLabel = dashboardApprovedAssetCopy(
+    metrics.approvedAssetCount,
+  );
+  const attentionBuildLabel = dashboardAttentionBuildCopy(
+    metrics.attentionBuildCount,
+  );
+  const recentWorkCountLabel = dashboardWorkCountCopy(data.recentWork.length);
+  const usableCatalogueLabel = dashboardUsableCatalogueCopy(
+    metrics.catalogueReadyCount,
+  );
+  const readinessNote = dashboardReadinessNoteCopy(metrics);
+  const readinessAria = dashboardReadinessAriaCopy(readiness);
   const recentWorkNeedsAttention = data.recentWork.some(
     (item) => item.tone === "danger" || item.tone === "warning",
   );
@@ -218,54 +255,85 @@ export function DashboardPage() {
       <header className="page-header">
         <div>
           <span className="eyebrow">
-            {isLocalPreview ? "合成示範資料" : currentWorkspace.name}
+            {isLocalPreview ? (
+              <DashboardBilingualText
+                copy={dashboardInterfaceCopy.syntheticDemoData}
+              />
+            ) : (
+              currentWorkspace.name
+            )}
           </span>
-          <h1>商戶儀表板</h1>
-          <p>集中查看產品目錄準備度、待審工作及進行中的電腦組裝。</p>
+          <h1>
+            <DashboardBilingualText copy={dashboardInterfaceCopy.heading} />
+          </h1>
+          <p>
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.introduction}
+            />
+          </p>
         </div>
         <div className="page-header__actions">
           <Link className="button button--secondary" to="/catalogue">
             <Plus aria-hidden="true" />
-            新增目錄產品
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.addCatalogueProduct}
+            />
           </Link>
           <Link className="button button--primary" to="/builder">
             <Wrench aria-hidden="true" />
-            開啟組裝工具
+            <DashboardBilingualText copy={dashboardInterfaceCopy.openBuilder} />
           </Link>
         </div>
       </header>
 
-      <section className="dashboard-metrics" aria-label="工作空間即時指標">
+      <section
+        className="dashboard-metrics"
+        aria-label={bilingualTitle(dashboardInterfaceCopy.workspaceMetrics)}
+      >
         <article>
           <Boxes aria-hidden="true" />
           <div>
-            <span>目錄組件</span>
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.catalogueComponents}
+            />
             <strong>{metrics.activeCatalogueCount}</strong>
-            <small>{metrics.verifiedCatalogueCount} 項規格已核實</small>
+            <small>
+              <DashboardBilingualText copy={verifiedCatalogueLabel} />
+            </small>
           </div>
         </article>
         <article>
           <Cuboid aria-hidden="true" />
           <div>
-            <span>等待素材審核</span>
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.pendingAssetReview}
+            />
             <strong>{metrics.pendingAssetCount}</strong>
-            <small>{metrics.approvedAssetCount} 項素材已核准</small>
+            <small>
+              <DashboardBilingualText copy={approvedAssetLabel} />
+            </small>
           </div>
         </article>
         <article>
           <CheckCircle2 aria-hidden="true" />
           <div>
-            <span>可安全匯出</span>
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.safeToExport}
+            />
             <strong>{metrics.readyBuildCount}</strong>
-            <small>{evaluatedLabel}</small>
+            <small>
+              <DashboardBilingualText copy={evaluatedLabel} />
+            </small>
           </div>
         </article>
         <article>
           <Clock3 aria-hidden="true" />
           <div>
-            <span>組裝草稿</span>
+            <DashboardBilingualText copy={dashboardInterfaceCopy.buildDrafts} />
             <strong>{metrics.draftBuildCount}</strong>
-            <small>{metrics.attentionBuildCount} 個最近草稿需要處理</small>
+            <small>
+              <DashboardBilingualText copy={attentionBuildLabel} />
+            </small>
           </div>
         </article>
       </section>
@@ -274,13 +342,21 @@ export function DashboardPage() {
         <section className="work-queue">
           <div className="dashboard-section-heading">
             <div>
-              <h2 className="section-title">最近工作</h2>
-              <p className="section-subtitle">此工作空間需要處理的項目。</p>
+              <h2 className="section-title">
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.recentWork}
+                />
+              </h2>
+              <p className="section-subtitle">
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.recentWorkSubtitle}
+                />
+              </p>
             </div>
             <StatusBadge
               tone={recentWorkNeedsAttention ? "warning" : "success"}
             >
-              {data.recentWork.length} 項
+              <DashboardBilingualText copy={recentWorkCountLabel} />
             </StatusBadge>
           </div>
           {data.recentWork.length > 0 ? (
@@ -342,15 +418,26 @@ export function DashboardPage() {
             />
           )}
           <Link className="text-link" to="/asset-review">
-            開啟 3D 素材審核工作室 <ArrowRight aria-hidden="true" />
+            <DashboardBilingualText
+              copy={dashboardInterfaceCopy.openAssetReview}
+            />
+            <ArrowRight aria-hidden="true" />
           </Link>
         </section>
 
         <aside className="pilot-readiness">
           <div className="dashboard-section-heading">
             <div>
-              <h2 className="section-title">資料準備度</h2>
-              <p className="section-subtitle">規格已核實並有核准素材的比例。</p>
+              <h2 className="section-title">
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.dataReadiness}
+                />
+              </h2>
+              <p className="section-subtitle">
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.readinessSubtitle}
+                />
+              </p>
             </div>
             <span className="readiness-score">{readiness}%</span>
           </div>
@@ -361,27 +448,41 @@ export function DashboardPage() {
                 "--readiness-angle": `${readiness * 3.6}deg`,
               } as CSSProperties
             }
-            aria-label={`目錄資料準備度百分之${readiness}`}
+            aria-label={bilingualTitle(readinessAria)}
           >
             <span>{metrics.catalogueReadyCount}</span>
-            <small>項可使用</small>
+            <small>
+              <DashboardBilingualText copy={usableCatalogueLabel} />
+            </small>
           </div>
           <dl className="readiness-list">
             <div>
-              <dt>規格已核實</dt>
+              <dt>
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.verifiedSpecifications}
+                />
+              </dt>
               <dd>
                 {metrics.verifiedCatalogueCount} /{" "}
                 {metrics.activeCatalogueCount}
               </dd>
             </div>
             <div>
-              <dt>素材已核准</dt>
+              <dt>
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.approvedAssets}
+                />
+              </dt>
               <dd>
                 {metrics.approvedAssetCount} / {metrics.activeCatalogueCount}
               </dd>
             </div>
             <div>
-              <dt>最近評估組裝</dt>
+              <dt>
+                <DashboardBilingualText
+                  copy={dashboardInterfaceCopy.evaluatedBuilds}
+                />
+              </dt>
               <dd>{metrics.evaluatedBuildCount}</dd>
             </div>
           </dl>
@@ -394,11 +495,7 @@ export function DashboardPage() {
               <FileWarning aria-hidden="true" />
             )}
             <span>
-              {metrics.activeCatalogueCount === 0
-                ? "先新增產品，再核實規格及完成素材審批。"
-                : readiness === 100
-                  ? "所有現行目錄項目均具備已核實規格及核准素材。"
-                  : `尚有 ${metrics.activeCatalogueCount - metrics.catalogueReadyCount} 項目錄記錄需要補齊。`}
+              <DashboardBilingualText copy={readinessNote} />
             </span>
           </div>
         </aside>
