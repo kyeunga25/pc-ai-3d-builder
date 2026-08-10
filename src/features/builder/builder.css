@@ -1788,10 +1788,12 @@
     right: 0;
     bottom: 0;
     width: min(420px, 92vw);
+    overflow: hidden;
     border-left: 1px solid var(--border-strong);
     background: var(--bg-1);
     box-shadow: -24px 0 55px rgba(0, 0, 0, 0.45);
     animation: inspector-enter 180ms ease-out;
+    overscroll-behavior: contain;
   }
 
   .inspector-drawer__top {
@@ -1803,6 +1805,27 @@
     padding: 0 16px;
     font-size: 16px;
     font-family: var(--font-display);
+  }
+
+  .inspector-drawer__top > strong {
+    min-width: 0;
+  }
+
+  .inspector-drawer__top > .icon-button {
+    flex: 0 0 auto;
+  }
+
+  .inspector-drawer-copy {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .inspector-drawer-copy > [lang="en"] {
+    color: var(--text-muted);
+    font-size: 0.78em;
   }
 
   .inspector-drawer .build-inspector {

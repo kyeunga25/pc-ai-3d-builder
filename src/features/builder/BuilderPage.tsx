@@ -1,5 +1,5 @@
-import { Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
@@ -31,6 +31,7 @@ import {
   mutateBuild,
 } from "./build-api";
 import { BuildInspector } from "./BuildInspector";
+import { BuilderInspectorDrawer } from "./BuilderInspectorDrawer";
 import { BuilderCommandBar } from "./BuilderCommandBar";
 import {
   BuilderViewport,
@@ -47,6 +48,10 @@ import {
   builderStatusCopy,
   type BuilderOperationStatus,
 } from "./builder-status";
+import {
+  bilingualInspectorDrawerTitle,
+  builderInspectorDrawerCopy,
+} from "./builder-inspector-drawer";
 import "./builder.css";
 
 type StepId = ComponentCategory | "summary";
@@ -178,6 +183,7 @@ export function BuilderPage() {
     isLocalPreview ? currentWorkspace.id : null,
   );
   const [reloadToken, setReloadToken] = useState(0);
+  const closeInspector = useCallback(() => setInspectorOpen(false), []);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -580,7 +586,12 @@ export function BuilderPage() {
           isLocalPreview={isLocalPreview}
           localApprovedAssetId={localApprovedAssetId}
         />
-        <aside className="desktop-inspector" aria-label="組裝檢查器">
+        <aside
+          className="desktop-inspector"
+          aria-label={bilingualInspectorDrawerTitle(
+            builderInspectorDrawerCopy.title,
+          )}
+        >
           <BuildInspector part={selectedPart} findings={visibleFindings} />
         </aside>
       </main>
@@ -597,28 +608,11 @@ export function BuilderPage() {
       />
 
       {inspectorOpen ? (
-        <div className="inspector-drawer-layer">
-          <button
-            className="inspector-drawer-backdrop"
-            type="button"
-            aria-label="關閉檢查器"
-            onClick={() => setInspectorOpen(false)}
-          />
-          <aside className="inspector-drawer" aria-label="組裝檢查器">
-            <div className="inspector-drawer__top">
-              <strong>組裝檢查器</strong>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="關閉檢查器"
-                onClick={() => setInspectorOpen(false)}
-              >
-                <X aria-hidden="true" />
-              </button>
-            </div>
-            <BuildInspector part={selectedPart} findings={visibleFindings} />
-          </aside>
-        </div>
+        <BuilderInspectorDrawer
+          part={selectedPart}
+          findings={visibleFindings}
+          onClose={closeInspector}
+        />
       ) : null}
     </div>
   );

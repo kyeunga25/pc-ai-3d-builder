@@ -15,7 +15,7 @@ The application shell uses a top command bar and merchant navigation. The builde
 
 The Builder command bar presents workspace and current-build context, editable build name, Dashboard navigation, build creation, two-step archive and inspector access in Traditional Chinese and English. Fixed labels wrap rather than clipping; viewer mode omits write controls. At compact widths the inspector text may be visually hidden, but the icon keeps its complete bilingual accessible name.
 
-At narrower widths, the inspector becomes an overlay and the component rail becomes a compact step bar. Primary actions must remain visible without horizontal scrolling.
+At narrower widths, the inspector becomes a labelled modal overlay and the component rail becomes a compact step bar. Opening the drawer moves focus to its close control, Tab and Shift+Tab stay within its controls, Escape or either close surface dismisses it, background scrolling pauses and focus returns to the opener. Primary actions must remain visible without horizontal scrolling.
 
 The Builder inspector shows its tabs, selected-component summary, structured specifications, rule findings and 3D asset state in Traditional Chinese and English. Pass, warning, error and unknown states use text and icons in addition to colour; an approved visual asset remains explicitly separate from compatibility evidence. Bilingual tab labels, stock counts, values and pill badges wrap inside the narrow overlay instead of clipping or creating page-level horizontal overflow.
 
