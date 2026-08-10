@@ -38,6 +38,16 @@ const selectedParts = catalogParts.filter((part) =>
   currentBuild.selectedPartIds.includes(part.id),
 );
 
+function buildTargetRequest(
+  targetBuildId = buildId,
+  path = "/api/build",
+  init: RequestInit = {},
+): Request {
+  const headers = new Headers(init.headers);
+  headers.set("x-rigstage-build-id", targetBuildId);
+  return new Request(`https://local.invalid${path}`, { ...init, headers });
+}
+
 function context(fixture: WorkspaceFixture): RequestContext {
   return {
     user: {
@@ -93,7 +103,7 @@ function updateRequest(
   name: string,
   selectedPartIds: string[],
 ): Request {
-  return new Request(`https://local.invalid/api/builds/${buildId}`, {
+  return buildTargetRequest(buildId, "/api/build", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -175,9 +185,9 @@ describe("persistent build runtime boundaries", () => {
 
   it("exports for the owning workspace and hides the build from another", async () => {
     const detail = await buildDetailResponse(
+      buildTargetRequest(),
       env.DB,
       context(protectedFixture),
-      buildId,
     );
     expect(detail.status).toBe(200);
     await expect(detail.json()).resolves.toMatchObject({
@@ -197,9 +207,9 @@ describe("persistent build runtime boundaries", () => {
     });
 
     const exported = await buildExportResponse(
+      buildTargetRequest(buildId, "/api/build/export"),
       env.DB,
       context(protectedFixture),
-      buildId,
     );
     const exportedText = await exported.text();
     const exportedBody = JSON.parse(exportedText) as {
@@ -231,17 +241,25 @@ describe("persistent build runtime boundaries", () => {
     expect(exportedText).not.toContain("assetId");
 
     const viewerExport = await buildExportResponse(
+      buildTargetRequest(buildId, "/api/build/export"),
       env.DB,
       context({ ...protectedFixture, role: "viewer" }),
-      buildId,
     );
     expect(viewerExport.status).toBe(200);
 
     await expect(
-      buildDetailResponse(env.DB, context(requesterFixture), buildId),
+      buildDetailResponse(
+        buildTargetRequest(),
+        env.DB,
+        context(requesterFixture),
+      ),
     ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
     await expect(
-      buildExportResponse(env.DB, context(requesterFixture), buildId),
+      buildExportResponse(
+        buildTargetRequest(buildId, "/api/build/export"),
+        env.DB,
+        context(requesterFixture),
+      ),
     ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
 
     expect(
@@ -265,7 +283,11 @@ describe("persistent build runtime boundaries", () => {
     const target = selectedParts.find((part) => part.category === "storage")!;
     const before = JSON.parse(
       await (
-        await buildExportResponse(env.DB, context(protectedFixture), buildId)
+        await buildExportResponse(
+          buildTargetRequest(buildId, "/api/build/export"),
+          env.DB,
+          context(protectedFixture),
+        )
       ).text(),
     ) as {
       build: {
@@ -284,7 +306,11 @@ describe("persistent build runtime boundaries", () => {
     try {
       const after = JSON.parse(
         await (
-          await buildExportResponse(env.DB, context(protectedFixture), buildId)
+          await buildExportResponse(
+            buildTargetRequest(buildId, "/api/build/export"),
+            env.DB,
+            context(protectedFixture),
+          )
         ).text(),
       ) as typeof before;
       const beforeTarget = before.build.components.find(
@@ -328,9 +354,9 @@ describe("persistent build runtime boundaries", () => {
       .run();
 
     const warningDetail = await buildDetailResponse(
+      buildTargetRequest(),
       env.DB,
       context(protectedFixture),
-      buildId,
     );
     await expect(warningDetail.json()).resolves.toMatchObject({
       summary: {
@@ -341,7 +367,11 @@ describe("persistent build runtime boundaries", () => {
       },
     });
     await expect(
-      buildExportResponse(env.DB, context(protectedFixture), buildId),
+      buildExportResponse(
+        buildTargetRequest(buildId, "/api/build/export"),
+        env.DB,
+        context(protectedFixture),
+      ),
     ).resolves.toMatchObject({ status: 200 });
 
     await env.DB.prepare(
@@ -353,9 +383,9 @@ describe("persistent build runtime boundaries", () => {
       .run();
 
     const errorDetail = await buildDetailResponse(
+      buildTargetRequest(),
       env.DB,
       context(protectedFixture),
-      buildId,
     );
     await expect(errorDetail.json()).resolves.toMatchObject({
       summary: {
@@ -366,7 +396,11 @@ describe("persistent build runtime boundaries", () => {
       },
     });
     await expect(
-      buildExportResponse(env.DB, context(protectedFixture), buildId),
+      buildExportResponse(
+        buildTargetRequest(buildId, "/api/build/export"),
+        env.DB,
+        context(protectedFixture),
+      ),
     ).rejects.toMatchObject({ status: 409, code: "BUILD_EXPORT_BLOCKED" });
 
     await env.DB.prepare(
@@ -378,9 +412,9 @@ describe("persistent build runtime boundaries", () => {
       .run();
 
     const unknownDetail = await buildDetailResponse(
+      buildTargetRequest(),
       env.DB,
       context(protectedFixture),
-      buildId,
     );
     await expect(unknownDetail.json()).resolves.toMatchObject({
       summary: {
@@ -391,7 +425,11 @@ describe("persistent build runtime boundaries", () => {
       },
     });
     await expect(
-      buildExportResponse(env.DB, context(protectedFixture), buildId),
+      buildExportResponse(
+        buildTargetRequest(buildId, "/api/build/export"),
+        env.DB,
+        context(protectedFixture),
+      ),
     ).rejects.toMatchObject({ status: 409, code: "BUILD_EXPORT_BLOCKED" });
   });
 
@@ -401,7 +439,6 @@ describe("persistent build runtime boundaries", () => {
       updateRequest(0, "已核實版本更新", selectedPartIds),
       env.DB,
       context(protectedFixture),
-      buildId,
       "request-build-runtime-update",
     );
     const updatedText = await updated.text();
@@ -422,7 +459,6 @@ describe("persistent build runtime boundaries", () => {
         updateRequest(0, "不可覆寫版本", []),
         env.DB,
         context(protectedFixture),
-        buildId,
         "request-build-runtime-stale",
       ),
     ).rejects.toMatchObject({
@@ -434,7 +470,6 @@ describe("persistent build runtime boundaries", () => {
         updateRequest(1, "外部工作空間更新", []),
         env.DB,
         context(requesterFixture),
-        buildId,
         "request-build-runtime-foreign",
       ),
     ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
@@ -581,19 +616,16 @@ describe("persistent build runtime boundaries", () => {
          ) VALUES (?1, ?2, 'cpu', ?3)`,
       ).bind(protectedFixture.workspaceId, raceBuildId, originalPartId),
     ]);
-    const request = new Request(
-      `https://local.invalid/api/builds/${raceBuildId}`,
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          expectedVersion: 0,
-          name: "Invalid Race Replacement",
-          selectedPartIds: [replacementPartId],
-        }),
-      },
-    );
+    const request = buildTargetRequest(raceBuildId, "/api/build", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        expectedVersion: 0,
+        name: "Invalid Race Replacement",
+        selectedPartIds: [replacementPartId],
+      }),
+    });
     const racingDb = databaseWithBeforeBatch(async () => {
       await env.DB.prepare(
         `UPDATE catalog_parts SET status = 'archived'
@@ -608,7 +640,6 @@ describe("persistent build runtime boundaries", () => {
         request,
         racingDb,
         context(protectedFixture),
-        raceBuildId,
         requestId,
       ),
     ).rejects.toMatchObject({

@@ -23,19 +23,13 @@ const fixedRouteTemplates = new Map<string, string>([
   ["/api/dashboard", "/api/dashboard"],
   ["/api/catalogue", "/api/catalogue"],
   ["/api/catalogue/import", "/api/catalogue/import"],
+  ["/api/build", "/api/build"],
+  ["/api/build/export", "/api/build/export"],
   ["/api/builds", "/api/builds"],
   ["/api/assets/review-queue", "/api/assets/review-queue"],
 ]);
 
 const dynamicRouteTemplates = [
-  {
-    pattern: /^\/api\/builds\/[^/]+\/export$/u,
-    template: "/api/builds/:buildId/export",
-  },
-  {
-    pattern: /^\/api\/builds\/[^/]+$/u,
-    template: "/api/builds/:buildId",
-  },
   {
     pattern: /^\/api\/catalogue\/[^/]+\/assets\/source$/u,
     template: "/api/catalogue/:partId/assets/source",

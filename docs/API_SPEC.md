@@ -64,17 +64,17 @@ Returns at most 50 active draft summaries from the resolved workspace, ordered b
 
 Explicitly creates one workspace-scoped draft. Viewer roles cannot mutate. The bounded JSON body contains a name and at most nine unique active catalogue part IDs, with no more than one part per component category. The build, selections and minimal audit event are submitted in one D1 batch. A database trigger rechecks that every selected part remains active at insertion time; an archive race returns `BUILD_SELECTION_INVALID` and rolls back the complete batch.
 
-## `GET /api/builds/:buildId`
+## `GET /api/build`
 
-Returns one draft with its selected catalogue records, current total price, deterministic compatibility findings, summary counts and non-negative version. The response never exposes the server mutation token.
+Requires one bounded build ID in `X-RigStage-Build-Id` and returns the matching draft from the resolved workspace with its selected catalogue records, current total price, deterministic compatibility findings, summary counts and non-negative version. The fixed URL and request body never contain the private build ID, and the response never exposes the server mutation token. A missing or malformed header returns bilingual `BUILD_NOT_FOUND` before D1 work.
 
-## `PATCH /api/builds/:buildId`
+## `PATCH /api/build`
 
-Updates the name and complete selected-part set, or logically archives the draft. Viewer roles cannot mutate. Both actions require `expectedVersion`. Update statements use a new server-only mutation token to gate deletion, replacement selections and the minimal audit event in one D1 batch. A stale version cannot replace a newer selection, and a part archived after selection validation aborts the batch without removing the previous selection.
+Targets the draft through `X-RigStage-Build-Id` and updates its name and complete selected-part set, or logically archives it. Viewer roles cannot mutate. The role and bounded target header are checked before the JSON body or D1 is read. Both actions require `expectedVersion`. Update statements use a new server-only mutation token to gate deletion, replacement selections and the minimal audit event in one D1 batch. A stale version cannot replace a newer selection, and a part archived after selection validation aborts the batch without removing the previous selection.
 
-## `GET /api/builds/:buildId/export`
+## `GET /api/build/export`
 
-Returns a schema-2 portable JSON attachment only when every fixed compatibility rule has neither an `error` nor an `unknown` result. Warnings remain visible. It includes the build record version and each component's catalogue record version so two exports can identify a changed source revision even when the build selection version is unchanged. This is current-state revision evidence, not an immutable snapshot or digest. The response omits users, workspace and internal build IDs, price, stock, asset metadata, object keys, checksums and deployment data.
+Targets the draft through `X-RigStage-Build-Id` and returns a schema-2 portable JSON attachment only when every fixed compatibility rule has neither an `error` nor an `unknown` result. Warnings remain visible. It includes the build record version and each component's catalogue record version so two exports can identify a changed source revision even when the build selection version is unchanged. This is current-state revision evidence, not an immutable snapshot or digest. The response omits users, workspace and internal build IDs, price, stock, asset metadata, object keys, checksums and deployment data. Legacy dynamic build-ID API paths are not routed.
 
 ## `GET /api/assets/review-queue`
 

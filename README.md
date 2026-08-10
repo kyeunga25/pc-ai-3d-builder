@@ -28,7 +28,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 上載最多 25 MiB 的自包含 glTF 2.0 GLB，經授權 API 讀取後在審核室及 Builder 以 Three.js 人手預覽。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。回滾及取代只清理單一明確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交狀態。
 - 素材審核導向固定使用 `/asset-review`；指定素材只以 workspace 綁定的頁面記憶體交接，載入後即清除，不寫入 URL、history state 或持久儲存，畫面亦不顯示內部素材 ID。
-- 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。
+- 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；私人 build ID 只經固定 API 的受保護標頭傳送，不寫入 URL 或請求 body；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。

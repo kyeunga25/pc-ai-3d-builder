@@ -40,6 +40,18 @@ const buildRow = {
   updated_at: "2026-07-26T00:00:00Z",
 };
 
+function buildTargetRequest(
+  buildId: string | null = "build-fixture",
+  path = "/api/build",
+  init: RequestInit = {},
+): Request {
+  const headers = new Headers(init.headers);
+  if (buildId !== null) {
+    headers.set("x-rigstage-build-id", buildId);
+  }
+  return new Request(`https://app.example${path}`, { ...init, headers });
+}
+
 function catalogueRow(part: CatalogPart) {
   return {
     id: part.id,
@@ -97,9 +109,9 @@ describe("persistent build routes", () => {
     });
 
     const response = await buildDetailResponse(
+      buildTargetRequest(),
       db,
       context("viewer"),
-      "build-fixture",
     );
     const text = await response.text();
 
@@ -114,10 +126,30 @@ describe("persistent build routes", () => {
     const { calls, db } = createD1Stub({ firstResults: [null] });
 
     await expect(
-      buildDetailResponse(db, context("viewer"), "build-foreign"),
+      buildDetailResponse(
+        buildTargetRequest("build-foreign"),
+        db,
+        context("viewer"),
+      ),
     ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
     expect(calls[0]?.values).toEqual(["workspace-fixture", "build-foreign"]);
   });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed build target before database work: %s",
+    async (buildId) => {
+      const { calls, db } = createD1Stub();
+
+      await expect(
+        buildDetailResponse(buildTargetRequest(buildId), db, context("viewer")),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "BUILD_NOT_FOUND",
+        message: "找不到所要求的組裝。 / The requested build was not found.",
+      });
+      expect(calls).toHaveLength(0);
+    },
+  );
 
   it("rejects viewer creation before reading the request or database", async () => {
     const { calls, db } = createD1Stub();
@@ -179,28 +211,19 @@ describe("persistent build routes", () => {
       batchChanges: 0,
       firstResults: [{ ...buildRow, record_version: 2 }],
     });
-    const request = new Request(
-      "https://app.example/api/builds/build-fixture",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          expectedVersion: 0,
-          name: "較舊組裝",
-          selectedPartIds: [],
-        }),
-      },
-    );
+    const request = buildTargetRequest("build-fixture", "/api/build", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        expectedVersion: 0,
+        name: "較舊組裝",
+        selectedPartIds: [],
+      }),
+    });
 
     await expect(
-      buildMutationResponse(
-        request,
-        db,
-        context(),
-        "build-fixture",
-        "request-fixture",
-      ),
+      buildMutationResponse(request, db, context(), "request-fixture"),
     ).rejects.toMatchObject({ code: "BUILD_VERSION_CONFLICT" });
     expect(
       calls.some(
@@ -213,23 +236,19 @@ describe("persistent build routes", () => {
 
   it("logically archives a build and its audit event in one guarded batch", async () => {
     const { calls, db } = createD1Stub();
-    const request = new Request(
-      "https://app.example/api/builds/build-fixture",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "archive",
-          expectedVersion: 0,
-        }),
-      },
-    );
+    const request = buildTargetRequest("build-fixture", "/api/build", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "archive",
+        expectedVersion: 0,
+      }),
+    });
 
     const response = await buildMutationResponse(
       request,
       db,
       context("staff"),
-      "build-fixture",
       "request-fixture",
     );
 
@@ -260,9 +279,9 @@ describe("persistent build routes", () => {
     });
 
     const response = await buildExportResponse(
+      buildTargetRequest("build-fixture", "/api/build/export"),
       db,
       context("viewer"),
-      "build-fixture",
     );
     const text = await response.text();
 

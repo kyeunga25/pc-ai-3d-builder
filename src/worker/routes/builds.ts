@@ -15,6 +15,7 @@ import {
   type ComponentCategory,
 } from "../../shared/domain/schemas";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { buildTargetHeader } from "../../shared/lib/build-target";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 import { readBoundedJson } from "../lib/request-body";
@@ -48,7 +49,7 @@ function writeRoleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權修改組裝。",
+    "你目前的工作空間角色無權修改組裝。 / Your current workspace role cannot modify builds.",
   );
 }
 
@@ -59,14 +60,18 @@ function assertWriteRole(role: WorkspaceRole): void {
 }
 
 function buildNotFound(): ApiError {
-  return new ApiError(404, "BUILD_NOT_FOUND", "找不到所要求的組裝。");
+  return new ApiError(
+    404,
+    "BUILD_NOT_FOUND",
+    "找不到所要求的組裝。 / The requested build was not found.",
+  );
 }
 
 function buildVersionConflict(): ApiError {
   return new ApiError(
     409,
     "BUILD_VERSION_CONFLICT",
-    "組裝已由另一個操作更新，請重新載入後再試。",
+    "組裝已由另一個操作更新，請重新載入後再試。 / The build changed in another operation. Reload and try again.",
   );
 }
 
@@ -74,7 +79,7 @@ function buildSelectionInvalid(): ApiError {
   return new ApiError(
     409,
     "BUILD_SELECTION_INVALID",
-    "組裝選擇包含不存在、已封存或重複類別的產品。",
+    "組裝選擇包含不存在、已封存或重複類別的產品。 / The build selection contains a missing, archived or duplicate-category product.",
   );
 }
 
@@ -84,10 +89,12 @@ function isInactiveBuildSelectionError(error: unknown): boolean {
   );
 }
 
-function validateBuildId(buildId: string): void {
-  if (!buildRecordIdPattern.test(buildId)) {
+function buildIdFromRequest(request: Request): string {
+  const buildId = request.headers.get(buildTargetHeader);
+  if (!buildId || !buildRecordIdPattern.test(buildId)) {
     throw buildNotFound();
   }
+  return buildId;
 }
 
 async function findBuild(
@@ -259,11 +266,11 @@ export async function buildListResponse(
 }
 
 export async function buildDetailResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
-  buildId: string,
 ): Promise<Response> {
-  validateBuildId(buildId);
+  const buildId = buildIdFromRequest(request);
   return Response.json(
     await loadBuildRecord(db, context.currentWorkspace.id, buildId),
     { headers: { "cache-control": "no-store" } },
@@ -281,7 +288,11 @@ export async function buildCreateResponse(
     await readBoundedJson(request),
   );
   if (!parsed.success) {
-    throw new ApiError(400, "VALIDATION_ERROR", "組裝內容無效。");
+    throw new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "組裝內容無效。 / The build content is invalid.",
+    );
   }
   const selectedParts = await loadSelectedParts(
     db,
@@ -354,14 +365,17 @@ export async function buildMutationResponse(
   request: Request,
   db: D1Database,
   context: RequestContext,
-  buildId: string,
   requestId: string,
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
-  validateBuildId(buildId);
+  const buildId = buildIdFromRequest(request);
   const parsed = buildMutationSchema.safeParse(await readBoundedJson(request));
   if (!parsed.success) {
-    throw new ApiError(400, "VALIDATION_ERROR", "組裝內容無效。");
+    throw new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "組裝內容無效。 / The build content is invalid.",
+    );
   }
   const input = parsed.data;
   const mutationToken = crypto.randomUUID();
@@ -507,17 +521,17 @@ export async function buildMutationResponse(
 }
 
 export async function buildExportResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
-  buildId: string,
 ): Promise<Response> {
-  validateBuildId(buildId);
+  const buildId = buildIdFromRequest(request);
   const build = await loadBuildRecord(db, context.currentWorkspace.id, buildId);
   if (!isBuildExportReady(build)) {
     throw new ApiError(
       409,
       "BUILD_EXPORT_BLOCKED",
-      "解決嚴重錯誤及未知相容性結果後才可匯出組裝。",
+      "解決嚴重錯誤及未知相容性結果後才可匯出組裝。 / Resolve errors and unknown compatibility results before exporting the build.",
     );
   }
   return new Response(

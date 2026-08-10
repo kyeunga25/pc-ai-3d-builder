@@ -158,32 +158,22 @@ async function routeRequest(
       });
     }
 
-    const buildExportMatch = /^\/api\/builds\/([^/]+)\/export$/u.exec(
-      url.pathname,
-    );
-    if (buildExportMatch) {
+    if (url.pathname === "/api/build/export") {
       if (request.method !== "GET") {
         return new Response(null, {
           status: 405,
           headers: { allow: "GET", "cache-control": "no-store" },
         });
       }
-      return buildExportResponse(env.DB, context, buildExportMatch[1]!);
+      return buildExportResponse(request, env.DB, context);
     }
 
-    const buildDetailMatch = /^\/api\/builds\/([^/]+)$/u.exec(url.pathname);
-    if (buildDetailMatch) {
+    if (url.pathname === "/api/build") {
       if (request.method === "GET") {
-        return buildDetailResponse(env.DB, context, buildDetailMatch[1]!);
+        return buildDetailResponse(request, env.DB, context);
       }
       if (request.method === "PATCH") {
-        return buildMutationResponse(
-          request,
-          env.DB,
-          context,
-          buildDetailMatch[1]!,
-          requestId,
-        );
+        return buildMutationResponse(request, env.DB, context, requestId);
       }
       return new Response(null, {
         status: 405,

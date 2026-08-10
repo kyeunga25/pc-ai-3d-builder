@@ -8,8 +8,9 @@ afterEach(() => {
 
 describe("request log route templates", () => {
   it.each([
-    ["/api/builds/build_private_123/export", "/api/builds/:buildId/export"],
-    ["/api/builds/build_private_123", "/api/builds/:buildId"],
+    ["/api/build/export", "/api/build/export"],
+    ["/api/build", "/api/build"],
+    ["/api/builds/build_private_123", "/api/*"],
     [
       "/api/catalogue/part_private_123/assets/source",
       "/api/catalogue/:partId/assets/source",
@@ -77,7 +78,8 @@ describe("request log route templates", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     const request = new Request(
-      "https://rigstage.invalid/api/builds/build_private_123?email=owner%40example.test",
+      "https://rigstage.invalid/api/build?email=owner%40example.test",
+      { headers: { "x-rigstage-build-id": "build_private_123" } },
     );
 
     logRequestRecord("error", request, {
@@ -91,7 +93,7 @@ describe("request log route templates", () => {
 
     const serialized = String(consoleError.mock.calls[0]?.[0]);
     expect(JSON.parse(serialized)).toMatchObject({
-      path: "/api/builds/:buildId",
+      path: "/api/build",
     });
     expect(serialized).not.toContain("build_private_123");
     expect(serialized).not.toContain("owner@example.test");

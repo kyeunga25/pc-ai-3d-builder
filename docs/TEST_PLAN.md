@@ -38,7 +38,7 @@ Current unit tests cover:
 - asset-review viewer rejection before body/D1/R2 reads, complete-approval requirements and stale-version rejection;
 - atomic review and audit statement construction without identity data in metadata;
 - deterministic build compatibility pass, warning, error and unknown outcomes;
-- workspace-scoped build list, role checks, guarded optimistic mutations and portable export;
+- workspace-scoped build list, fixed-URL header-only build targets, malformed-target rejection before D1, generic logging of legacy dynamic paths, role checks, guarded optimistic mutations and portable export;
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links and schema rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft.

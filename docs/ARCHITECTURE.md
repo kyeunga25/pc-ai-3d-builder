@@ -60,7 +60,7 @@ Any source replacement, review-version change, missing rights confirmation, appr
 
 ## Builds, compatibility and export
 
-Build list reads are bounded to 50 records and never create data. Staff, admin and owner roles may explicitly create or update a draft with at most one active catalogue part from each of nine categories. Updates use an expected record version and a random server-side mutation token so stale D1 batch statements cannot replace a newer selection.
+Build list reads are bounded to 50 records and never create data. A selected private build ID is retained in component memory and sent only in `X-RigStage-Build-Id` to fixed detail, mutation and export endpoints; it is absent from browser/API URLs, request bodies and route logs. Missing or malformed targets fail before D1, while the resolved workspace remains the first lookup predicate. Staff, admin and owner roles may explicitly create or update a draft with at most one active catalogue part from each of nine categories. Updates use an expected record version and a random server-side mutation token so stale D1 batch statements cannot replace a newer selection.
 
 Compatibility is calculated at read time from current, verified structured specifications. Six fixed rules cover CPU socket, memory type, motherboard form factor, GPU clearance, cooler clearance and the recorded GPU power-supply recommendation. Missing selections, unverified specifications or absent required fields produce an `unknown` result rather than an inference.
 
