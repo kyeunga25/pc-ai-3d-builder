@@ -41,6 +41,18 @@ describe("Catalogue operation status copy", () => {
     );
   });
 
+  it("uses correct English singular catalogue and import counts", () => {
+    expect(catalogueCountStatus(1, true).message).toBe(
+      "1 件產品 / 1 product · 合成示範資料 / Synthetic demo data",
+    );
+    expect(catalogueCountStatus(1, false).message).toBe(
+      "1 件工作空間產品 / 1 workspace product",
+    );
+    expect(catalogueImportedStatus(1).message).toBe(
+      "已匯入 1 件產品 / Imported 1 product",
+    );
+  });
+
   it.each(["archive", "asset-draft", "import", "save"] as const)(
     "replaces a monolingual %s failure with a safe bilingual fallback",
     (operation) => {

@@ -9,6 +9,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Live workspace dashboard plus catalogue, asset review and builder routes.
 - Bounded, read-only dashboard aggregates with recent review and build work, including Traditional-Chinese-first bilingual page actions, metric/readiness summaries, schema-required work details, lifecycle labels and relative update times.
 - Bounded catalogue pagination and review-queue reads from the resolved workspace.
+- Traditional-Chinese-first bilingual Catalogue list for page guidance, actions, search, category and verification filters, table columns, all nine component categories, every stock/asset/quality state, correct English stock-count grammar and privacy-safe row actions. Viewer mutations stay disabled and compact copy wraps without exposing part or asset IDs.
 - Role-protected catalogue creation, optimistic updates and logical archive.
 - Validated CSV template download and transactional import of at most 50 catalogue records.
 - Traditional-Chinese-first bilingual Catalogue status and recovery copy for product writes, two-step archive, private asset-draft creation and CSV import, including semantic info/success/warning/error announcements and reload guidance after an ambiguous write result.

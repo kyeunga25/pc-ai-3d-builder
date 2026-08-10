@@ -101,10 +101,11 @@ export function catalogueCountStatus(
   count: number,
   isLocalPreview: boolean,
 ): CatalogueOperationStatus {
+  const product = `product${count === 1 ? "" : "s"}`;
   return status(
     isLocalPreview
-      ? `${count} 件產品 / ${count} products · 合成示範資料 / Synthetic demo data`
-      : `${count} 件工作空間產品 / ${count} workspace products`,
+      ? `${count} 件產品 / ${count} ${product} · 合成示範資料 / Synthetic demo data`
+      : `${count} 件工作空間產品 / ${count} workspace ${product}`,
     "info",
   );
 }
@@ -125,7 +126,7 @@ export function catalogueImportedStatus(
   count: number,
 ): CatalogueOperationStatus {
   return status(
-    `已匯入 ${count} 件產品 / Imported ${count} products`,
+    `已匯入 ${count} 件產品 / Imported ${count} product${count === 1 ? "" : "s"}`,
     "success",
   );
 }

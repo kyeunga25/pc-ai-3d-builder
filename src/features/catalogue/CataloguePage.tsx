@@ -46,6 +46,19 @@ import {
 } from "./catalogue-api";
 import { CatalogueEditorDialog } from "./CatalogueEditorDialog";
 import {
+  bilingualCataloguePageTitle,
+  catalogueAssetQualityCopy,
+  catalogueAssetStatusPresentation,
+  catalogueCategoryCopy,
+  catalogueLoadMoreCopy,
+  cataloguePageCopy,
+  catalogueStockCountCopy,
+  catalogueStockStatusPresentation,
+  catalogueVerifiedFilterCopy,
+  catalogueViewProductTitle,
+  type CataloguePageCopy,
+} from "./catalogue-page-copy";
+import {
   catalogueArchivedStatus,
   catalogueCountStatus,
   catalogueCreatedStatus,
@@ -56,46 +69,15 @@ import {
   type CatalogueOperationStatus,
 } from "./catalogue-status";
 import { CatalogueStatusView } from "./CatalogueStatusView";
-import { categoryLabels } from "./catalogue-options";
 import "./catalogue.css";
 
-function stockLabel(status: CatalogPart["stockStatus"]) {
-  switch (status) {
-    case "in_stock":
-      return { label: "有現貨", tone: "success" as const };
-    case "low_stock":
-      return { label: "少量現貨", tone: "warning" as const };
-    case "out_of_stock":
-      return { label: "暫時缺貨", tone: "danger" as const };
-    case "unknown":
-      return { label: "未確認", tone: "neutral" as const };
-  }
-}
-
-function assetLabel(status: CatalogPart["assetStatus"]) {
-  switch (status) {
-    case "approved":
-      return { label: "已核准", tone: "success" as const };
-    case "needs_review":
-      return { label: "待審核", tone: "warning" as const };
-    case "draft":
-      return { label: "草稿", tone: "info" as const };
-    case "proxy":
-      return { label: "替代模型", tone: "neutral" as const };
-  }
-}
-
-function assetQualityLabel(quality: CatalogPart["assetQuality"]) {
-  switch (quality) {
-    case "unreviewed":
-      return "尚未評級";
-    case "draft":
-      return "草稿品質";
-    case "reviewed":
-      return "已審核品質";
-    case "approved":
-      return "已核准品質";
-  }
+function CatalogueCopy({ copy }: { copy: CataloguePageCopy }) {
+  return (
+    <span className="catalogue-page-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
 }
 
 export function CataloguePage() {
@@ -449,9 +431,15 @@ export function CataloguePage() {
     <div className="page catalogue-page">
       <header className="page-header">
         <div>
-          <span className="eyebrow">工作空間資料 · 人手核實狀態</span>
-          <h1>產品目錄</h1>
-          <p>在組件加入組裝方案前，先檢查庫存、規格及經人工核准的 3D 素材。</p>
+          <span className="eyebrow">
+            <CatalogueCopy copy={cataloguePageCopy.pageEyebrow} />
+          </span>
+          <h1>
+            <CatalogueCopy copy={cataloguePageCopy.pageTitle} />
+          </h1>
+          <p>
+            <CatalogueCopy copy={cataloguePageCopy.pageSummary} />
+          </p>
         </div>
         <div className="page-header__actions">
           <input
@@ -465,42 +453,49 @@ export function CataloguePage() {
           <button
             className="button button--secondary"
             type="button"
+            aria-label={bilingualCataloguePageTitle(cataloguePageCopy.template)}
             onClick={downloadCsvTemplate}
           >
             <FileDown aria-hidden="true" />
-            CSV 範本 <span lang="en">Template</span>
+            <CatalogueCopy copy={cataloguePageCopy.template} />
           </button>
           <button
             className="button button--secondary"
             type="button"
+            aria-label={bilingualCataloguePageTitle(
+              importing
+                ? cataloguePageCopy.importing
+                : cataloguePageCopy.importCsv,
+            )}
             disabled={!canWrite || importing}
-            title={
+            title={bilingualCataloguePageTitle(
               canWrite
-                ? "匯入最多 50 項產品 / Import up to 50 products"
-                : "目前角色只可查看產品目錄 / The current role can only view the catalogue"
-            }
+                ? cataloguePageCopy.importTitle
+                : cataloguePageCopy.viewerOnlyTitle,
+            )}
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload aria-hidden="true" />
-            {importing ? (
-              <>
-                正在匯入… <span lang="en">Importing…</span>
-              </>
-            ) : (
-              <>
-                匯入 CSV <span lang="en">Import CSV</span>
-              </>
-            )}
+            <CatalogueCopy
+              copy={
+                importing
+                  ? cataloguePageCopy.importing
+                  : cataloguePageCopy.importCsv
+              }
+            />
           </button>
           <button
             className="button button--primary"
             type="button"
+            aria-label={bilingualCataloguePageTitle(
+              cataloguePageCopy.addProduct,
+            )}
             disabled={!canWrite}
-            title={
+            title={bilingualCataloguePageTitle(
               canWrite
-                ? "新增工作空間產品 / Add a workspace product"
-                : "目前角色只可查看產品目錄 / The current role can only view the catalogue"
-            }
+                ? cataloguePageCopy.addProductTitle
+                : cataloguePageCopy.viewerOnlyTitle,
+            )}
             onClick={() =>
               setEditorState({
                 workspaceId: currentWorkspace.id,
@@ -509,32 +504,41 @@ export function CataloguePage() {
             }
           >
             <Plus aria-hidden="true" />
-            新增產品 <span lang="en">Add product</span>
+            <CatalogueCopy copy={cataloguePageCopy.addProduct} />
           </button>
         </div>
       </header>
 
       {visibleLoadState === "loading" ? (
         <LoadingState
-          label="正在載入工作空間產品目錄"
-          labelEnglish="Loading workspace catalogue"
+          label={cataloguePageCopy.loadingLabel.zhHant}
+          labelEnglish={cataloguePageCopy.loadingLabel.english}
         />
       ) : visibleLoadState === "error" ? (
         <ErrorState
-          title="無法載入工作空間產品目錄"
-          titleEnglish="Unable to load the workspace catalogue"
+          title={cataloguePageCopy.errorTitle.zhHant}
+          titleEnglish={cataloguePageCopy.errorTitle.english}
           onRetry={retryCatalogue}
         />
       ) : (
         <>
-          <section className="catalogue-toolbar" aria-label="產品目錄篩選器">
+          <section
+            className="catalogue-toolbar"
+            aria-label={bilingualCataloguePageTitle(
+              cataloguePageCopy.toolbarLabel,
+            )}
+          >
             <label className="search-control">
               <Search aria-hidden="true" />
-              <span className="sr-only">搜尋產品目錄</span>
+              <span className="sr-only">
+                {bilingualCataloguePageTitle(cataloguePageCopy.searchLabel)}
+              </span>
               <input
                 ref={searchInputRef}
                 type="search"
-                placeholder="搜尋 SKU、品牌或型號"
+                placeholder={bilingualCataloguePageTitle(
+                  cataloguePageCopy.searchPlaceholder,
+                )}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -542,17 +546,23 @@ export function CataloguePage() {
             </label>
             <label className="select-control">
               <ListFilter aria-hidden="true" />
-              <span className="sr-only">組件分類</span>
+              <span className="sr-only">
+                {bilingualCataloguePageTitle(
+                  cataloguePageCopy.categoryFilterLabel,
+                )}
+              </span>
               <select
                 value={category}
                 onChange={(event) =>
                   setCategory(event.target.value as ComponentCategory | "all")
                 }
               >
-                <option value="all">所有分類</option>
-                {Object.entries(categoryLabels).map(([value, label]) => (
+                <option value="all">
+                  {bilingualCataloguePageTitle(cataloguePageCopy.allCategories)}
+                </option>
+                {Object.entries(catalogueCategoryCopy).map(([value, copy]) => (
                   <option key={value} value={value}>
-                    {label}
+                    {bilingualCataloguePageTitle(copy)}
                   </option>
                 ))}
               </select>
@@ -562,10 +572,13 @@ export function CataloguePage() {
               className="button catalogue-filter-button"
               type="button"
               aria-pressed={verifiedOnly}
+              aria-label={bilingualCataloguePageTitle(
+                catalogueVerifiedFilterCopy(verifiedOnly),
+              )}
               onClick={() => setVerifiedOnly((current) => !current)}
             >
               <Filter aria-hidden="true" />
-              {verifiedOnly ? "顯示全部規格" : "只顯示已核實"}
+              <CatalogueCopy copy={catalogueVerifiedFilterCopy(verifiedOnly)} />
             </button>
             <CatalogueStatusView
               className="catalogue-toolbar__notice"
@@ -576,37 +589,46 @@ export function CataloguePage() {
           {filteredParts.length === 0 ? (
             <EmptyState
               title={
-                parts.length === 0 ? "產品目錄仍是空白" : "找不到相符的目錄組件"
+                parts.length === 0
+                  ? cataloguePageCopy.emptyCatalogueTitle.zhHant
+                  : cataloguePageCopy.noMatchesTitle.zhHant
               }
               titleEnglish={
                 parts.length === 0
-                  ? "The catalogue is empty"
-                  : "No matching catalogue parts"
+                  ? cataloguePageCopy.emptyCatalogueTitle.english
+                  : cataloguePageCopy.noMatchesTitle.english
               }
               message={
                 parts.length === 0
-                  ? "使用「新增產品」或 CSV 匯入，建立這個工作空間的第一項產品。"
-                  : "請嘗試其他 SKU、品牌或組件分類。"
+                  ? cataloguePageCopy.emptyCatalogueMessage.zhHant
+                  : cataloguePageCopy.noMatchesMessage.zhHant
               }
               messageEnglish={
                 parts.length === 0
-                  ? "Use Add product or CSV import to create the first product in this workspace."
-                  : "Try another SKU, brand, or component category."
+                  ? cataloguePageCopy.emptyCatalogueMessage.english
+                  : cataloguePageCopy.noMatchesMessage.english
               }
             />
           ) : (
-            <section className="catalogue-table" aria-label="產品目錄結果">
+            <section
+              className="catalogue-table"
+              aria-label={bilingualCataloguePageTitle(
+                cataloguePageCopy.resultsLabel,
+              )}
+            >
               <div className="catalogue-table__head">
-                <span>產品</span>
-                <span>分類</span>
-                <span>庫存</span>
-                <span>3D 素材</span>
-                <span>售價</span>
-                <span aria-hidden="true" />
+                <CatalogueCopy copy={cataloguePageCopy.productColumn} />
+                <CatalogueCopy copy={cataloguePageCopy.categoryColumn} />
+                <CatalogueCopy copy={cataloguePageCopy.stockColumn} />
+                <CatalogueCopy copy={cataloguePageCopy.assetColumn} />
+                <CatalogueCopy copy={cataloguePageCopy.priceColumn} />
+                <CatalogueCopy copy={cataloguePageCopy.actionsColumn} />
               </div>
               {filteredParts.map((part) => {
-                const stock = stockLabel(part.stockStatus);
-                const asset = assetLabel(part.assetStatus);
+                const stock =
+                  catalogueStockStatusPresentation[part.stockStatus];
+                const asset =
+                  catalogueAssetStatusPresentation[part.assetStatus];
 
                 return (
                   <article className="catalogue-row" key={part.id}>
@@ -620,19 +642,29 @@ export function CataloguePage() {
                       <span className="mono">{part.sku}</span>
                     </div>
                     <span className="catalogue-row__category">
-                      {categoryLabels[part.category]}
+                      <CatalogueCopy
+                        copy={catalogueCategoryCopy[part.category]}
+                      />
                     </span>
                     <div className="catalogue-row__stock">
-                      <StatusBadge tone={stock.tone}>{stock.label}</StatusBadge>
+                      <StatusBadge tone={stock.tone}>
+                        <CatalogueCopy copy={stock.copy} />
+                      </StatusBadge>
                       <small>
-                        {part.stockCount === null
-                          ? "數量尚未核實"
-                          : `${part.stockCount} 件`}
+                        <CatalogueCopy
+                          copy={catalogueStockCountCopy(part.stockCount)}
+                        />
                       </small>
                     </div>
                     <div className="catalogue-row__asset">
-                      <StatusBadge tone={asset.tone}>{asset.label}</StatusBadge>
-                      <small>{assetQualityLabel(part.assetQuality)}</small>
+                      <StatusBadge tone={asset.tone}>
+                        <CatalogueCopy copy={asset.copy} />
+                      </StatusBadge>
+                      <small>
+                        <CatalogueCopy
+                          copy={catalogueAssetQualityCopy[part.assetQuality]}
+                        />
+                      </small>
                     </div>
                     <strong className="catalogue-row__price">
                       {formatHkd(part.priceMinor)}
@@ -640,7 +672,10 @@ export function CataloguePage() {
                     <button
                       className="catalogue-row__action"
                       type="button"
-                      aria-label={`查看 ${part.manufacturer} ${part.model}`}
+                      aria-label={catalogueViewProductTitle(
+                        part.manufacturer,
+                        part.model,
+                      )}
                       onClick={() =>
                         setEditorState({
                           workspaceId: currentWorkspace.id,
@@ -648,7 +683,7 @@ export function CataloguePage() {
                         })
                       }
                     >
-                      查看
+                      <CatalogueCopy copy={cataloguePageCopy.view} />
                     </button>
                   </article>
                 );
@@ -661,7 +696,7 @@ export function CataloguePage() {
                     disabled={loadingMore}
                     onClick={() => void loadMore()}
                   >
-                    {loadingMore ? "正在載入…" : "載入更多產品"}
+                    <CatalogueCopy copy={catalogueLoadMoreCopy(loadingMore)} />
                   </button>
                 </div>
               ) : null}

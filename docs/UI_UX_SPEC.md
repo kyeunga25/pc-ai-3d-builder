@@ -13,6 +13,8 @@
 
 The application shell uses a top command bar and merchant navigation. The builder keeps its central viewport as the primary area, with component selection, inspection and build status surrounding it.
 
+The Catalogue list shows page guidance, actions, search, category and verification filters, columns, category, stock, asset state, quality, quantity and row actions in Traditional Chinese and English. Unknown stock is not presented as available; status uses text and icons in addition to colour. Viewer write actions stay disabled. At compact widths, page actions and live status wrap, filters can move to separate rows and the simplified product row retains a bilingual accessible View action without page-level horizontal overflow.
+
 The Builder command bar presents workspace and current-build context, editable build name, Dashboard navigation, build creation, two-step archive and inspector access in Traditional Chinese and English. Fixed labels wrap rather than clipping; viewer mode omits write controls. At compact widths the inspector text may be visually hidden, but the icon keeps its complete bilingual accessible name.
 
 At narrower widths, the inspector becomes a labelled modal overlay and the component rail becomes a compact step bar. Opening the drawer moves focus to its close control, Tab and Shift+Tab stay within its controls, Escape or either close surface dismisses it, background scrolling pauses and focus returns to the opener. Primary actions must remain visible without horizontal scrolling.

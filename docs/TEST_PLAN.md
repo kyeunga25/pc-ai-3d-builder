@@ -29,6 +29,7 @@ Current unit tests cover:
 - construction-time rejection of single-language public API errors, bilingual 404/405/429/500 serialization and safe client fallback when an upstream message is absent;
 - exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;
 - bounded, workspace-scoped catalogue pagination and filters, including transient header-only cursor transport, rejection of URL or malformed cursors and unchanged workspace-first D1 binding;
+- exhaustive bilingual Catalogue-list coverage for page guidance, actions, search/category/verification filters, table columns, nine categories, four stock states, four asset states, four quality states, stock singular/plural/unknown counts, privacy-safe product actions, viewer-disabled writes, private-ID absence and phone-width wrapping;
 - catalogue writer fixed-URL header targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, role checks, SKU conflicts, optimistic versions and logical archive;
 - enumerated bilingual Catalogue read/write/archive/asset-draft/import states, safe replacement of monolingual technical errors, ambiguous-write reload guidance, semantic status/alert tones and bilingual mutation controls;
 - catalogue archive rejection while a linked generation credit remains reserved, followed by safe recovery after human rejection;
