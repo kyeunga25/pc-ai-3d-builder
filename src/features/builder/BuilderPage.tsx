@@ -32,7 +32,11 @@ import {
 } from "./build-api";
 import { BuildInspector } from "./BuildInspector";
 import { BuilderCommandBar } from "./BuilderCommandBar";
-import { BuilderViewport, type BuilderDisplayMode } from "./BuilderViewport";
+import {
+  BuilderViewport,
+  type BuilderCameraPreset,
+  type BuilderDisplayMode,
+} from "./BuilderViewport";
 import { BuildStatusBar } from "./BuildStatusBar";
 import { ComponentRail } from "./ComponentRail";
 import {
@@ -139,7 +143,7 @@ export function BuilderPage() {
   const [selectedCategory, setSelectedCategory] = useState<StepId>(
     localApprovedAssetId ? "cooling" : "gpu",
   );
-  const [camera, setCamera] = useState("等角");
+  const [camera, setCamera] = useState<BuilderCameraPreset>("等角");
   const [displayMode, setDisplayMode] = useState<BuilderDisplayMode>("著色");
   const [saveState, setSaveState] = useState<BuilderOperationStatus>(
     isLocalPreview

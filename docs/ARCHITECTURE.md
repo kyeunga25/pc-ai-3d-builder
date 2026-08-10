@@ -69,7 +69,7 @@ Compatibility is calculated at read time from current, verified structured speci
 
 Portable export is a read-only response and is blocked while any rule is `error` or `unknown`. Schema 2 records the build version and every selected component's current catalogue record version alongside product identity, verified specifications and bilingual rule evidence. This makes later catalogue revisions visible without representing the export as an immutable snapshot or digest. It omits build and workspace IDs, users, pricing, stock, asset metadata, R2 locations and deployment configuration.
 
-The builder may preview the currently selected component only when its asset is approved. It retrieves the model through the same protected private-file route used by review, creates a page-local object URL and revokes it when the selection changes. The GLB remains visual evidence only and never changes a compatibility result.
+The builder may preview the currently selected component only when its asset is approved. It retrieves the model through the same protected private-file route used by review, creates a page-local object URL and revokes it when the selection changes. A typed viewport copy contract exhaustively maps four camera presets, three display modes, ten component steps and four stock states. It distinguishes authorized private loading, local approved synthetic preparation, private-load failure, local private-file fallback and missing-approved-model fallback without exposing a workspace or asset identifier. The GLB remains visual evidence only and never changes a compatibility result; the bilingual viewport footer states that boundary explicitly.
 
 ## Privacy and observability
 

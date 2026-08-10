@@ -17,6 +17,8 @@ At narrower widths, the inspector becomes an overlay and the component rail beco
 
 The Builder inspector shows its tabs, selected-component summary, structured specifications, rule findings and 3D asset state in Traditional Chinese and English. Pass, warning, error and unknown states use text and icons in addition to colour; an approved visual asset remains explicitly separate from compatibility evidence. Bilingual tab labels, stock counts, values and pill badges wrap inside the narrow overlay instead of clipping or creating page-level horizontal overflow.
 
+The Builder viewport shows camera presets, display modes, fit-view control, scene readouts, selected component, stock state and model provenance in Traditional Chinese and English. Authorized private loading, local synthetic preparation, load failure and static fallback remain visibly distinct. The footer uses content-driven height and wrapping for preview provenance, the visual-evidence limitation and scene units; compact widths may hide secondary controls but retain bilingual accessible names.
+
 ## States
 
 Every data-dependent screen must represent loading, empty and error states. Synthetic demo values must be visibly distinguishable from verified merchant data.

@@ -18,19 +18,42 @@ import {
 
 import { fetchAssetFileBlob } from "../asset-review/asset-review-api";
 import { assetModelContentType } from "../../shared/domain/asset-files";
-import { componentSteps } from "../../shared/domain/mockData";
-import type {
-  CatalogPart,
-  ComponentCategory,
-} from "../../shared/domain/schemas";
+import type { CatalogPart } from "../../shared/domain/schemas";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { formatHkd } from "../../shared/i18n/locale";
 import { createAbortBoundObjectUrl } from "../../shared/lib/private-object-url";
+import {
+  bilingualViewportTitle,
+  builderCameraPresets,
+  builderViewportCameraCopy,
+  builderViewportCameraReadoutCopy,
+  builderViewportCopy,
+  builderViewportDisplayModeCopy,
+  builderViewportDisplayReadoutCopy,
+  builderViewportEditingCopy,
+  builderViewportFooterPreviewCopy,
+  builderViewportModelCaptionCopy,
+  builderViewportPlaceholderCopy,
+  builderViewportStockCopy,
+  type BuilderCameraPreset,
+  type BuilderDisplayMode,
+  type BuilderStepId,
+  type BuilderViewportCopy,
+} from "./builder-viewport-copy";
 
-type StepId = ComponentCategory | "summary";
-export type BuilderDisplayMode = "著色" | "線框" | "靜態預覽";
+export type {
+  BuilderCameraPreset,
+  BuilderDisplayMode,
+} from "./builder-viewport-copy";
 
-const cameraPresets = ["等角", "正面", "左側", "頂部"];
+function ViewportCopy({ copy }: { copy: BuilderViewportCopy }) {
+  return (
+    <span className="builder-viewport-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
 const AssetModelPreview = lazy(async () => {
   const module = await import("../../shared/components/AssetModelPreview");
   return { default: module.AssetModelPreview };
@@ -47,9 +70,9 @@ export function BuilderViewport({
   isLocalPreview,
   localApprovedAssetId,
 }: {
-  selectedCategory: StepId;
-  camera: string;
-  setCamera: Dispatch<SetStateAction<string>>;
+  selectedCategory: BuilderStepId;
+  camera: BuilderCameraPreset;
+  setCamera: Dispatch<SetStateAction<BuilderCameraPreset>>;
   displayMode: BuilderDisplayMode;
   setDisplayMode: Dispatch<SetStateAction<BuilderDisplayMode>>;
   selectedPart: CatalogPart | null;
@@ -160,20 +183,31 @@ export function BuilderViewport({
       : displayMode === "靜態預覽"
         ? "static"
         : "shaded";
+  const placeholderCopy = builderViewportPlaceholderCopy({
+    hasApprovedAsset: selectedPart?.assetStatus === "approved",
+    isLocalPreview,
+    isLocalSyntheticModel,
+    modelState: modelState === "ready" ? "none" : modelState,
+  });
 
   return (
-    <section className="builder-viewport" aria-label="3D 組件預覽視窗">
+    <section
+      className="builder-viewport"
+      aria-label={bilingualViewportTitle(builderViewportCopy.viewportLabel)}
+    >
       <div className="builder-viewport__top">
         <div
           className="viewport-control-group"
           role="group"
-          aria-label="鏡頭預設角度"
+          aria-label={bilingualViewportTitle(
+            builderViewportCopy.cameraGroupLabel,
+          )}
         >
           <span className="viewport-control-group__label">
             <Camera aria-hidden="true" />
-            鏡頭
+            <ViewportCopy copy={builderViewportCopy.cameraLabel} />
           </span>
-          {cameraPresets.map((preset) => (
+          {builderCameraPresets.map((preset) => (
             <button
               className={camera === preset ? "is-active" : ""}
               key={preset}
@@ -182,13 +216,13 @@ export function BuilderViewport({
               disabled={!modelUrl}
               onClick={() => setCamera(preset)}
             >
-              {preset}
+              <ViewportCopy copy={builderViewportCameraCopy[preset]} />
             </button>
           ))}
         </div>
 
         <label className="viewport-display-control">
-          <span>顯示</span>
+          <ViewportCopy copy={builderViewportCopy.displayLabel} />
           <select
             value={displayMode}
             disabled={!modelUrl}
@@ -196,9 +230,15 @@ export function BuilderViewport({
               setDisplayMode(event.target.value as BuilderDisplayMode)
             }
           >
-            <option>著色</option>
-            <option>線框</option>
-            <option>靜態預覽</option>
+            {(
+              Object.keys(
+                builderViewportDisplayModeCopy,
+              ) as BuilderDisplayMode[]
+            ).map((mode) => (
+              <option key={mode} value={mode}>
+                {bilingualViewportTitle(builderViewportDisplayModeCopy[mode])}
+              </option>
+            ))}
           </select>
           <ChevronDown aria-hidden="true" />
         </label>
@@ -206,7 +246,7 @@ export function BuilderViewport({
         <button
           className="viewport-icon-button"
           type="button"
-          aria-label="調整至合適視野"
+          aria-label={bilingualViewportTitle(builderViewportCopy.fitView)}
           disabled={!modelUrl}
           onClick={() => {
             setCamera("等角");
@@ -226,7 +266,9 @@ export function BuilderViewport({
             <Suspense
               fallback={
                 <span className="builder-model-state">
-                  正在載入 3D 預覽元件…
+                  <ViewportCopy
+                    copy={builderViewportCopy.modelComponentLoading}
+                  />
                 </span>
               }
             >
@@ -238,9 +280,9 @@ export function BuilderViewport({
               />
             </Suspense>
             <figcaption>
-              {isLocalSyntheticModel
-                ? "已核准本機合成 GLB · 不含真實供應商輸出"
-                : "已核准私人 GLB · 只在目前瀏覽器工作階段解碼"}
+              <ViewportCopy
+                copy={builderViewportModelCaptionCopy(isLocalSyntheticModel)}
+              />
             </figcaption>
           </figure>
         ) : (
@@ -268,13 +310,7 @@ export function BuilderViewport({
               </div>
             </div>
             <figcaption>
-              {modelState === "loading"
-                ? "正在透過授權 API 載入私人 GLB…"
-                : modelState === "error"
-                  ? "無法讀取已核准 GLB；已保留靜態後備預覽。"
-                  : selectedPart?.assetStatus === "approved" && isLocalPreview
-                    ? "本地預覽不讀取私人 GLB；顯示合成幾何後備。"
-                    : "此組件未有可用的已核准 GLB；顯示靜態幾何後備。"}
+              <ViewportCopy copy={placeholderCopy} />
             </figcaption>
           </figure>
         )}
@@ -287,13 +323,11 @@ export function BuilderViewport({
 
         <div className="builder-stage__readout">
           <Move3D aria-hidden="true" />
-          <span>
-            鏡頭 <strong>{camera}</strong>
+          <ViewportCopy copy={builderViewportCameraReadoutCopy(camera)} />
+          <ViewportCopy copy={builderViewportDisplayReadoutCopy(displayMode)} />
+          <span className="mono">
+            <ViewportCopy copy={builderViewportCopy.gridReadout} />
           </span>
-          <span>
-            模式 <strong>{displayMode}</strong>
-          </span>
-          <span className="mono">網格 10 毫米</span>
         </div>
 
         <div className="tablet-selected-part">
@@ -301,11 +335,13 @@ export function BuilderViewport({
             <Box aria-hidden="true" />
           </div>
           <div>
-            <span>目前類別組件</span>
+            <ViewportCopy copy={builderViewportCopy.currentCategoryComponent} />
             <strong>
-              {selectedPart
-                ? `${selectedPart.manufacturer} ${selectedPart.model}`
-                : "尚未選擇"}
+              {selectedPart ? (
+                `${selectedPart.manufacturer} ${selectedPart.model}`
+              ) : (
+                <ViewportCopy copy={builderViewportCopy.noSelection} />
+              )}
             </strong>
           </div>
           <strong>
@@ -315,9 +351,9 @@ export function BuilderViewport({
             <>
               <span className="stock-inline">
                 <i aria-hidden="true" />
-                {selectedPart.stockStatus === "out_of_stock"
-                  ? "缺貨"
-                  : "可選目錄記錄"}
+                <ViewportCopy
+                  copy={builderViewportStockCopy[selectedPart.stockStatus]}
+                />
               </span>
               <span className="mono">{selectedPart.sku}</span>
             </>
@@ -326,24 +362,26 @@ export function BuilderViewport({
 
         <span className="selected-category-readout">
           <Rotate3D aria-hidden="true" />
-          正在編輯{" "}
-          <strong>
-            {componentSteps.find((step) => step.id === selectedCategory)
-              ?.label ?? "總覽"}
-          </strong>
+          <ViewportCopy copy={builderViewportEditingCopy(selectedCategory)} />
         </span>
       </div>
 
       <div className="builder-viewport__footer">
         <span>
           <Image aria-hidden="true" />
-          {modelUrl
-            ? isLocalSyntheticModel
-              ? "本機合成的已核准組件預覽"
-              : "受保護的已核准組件預覽"
-            : "提供靜態後備預覽"}
+          <ViewportCopy
+            copy={builderViewportFooterPreviewCopy(
+              modelUrl !== null,
+              isLocalSyntheticModel,
+            )}
+          />
         </span>
-        <span className="mono">場景 v1 · +Y 向上 · 單位：米</span>
+        <span>
+          <ViewportCopy copy={builderViewportCopy.evidenceBoundary} />
+        </span>
+        <span className="mono">
+          <ViewportCopy copy={builderViewportCopy.sceneDetails} />
+        </span>
       </div>
     </section>
   );
