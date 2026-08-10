@@ -135,6 +135,45 @@ describe("private asset file workspace isolation", () => {
     expect(allowed.status).toBe(200);
     expect(new Uint8Array(await allowed.arrayBuffer())).toEqual(sourceBytes);
 
+    await env.PRIVATE_ASSETS.put(sourceObjectKey, sourceBytes.slice(0, -1), {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+    });
+    await expect(
+      assetFileResponse(
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        assetId,
+        "source",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+
+    await env.PRIVATE_ASSETS.put(sourceObjectKey, sourceBytes, {
+      httpMetadata: { contentType: "image/jpeg", cacheControl: "no-store" },
+    });
+    await expect(
+      assetFileResponse(
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        assetId,
+        "source",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+
+    await env.PRIVATE_ASSETS.put(sourceObjectKey, sourceBytes, {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+    });
+    const recovered = await assetFileResponse(
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      assetId,
+      "source",
+    );
+    expect(recovered.status).toBe(200);
+    expect(new Uint8Array(await recovered.arrayBuffer())).toEqual(sourceBytes);
+
     await expect(
       assetFileResponse(
         env.DB,
@@ -189,6 +228,13 @@ describe("private asset file workspace isolation", () => {
         "SELECT COUNT(*) AS count FROM audit_events WHERE workspace_id = ?1",
       )
         .bind(requesterFixture.workspaceId)
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM audit_events WHERE workspace_id = ?1",
+      )
+        .bind(protectedFixture.workspaceId)
         .first(),
     ).toEqual({ count: 0 });
     expect(await env.PRIVATE_ASSETS.get(sourceObjectKey)).not.toBeNull();

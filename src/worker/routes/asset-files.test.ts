@@ -74,24 +74,42 @@ function assetRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createR2Stub(initial: Array<{ key: string; bytes: Uint8Array }> = []) {
-  const objects = new Map(initial.map(({ key, bytes }) => [key, bytes]));
+function createR2Stub(
+  initial: Array<{
+    key: string;
+    bytes: Uint8Array;
+    contentType?: string;
+  }> = [],
+) {
+  const objects = new Map(
+    initial.map(({ key, bytes, contentType }) => [key, { bytes, contentType }]),
+  );
   const puts: string[] = [];
   const deletes: string[] = [];
   const bucket = {
-    async put(key: string, value: Uint8Array) {
+    async put(key: string, value: Uint8Array, options?: R2PutOptions) {
       puts.push(key);
-      objects.set(key, value);
+      const metadata = options?.httpMetadata;
+      objects.set(key, {
+        bytes: value,
+        contentType:
+          metadata instanceof Headers
+            ? (metadata.get("content-type") ?? undefined)
+            : metadata?.contentType,
+      });
       return { key };
     },
     async get(key: string) {
-      const bytes = objects.get(key);
-      if (!bytes) {
+      const object = objects.get(key);
+      if (!object) {
         return null;
       }
       return {
-        body: new Response(bytes.buffer as ArrayBuffer).body,
-        size: bytes.byteLength,
+        body: new Response(object.bytes.buffer as ArrayBuffer).body,
+        size: object.bytes.byteLength,
+        httpMetadata: object.contentType
+          ? { contentType: object.contentType }
+          : undefined,
       };
     },
     async delete(key: string) {
@@ -353,7 +371,11 @@ describe("private asset routes", () => {
       firstResults: [assetRow()],
     });
     const { bucket } = createR2Stub([
-      { key: "private/source-fixture", bytes: source },
+      {
+        key: "private/source-fixture",
+        bytes: source,
+        contentType: "image/png",
+      },
     ]);
 
     const response = await assetFileResponse(
@@ -375,5 +397,63 @@ describe("private asset routes", () => {
     );
     expect((await response.arrayBuffer()).byteLength).toBe(8);
     expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
+  });
+
+  it.each([
+    {
+      label: "source size",
+      kind: "source",
+      row: assetRow(),
+      stored: {
+        key: "private/source-fixture",
+        bytes: new Uint8Array(7),
+        contentType: "image/png",
+      },
+    },
+    {
+      label: "model content type",
+      kind: "model",
+      row: assetRow({
+        model_object_key: "private/model-fixture",
+        model_content_type: "model/gltf-binary",
+        model_size_bytes: 8,
+        model_sha256: "b".repeat(64),
+      }),
+      stored: {
+        key: "private/model-fixture",
+        bytes: new Uint8Array(8),
+        contentType: "application/octet-stream",
+      },
+    },
+  ])("rejects a private $label mismatch", async ({ kind, row, stored }) => {
+    const { calls, db } = createD1Stub({ firstResults: [row] });
+    const { bucket } = createR2Stub([stored]);
+
+    await expect(
+      assetFileResponse(db, bucket, context("viewer"), "asset-fixture", kind),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("keeps an R2 read failure as an operational error", async () => {
+    const storageError = new Error("synthetic R2 read failure");
+    const { db } = createD1Stub({ firstResults: [assetRow()] });
+    const bucket = {
+      async get() {
+        throw storageError;
+      },
+    } as unknown as R2Bucket;
+
+    await expect(
+      assetFileResponse(
+        db,
+        bucket,
+        context("viewer"),
+        "asset-fixture",
+        "source",
+      ),
+    ).rejects.toBe(storageError);
   });
 });

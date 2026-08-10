@@ -96,7 +96,7 @@ A successful replacement increments the review version and resets the checklist,
 
 ## `GET /api/assets/:assetId/files/:kind`
 
-Streams a private `source` or `model` file only after Access verification and active workspace membership resolution. The response is `private, no-store` with a generic filename. Permanent object URLs and keys are never returned.
+Streams a private `source` or `model` file only after Access verification and active workspace membership resolution. Before streaming, the R2 object's byte size and content type must still match the validated D1 metadata. A missing or mismatched object returns bilingual `ASSET_FILE_NOT_FOUND` without streaming bytes or writing state; an R2 operational failure remains an internal failure and can be retried. A successful response is `private, no-store` with a generic filename. Permanent object URLs and keys are never returned.
 
 ## `PATCH /api/assets/:assetId/review`
 

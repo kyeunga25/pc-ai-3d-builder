@@ -55,7 +55,11 @@ function assetNotFound(): ApiError {
 }
 
 function assetFileNotFound(): ApiError {
-  return new ApiError(404, "ASSET_FILE_NOT_FOUND", "找不到所要求的素材檔案。");
+  return new ApiError(
+    404,
+    "ASSET_FILE_NOT_FOUND",
+    "找不到可安全讀取的素材檔案，請重新上載後再試。 / No safely readable asset file was found. Upload it again and retry.",
+  );
 }
 
 function assetVersionConflict(): ApiError {
@@ -454,12 +458,20 @@ export async function assetFileResponse(
     kind === "source" ? asset.source_object_key : asset.model_object_key;
   const contentType =
     kind === "source" ? asset.source_content_type : asset.model_content_type;
-  if (!objectKey || !contentType) {
+  const sizeBytes =
+    kind === "source" ? asset.source_size_bytes : asset.model_size_bytes;
+  if (!objectKey || !contentType || sizeBytes === null) {
     throw assetFileNotFound();
   }
 
   const object = await bucket.get(objectKey);
   if (!object || !("body" in object)) {
+    throw assetFileNotFound();
+  }
+  if (
+    object.size !== sizeBytes ||
+    object.httpMetadata?.contentType !== contentType
+  ) {
     throw assetFileNotFound();
   }
 
