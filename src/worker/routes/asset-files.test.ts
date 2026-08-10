@@ -264,6 +264,87 @@ describe("private asset routes", () => {
     ).toBe(false);
   });
 
+  it("locks an approved asset before reading or storing its replacement", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [assetRow({ status: "approved", quality: "approved" })],
+    });
+    const { bucket, deletes, puts } = createR2Stub();
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/files/source",
+      {
+        method: "PUT",
+        headers: {
+          "content-length": String(assetFileLimits.source + 1),
+          "content-type": "image/png",
+          "x-rigstage-expected-version": "0",
+        },
+        body: new Uint8Array([0x89]).buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context(),
+        "asset-fixture",
+        "source",
+        "request-approved",
+      ),
+    ).rejects.toMatchObject({ status: 409, code: "ASSET_LOCKED" });
+    expect(puts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("removes only the new object when an optimistic update loses a race", async () => {
+    const source = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    const current = assetRow({ source_object_key: "private/old-source" });
+    const { db } = createD1Stub({
+      batchChanges: 0,
+      firstResults: [current, current],
+    });
+    const { bucket, deletes, objects, puts } = createR2Stub([
+      { key: "private/old-source", bytes: source },
+    ]);
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/files/source",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-expected-version": "0",
+        },
+        body: source.buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context("admin"),
+        "asset-fixture",
+        "source",
+        "request-race",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_VERSION_CONFLICT",
+    });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).not.toBe("private/old-source");
+    expect(deletes).toEqual([puts[0]]);
+    expect(objects.has("private/old-source")).toBe(true);
+    expect(objects.has(puts[0]!)).toBe(false);
+  });
+
   it("streams a private file only after a workspace-scoped asset lookup", async () => {
     const source = new Uint8Array([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
