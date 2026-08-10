@@ -39,4 +39,13 @@ describe("withPublicSecurityHeaders", () => {
     );
     await expect(response.text()).resolves.toBe("ok");
   });
+
+  it("prevents asset-first login state URLs from being cached", async () => {
+    const staticHeaders = await readFile(
+      new URL("../../../public/_headers", import.meta.url),
+      "utf8",
+    );
+
+    expect(staticHeaders).toMatch(/\/login\n\s+Cache-Control: no-store/u);
+  });
 });
