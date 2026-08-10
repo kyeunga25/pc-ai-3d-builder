@@ -250,6 +250,12 @@ describe("private asset routes", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("content-disposition")).toBe(
+      'inline; filename="source.png"',
+    );
+    expect(JSON.stringify([...response.headers])).not.toContain(
+      "private/source-fixture",
+    );
     expect((await response.arrayBuffer()).byteLength).toBe(8);
     expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
   });

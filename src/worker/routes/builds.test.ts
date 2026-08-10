@@ -270,6 +270,10 @@ describe("persistent build routes", () => {
     expect(response.headers.get("content-disposition")).toBe(
       'attachment; filename="rigstage-build.json"',
     );
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("content-type")).toBe(
+      "application/json; charset=utf-8",
+    );
     expect(text).not.toContain("workspace-fixture");
     expect(text).not.toContain("priceMinor");
     expect(text).not.toContain("stockStatus");
