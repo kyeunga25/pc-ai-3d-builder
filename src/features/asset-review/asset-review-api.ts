@@ -36,6 +36,40 @@ export class AssetReviewApiError extends Error {
   }
 }
 
+type GenerationRequestLeaseInput = {
+  assetId: string;
+  expectedVersion: number;
+  workspaceId: string;
+};
+
+export type GenerationRequestLease = GenerationRequestLeaseInput & {
+  idempotencyKey: string;
+};
+
+export function acquireGenerationRequestLease(
+  current: GenerationRequestLease | null,
+  input: GenerationRequestLeaseInput,
+  createKey: () => string = () => crypto.randomUUID(),
+): GenerationRequestLease {
+  if (
+    current?.workspaceId === input.workspaceId &&
+    current.assetId === input.assetId &&
+    current.expectedVersion === input.expectedVersion
+  ) {
+    return current;
+  }
+
+  return { ...input, idempotencyKey: createKey() };
+}
+
+export function shouldRetainGenerationRequestLease(error: unknown): boolean {
+  if (!(error instanceof AssetReviewApiError)) {
+    return true;
+  }
+
+  return error.status >= 500 && error.code !== "GENERATION_START_FAILED";
+}
+
 async function apiError(response: Response): Promise<AssetReviewApiError> {
   const parsed = apiErrorSchema.safeParse(
     await response.json().catch(() => null),
@@ -208,10 +242,11 @@ export async function startGenerationJob(
   workspaceId: string,
   assetId: string,
   input: GenerationJobStartInput,
+  idempotencyKey: string,
 ): Promise<GenerationJob> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  headers.set("idempotency-key", crypto.randomUUID());
+  headers.set("idempotency-key", idempotencyKey);
   const response = await apiFetch(
     `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
     {

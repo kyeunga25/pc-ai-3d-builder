@@ -54,12 +54,15 @@ import { reviewAsset } from "../../shared/domain/mockData";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import {
+  acquireGenerationRequestLease,
   AssetReviewApiError,
   fetchAssetFileBlob,
   fetchAssetReview,
   fetchAssetReviewQueue,
   fetchGenerationJobs,
+  shouldRetainGenerationRequestLease,
   startGenerationJob,
+  type GenerationRequestLease,
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
@@ -300,6 +303,7 @@ export function AssetReviewPage() {
     }));
   const [generationSubmitting, setGenerationSubmitting] = useState(false);
   const appliedGenerationJobRef = useRef<string | null>(null);
+  const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -1033,11 +1037,22 @@ export function AssetReviewPage() {
         }));
         setForm(createReviewForm(updated));
       } else {
+        const lease = acquireGenerationRequestLease(
+          generationRequestLeaseRef.current,
+          {
+            workspaceId: currentWorkspace.id,
+            assetId: currentForm.asset.id,
+            expectedVersion: currentForm.asset.version,
+          },
+        );
+        generationRequestLeaseRef.current = lease;
         const job = await startGenerationJob(
           currentWorkspace.id,
           currentForm.asset.id,
           { expectedVersion: currentForm.asset.version },
+          lease.idempotencyKey,
         );
+        generationRequestLeaseRef.current = null;
         setGenerationState((current) => ({
           ...current,
           items: [job, ...current.items.filter((item) => item.id !== job.id)],
@@ -1055,6 +1070,9 @@ export function AssetReviewPage() {
             ),
       );
     } catch (error) {
+      if (!isLocalPreview && !shouldRetainGenerationRequestLease(error)) {
+        generationRequestLeaseRef.current = null;
+      }
       setReviewNotice(
         bilingualCopy(
           error instanceof AssetReviewApiError

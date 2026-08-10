@@ -47,7 +47,7 @@ Current unit tests cover:
 - owner/admin generation role checks, saved source-rights requirement, current review version and matching R2 source size, content type and SHA-256 before reservation;
 - generation reservation, Workflow claim and draft staging fail closed when the catalogue part is archived at each D1 boundary;
 - workspace-scoped generation job listing without private object or Workflow data;
-- idempotent, zero-cost job creation with exactly one capability reservation before Workflow start, including rejection of cross-asset or cross-version key reuse;
+- idempotent, zero-cost job creation with exactly one capability reservation before Workflow start, including in-memory reuse after an ambiguous client result, key rotation for changed inputs, header-only transport and rejection of cross-asset or cross-version key reuse;
 - immutable provider-attempt disposition for duplicates, out-of-order results, conflicts and late completion;
 - exact-once capability settlement after approval and release after rejection, replacement, post-preflight source loss or terminal failure;
 - payment provider boundary remaining disconnected and disabled.
