@@ -32,7 +32,7 @@ Viewer roles remain read-only. Catalogue creation, update and logical archive us
 
 Original images, uploaded GLB models and future render outputs use a private object binding. The browser receives file bytes only after Access and workspace verification, then uses a short-lived blob URL for the current page. It does not receive object keys, checksums, provider keys or permanent public object URLs.
 
-Uploads are bounded to 10 MiB for JPEG, PNG or WebP source images and 25 MiB for self-contained glTF 2.0 GLB models. Replacing a file increments the review version and resets all checklist and dimension evidence.
+Uploads are bounded to 10 MiB for JPEG, PNG or WebP source images and 25 MiB for self-contained glTF 2.0 GLB models. Source images must match their MIME type, remain within the 32,768 px edge and 100 MP safety bounds, and pass format-specific container checks before storage; animated WebP is capped at 120 frames and 100 MP aggregate frame area. This rejects signatures without complete PNG chunks, JPEG marker/scan closure or WebP still/animation bitstream headers, but deliberately does not claim pixel-level decoding, provenance verification or content moderation. Replacing a file increments the review version and resets all checklist and dimension evidence.
 
 The builder may decode only the selected component's approved GLB. It uses the protected file route and a revocable browser object URL; model geometry remains non-authoritative.
 

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import type { WorkspaceRole } from "../src/shared/domain/session";
+import { createSyntheticSourcePng } from "../src/shared/domain/synthetic-image";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { createAssetSourceResponse } from "../src/worker/routes/asset-files";
 
@@ -27,9 +28,7 @@ const foreignFixture: WorkspaceFixture = {
 };
 
 const partId = "part-asset-create-race";
-const sourceBytes = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-]);
+const sourceBytes = createSyntheticSourcePng();
 
 function context(fixture: WorkspaceFixture): RequestContext {
   return {
@@ -191,7 +190,9 @@ describe("asset creation runtime constraints", () => {
     await expect(recovered.json()).resolves.toMatchObject({
       part: { id: partId },
       status: "draft",
-      files: { source: { contentType: "image/png", sizeBytes: 8 } },
+      files: {
+        source: { contentType: "image/png", sizeBytes: sourceBytes.byteLength },
+      },
     });
 
     await expect(

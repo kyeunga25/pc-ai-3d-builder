@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { GlbValidationError, validateGlbStructure } from "./glb-validation";
+import {
+  ImageStructureError,
+  validateImageStructure,
+} from "./image-validation";
 
 export const assetFileKindSchema = z.enum(["source", "model"]);
 export const assetSourceContentTypeSchema = z.enum([
@@ -30,34 +34,17 @@ export class AssetFileValidationError extends Error {
   }
 }
 
-function bytesEqual(
-  bytes: Uint8Array,
-  offset: number,
-  expected: readonly number[],
-): boolean {
-  return expected.every((value, index) => bytes[offset + index] === value);
-}
-
 function inferImageContentType(
   bytes: Uint8Array,
 ): AssetSourceContentType | null {
-  if (
-    bytes.length >= 8 &&
-    bytesEqual(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  ) {
-    return "image/png";
+  try {
+    return validateImageStructure(bytes);
+  } catch (error) {
+    if (error instanceof ImageStructureError) {
+      return null;
+    }
+    throw error;
   }
-  if (bytes.length >= 3 && bytesEqual(bytes, 0, [0xff, 0xd8, 0xff])) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 12 &&
-    bytesEqual(bytes, 0, [0x52, 0x49, 0x46, 0x46]) &&
-    bytesEqual(bytes, 8, [0x57, 0x45, 0x42, 0x50])
-  ) {
-    return "image/webp";
-  }
-  return null;
 }
 
 function validateGlb(bytes: Uint8Array): void {
@@ -106,7 +93,7 @@ export function validateAssetFileBytes(
       declaredContentType.toLowerCase() !== inferredContentType
     ) {
       throw new AssetFileValidationError(
-        "來源圖片的格式或檔頭無效；只接受 JPEG、PNG 或 WebP。",
+        "來源圖片容器無效、已截斷或超出安全尺寸；只接受完整 JPEG、PNG 或 WebP。 / The source image container is invalid, truncated, or exceeds safe dimensions. Upload a complete JPEG, PNG, or WebP image.",
       );
     }
     return inferredContentType;

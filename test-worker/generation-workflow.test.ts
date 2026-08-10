@@ -6,6 +6,7 @@ import { assetReviewChecks } from "../src/shared/domain/assets";
 import type { AssetGenerationParams } from "../src/shared/domain/generation-jobs";
 import { validateGeneratedGlb } from "../src/shared/domain/glb-validation";
 import { createSyntheticDraftGlb } from "../src/shared/domain/synthetic-glb";
+import { createSyntheticSourcePng } from "../src/shared/domain/synthetic-image";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { generationOutputRequirements } from "../src/worker/generation/provider";
 import { sha256Hex } from "../src/worker/lib/digest";
@@ -20,8 +21,7 @@ const workspaceId = "workspace-local-generation";
 const userId = "user-local-generation";
 const partId = "part-local-generation";
 const assetId = "asset-local-generation";
-const sourceBytes = new Uint8Array(128);
-sourceBytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const sourceBytes = createSyntheticSourcePng();
 const sourceSha256 = await sha256Hex(sourceBytes);
 
 type GenerationFixture = {
@@ -178,7 +178,7 @@ async function seedGenerationFixture(
          source_sha256, created_by, updated_by
        ) VALUES (
          ?1, ?2, ?3, 'draft', 'draft', 'uploaded', ?4, 1, 2,
-         ?5, 'image/png', 128, ?6, ?7, ?7
+         ?5, 'image/png', ?6, ?7, ?8, ?8
        )`,
     ).bind(
       fixture.assetId,
@@ -186,6 +186,7 @@ async function seedGenerationFixture(
       fixture.partId,
       JSON.stringify(["source_rights"]),
       sourceObjectKey(fixture),
+      sourceBytes.byteLength,
       fixture.sourceSha256,
       fixture.userId,
     ),
@@ -513,7 +514,7 @@ describe("local generation Workflow", () => {
       message: expect.stringMatching(/來源.*source/iu),
     });
 
-    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(127), {
+    await env.PRIVATE_ASSETS.put(sourceKey, sourceBytes.slice(0, -1), {
       httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
     });
     await expect(

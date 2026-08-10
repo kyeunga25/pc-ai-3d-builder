@@ -52,6 +52,7 @@ import {
 } from "../../shared/domain/generation-jobs";
 import { reviewAsset } from "../../shared/domain/mockData";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
+import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import {
   AssetReviewApiError,
   fetchAssetFileBlob,
@@ -134,14 +135,6 @@ function BilingualActionLabel({ copy }: { copy: BilingualCopy }) {
       <small lang="en">{copy.english}</small>
     </span>
   );
-}
-
-const syntheticSourcePngBase64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-
-function createSyntheticSourcePng(): Uint8Array {
-  const raw = atob(syntheticSourcePngBase64);
-  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
 }
 
 function assetKey(asset: AssetReviewItem): string {

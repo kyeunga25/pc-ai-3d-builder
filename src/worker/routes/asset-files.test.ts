@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import type { RequestContext } from "../auth/workspace";
 import { sha256Hex } from "../lib/digest";
 import { createD1Stub } from "../test/d1-stub";
@@ -30,9 +31,7 @@ function context(role: WorkspaceRole = "owner"): RequestContext {
   };
 }
 
-const minimalSource = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-]);
+const minimalSource = createSyntheticSourcePng();
 const minimalSourceSha256 = await sha256Hex(minimalSource);
 const minimalSourceDigest = await crypto.subtle.digest(
   "SHA-256",
@@ -74,7 +73,7 @@ function assetRow(overrides: Record<string, unknown> = {}) {
     review_version: 0,
     source_object_key: "private/source-fixture",
     source_content_type: "image/png",
-    source_size_bytes: 8,
+    source_size_bytes: minimalSource.byteLength,
     source_sha256: minimalSourceSha256,
     model_object_key: null,
     model_content_type: null,
@@ -172,7 +171,10 @@ describe("private asset routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       id: "asset-fixture",
       files: {
-        source: { contentType: "image/png", sizeBytes: 8 },
+        source: {
+          contentType: "image/png",
+          sizeBytes: minimalSource.byteLength,
+        },
         model: null,
       },
     });
@@ -209,6 +211,41 @@ describe("private asset routes", () => {
     ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
     expect(calls).toHaveLength(0);
     expect(puts).toHaveLength(0);
+  });
+
+  it("rejects a signature-only source before private storage or mutation", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [{ id: "part-fixture" }, null],
+    });
+    const { bucket, puts } = createR2Stub();
+    const request = new Request(
+      "https://app.example/api/catalogue/part-fixture/assets/source",
+      {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+          .buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      createAssetSourceResponse(
+        request,
+        db,
+        bucket,
+        context("staff"),
+        "part-fixture",
+        "request-invalid-source",
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "VALIDATION_ERROR",
+      message: expect.stringMatching(/容器.*container/iu),
+    });
+    expect(puts).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
   });
 
   it("uploads a GLB with an optimistic version and removes the replaced object", async () => {
@@ -414,7 +451,9 @@ describe("private asset routes", () => {
     expect(JSON.stringify([...response.headers])).not.toContain(
       "private/source-fixture",
     );
-    expect((await response.arrayBuffer()).byteLength).toBe(8);
+    expect((await response.arrayBuffer()).byteLength).toBe(
+      minimalSource.byteLength,
+    );
     expect(materializedReads).toEqual([]);
     expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
   });

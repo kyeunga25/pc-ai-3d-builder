@@ -2,6 +2,10 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import type { WorkspaceRole } from "../src/shared/domain/session";
+import {
+  createAlternateSyntheticSourcePng,
+  createSyntheticSourcePng,
+} from "../src/shared/domain/synthetic-image";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { sha256Hex } from "../src/worker/lib/digest";
 import {
@@ -34,12 +38,9 @@ const requesterFixture: WorkspaceFixture = {
 };
 
 const assetId = "asset-file-isolation-protected";
-const sourceBytes = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
-]);
+const sourceBytes = createSyntheticSourcePng();
 const sourceDigest = await sha256Hex(sourceBytes);
-const replacementBytes = sourceBytes.slice();
-replacementBytes[replacementBytes.byteLength - 1] = 0x02;
+const replacementBytes = createAlternateSyntheticSourcePng();
 const replacementDigest = await sha256Hex(replacementBytes);
 const sourceObjectKey =
   "workspaces/workspace-file-isolation-protected/assets/asset-file-isolation-protected/source/fixture";
@@ -349,6 +350,7 @@ describe("private asset file workspace isolation", () => {
       "request-file-archive-recovery",
     );
     expect(recoveredUpload.status).toBe(200);
+    expect(replacementDigest).not.toBe(sourceDigest);
     await expect(recoveredUpload.json()).resolves.toMatchObject({
       id: assetId,
       version: 1,

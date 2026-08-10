@@ -29,7 +29,7 @@ Current unit tests cover:
 - catalogue writer role checks, SKU conflicts, optimistic versions and logical archive;
 - catalogue archive rejection while a linked generation credit remains reserved, followed by safe recovery after human rejection;
 - strict CSV parsing and transactional imports of at most 50 catalogue records;
-- image and GLB signature, MIME, size and length validation;
+- image MIME, size, bounded-dimension and container validation, including PNG ordering/CRC, JPEG frame/scan/EOI bounds, WebP RIFF length/zero padding/still or animation-frame bitstream headers, 120-frame and aggregate-pixel animation caps, and rejection before R2 or D1 writes; plus strict GLB size, length and self-contained structure validation;
 - workspace-scoped private R2 creation with upload checksum enforcement, replacement, rollback cleanup and reads that fail closed on missing or drifted size, content type or SHA-256;
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
