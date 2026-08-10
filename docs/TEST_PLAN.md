@@ -35,7 +35,7 @@ Current unit tests cover:
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
 - bounded JSON mutation bodies;
-- asset-review role checks, complete-approval requirements and stale-version rejection;
+- asset-review viewer rejection before body/D1/R2 reads, complete-approval requirements and stale-version rejection;
 - atomic review and audit statement construction without identity data in metadata;
 - deterministic build compatibility pass, warning, error and unknown outcomes;
 - workspace-scoped build list, role checks, guarded optimistic mutations and portable export;

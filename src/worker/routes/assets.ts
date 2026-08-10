@@ -53,8 +53,14 @@ function roleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權執行這項審核操作。",
+    "你目前的工作空間角色無權執行這項審核操作。 / Your current workspace role cannot perform this review action.",
   );
+}
+
+function assertReviewMutationRole(role: WorkspaceRole): void {
+  if (role === "viewer") {
+    throw roleError();
+  }
 }
 
 function assetModelRequired(): ApiError {
@@ -73,9 +79,7 @@ export function resolveReviewTransition(
   role: WorkspaceRole,
   input: AssetReviewMutation,
 ): ReviewTransition {
-  if (role === "viewer") {
-    throw roleError();
-  }
+  assertReviewMutationRole(role);
 
   if (
     (input.action === "approve" || input.action === "reject") &&
@@ -238,6 +242,7 @@ export async function assetReviewMutationResponse(
   assetId: string,
   requestId: string,
 ): Promise<Response> {
+  assertReviewMutationRole(context.currentWorkspace.role);
   if (!assetRecordIdPattern.test(assetId)) {
     throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
   }

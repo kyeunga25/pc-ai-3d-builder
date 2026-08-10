@@ -225,6 +225,44 @@ describe("asset review routes", () => {
     expect(prepared[0]?.values).toEqual(["workspace-fixture"]);
   });
 
+  it("rejects viewer review mutations before reading or private work", async () => {
+    const { batches, db, prepared } = fakeDatabase();
+    let privateReads = 0;
+    const privateAssetsSpy = {
+      async get() {
+        privateReads += 1;
+        return null;
+      },
+    } as unknown as R2Bucket;
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/review",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "{malformed",
+      },
+    );
+
+    await expect(
+      assetReviewMutationResponse(
+        request,
+        db,
+        privateAssetsSpy,
+        context("viewer"),
+        "asset-fixture",
+        "request-viewer-denied",
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "ROLE_FORBIDDEN",
+      message: expect.stringMatching(/你目前.+Your current workspace role/u),
+    });
+    expect(request.bodyUsed).toBe(false);
+    expect(prepared).toHaveLength(0);
+    expect(batches).toHaveLength(0);
+    expect(privateReads).toBe(0);
+  });
+
   it("updates the asset, review history and audit log in one workspace-bound batch", async () => {
     const { batches, db } = fakeDatabase();
     const request = new Request(
