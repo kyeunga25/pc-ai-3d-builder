@@ -85,6 +85,14 @@ function generationSourceRequired(): ApiError {
   );
 }
 
+function assetVersionConflict(): ApiError {
+  return new ApiError(
+    409,
+    "ASSET_VERSION_CONFLICT",
+    "素材或所屬產品已更新，請重新載入後再建立生成工作。 / The asset or catalogue part changed; reload before generating.",
+  );
+}
+
 function mapGenerationJob(row: GenerationJobRow): GenerationJob {
   return generationJobSchema.parse({
     id: row.id,
@@ -330,11 +338,7 @@ export async function generationJobStartResponse(
     throw new ApiError(409, "ASSET_LOCKED", "已核准素材不可建立生成工作。");
   }
   if (asset.review_version !== parsed.data.expectedVersion) {
-    throw new ApiError(
-      409,
-      "ASSET_VERSION_CONFLICT",
-      "素材已更新，請重新載入後再建立生成工作。",
-    );
+    throw assetVersionConflict();
   }
   if (
     !asset.source_object_key ||
@@ -446,6 +450,12 @@ export async function generationJobStartResponse(
       ),
     ]);
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("GENERATION_INPUT_STALE")
+    ) {
+      throw assetVersionConflict();
+    }
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       const duplicate = await findGenerationJob(
         env.DB,

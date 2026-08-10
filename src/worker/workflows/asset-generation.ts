@@ -53,6 +53,7 @@ type GenerationStateRow = {
   output_object_key: string | null;
   previous_model_object_key: string | null;
   asset_status: string;
+  catalogue_status: string;
   review_version: number;
   source_rights_confirmed: number;
   source_object_key: string | null;
@@ -65,6 +66,7 @@ type GenerationStateRow = {
 
 type ClaimedGeneration =
   | { disposition: "completed" }
+  | { disposition: "rejected"; failureCode: string }
   | {
       disposition: "runnable";
       inputSha256: string;
@@ -116,13 +118,16 @@ async function loadGenerationState(
               j.requested_review_version, j.input_sha256, j.max_cost_minor,
               j.max_provider_cost_units,
               j.output_object_key, j.previous_model_object_key,
-              a.status AS asset_status, a.review_version,
+              a.status AS asset_status, p.status AS catalogue_status,
+              a.review_version,
               a.source_rights_confirmed, a.source_object_key,
               a.source_content_type, a.source_size_bytes, a.source_sha256,
               a.model_object_key, e.status AS entitlement_status
        FROM generation_jobs AS j
        INNER JOIN product_assets AS a
          ON a.workspace_id = j.workspace_id AND a.id = j.asset_id
+       INNER JOIN catalog_parts AS p
+         ON p.workspace_id = a.workspace_id AND p.id = a.catalog_part_id
        LEFT JOIN generation_job_entitlements AS e
          ON e.workspace_id = j.workspace_id AND e.job_id = j.id
        WHERE j.workspace_id = ?1 AND j.id = ?2 AND j.asset_id = ?3
@@ -202,6 +207,16 @@ export async function claimGenerationJob(
   if (!current) {
     throw new GenerationWorkflowStateError("GENERATION_JOB_NOT_FOUND");
   }
+  if (
+    current.catalogue_status !== "active" &&
+    ["queued", "running", "validating"].includes(current.job_status)
+  ) {
+    await markGenerationFailed(db, params, "GENERATION_INPUT_STALE");
+    return {
+      disposition: "rejected",
+      failureCode: "GENERATION_INPUT_STALE",
+    };
+  }
   const disposition = generationClaimDisposition(
     {
       assetStatus: current.asset_status,
@@ -227,6 +242,7 @@ export async function claimGenerationJob(
       disposition.code === "GENERATION_ENTITLEMENT_MISSING"
     ) {
       await markGenerationFailed(db, params, disposition.code);
+      return { disposition: "rejected", failureCode: disposition.code };
     }
     throw new GenerationWorkflowStateError(disposition.code);
   }
@@ -237,7 +253,17 @@ export async function claimGenerationJob(
           `UPDATE generation_jobs
            SET status = 'running', updated_at = CURRENT_TIMESTAMP
            WHERE workspace_id = ?1 AND id = ?2 AND asset_id = ?3
-             AND status = 'queued'`,
+             AND status = 'queued'
+             AND EXISTS (
+               SELECT 1
+               FROM product_assets AS a
+               INNER JOIN catalog_parts AS p
+                 ON p.workspace_id = a.workspace_id
+                AND p.id = a.catalog_part_id
+               WHERE a.workspace_id = generation_jobs.workspace_id
+                 AND a.id = generation_jobs.asset_id
+                 AND p.status = 'active'
+             )`,
         )
         .bind(params.workspaceId, params.jobId, params.assetId),
       db
@@ -259,6 +285,17 @@ export async function claimGenerationJob(
     ]);
     if (updateResult?.meta.changes !== 1) {
       current = await loadGenerationState(db, params);
+      if (
+        current &&
+        current.catalogue_status !== "active" &&
+        ["queued", "running", "validating"].includes(current.job_status)
+      ) {
+        await markGenerationFailed(db, params, "GENERATION_INPUT_STALE");
+        return {
+          disposition: "rejected",
+          failureCode: "GENERATION_INPUT_STALE",
+        };
+      }
     } else {
       current = { ...current, job_status: "running" };
     }
@@ -358,6 +395,11 @@ export async function stageGeneratedDraft(
     await deletePrivateObjectQuietly(env.PRIVATE_ASSETS, draft.objectKey);
     throw new GenerationWorkflowStateError("GENERATION_RESULT_LATE");
   }
+  if (current.catalogue_status !== "active") {
+    await deletePrivateObjectQuietly(env.PRIVATE_ASSETS, draft.objectKey);
+    await markGenerationFailed(env.DB, params, "GENERATION_INPUT_STALE");
+    throw new GenerationWorkflowStateError("GENERATION_INPUT_STALE");
+  }
   const stageFailure = generationStageFailure(
     {
       assetStatus: current.asset_status,
@@ -400,7 +442,14 @@ export async function stageGeneratedDraft(
                rejected_at = NULL, updated_at = CURRENT_TIMESTAMP
            WHERE workspace_id = ?6 AND id = ?7 AND review_version = ?8
              AND source_sha256 = ?9 AND source_rights_confirmed = 1
-             AND status <> 'approved'`,
+             AND status <> 'approved'
+             AND EXISTS (
+               SELECT 1
+               FROM catalog_parts AS p
+               WHERE p.workspace_id = product_assets.workspace_id
+                 AND p.id = product_assets.catalog_part_id
+                 AND p.status = 'active'
+             )`,
       ).bind(
         draft.objectKey,
         draft.contentType,
@@ -552,6 +601,9 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
       );
       if (claim.disposition === "completed") {
         return { jobId: params.jobId, status: "awaiting_review" };
+      }
+      if (claim.disposition === "rejected") {
+        throw new GenerationWorkflowStateError(claim.failureCode);
       }
 
       const sourceReady = await step.do(

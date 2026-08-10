@@ -5,11 +5,16 @@ import { describe, expect, it } from "vitest";
 import { assetReviewChecks } from "../src/shared/domain/assets";
 import type { AssetGenerationParams } from "../src/shared/domain/generation-jobs";
 import { validateGeneratedGlb } from "../src/shared/domain/glb-validation";
+import { createSyntheticDraftGlb } from "../src/shared/domain/synthetic-glb";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { generationOutputRequirements } from "../src/worker/generation/provider";
+import { sha256Hex } from "../src/worker/lib/digest";
 import { assetReviewMutationResponse } from "../src/worker/routes/assets";
 import { generationJobStartResponse } from "../src/worker/routes/generation-jobs";
-import { markGenerationFailed } from "../src/worker/workflows/asset-generation";
+import {
+  markGenerationFailed,
+  stageGeneratedDraft,
+} from "../src/worker/workflows/asset-generation";
 
 const workspaceId = "workspace-local-generation";
 const userId = "user-local-generation";
@@ -110,6 +115,22 @@ function requestContextFor(fixture: GenerationFixture): RequestContext {
     },
     workspaces: [],
   };
+}
+
+function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
+  let pending = true;
+  return {
+    prepare(query: string) {
+      return env.DB.prepare(query);
+    },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      if (pending) {
+        pending = false;
+        await beforeBatch();
+      }
+      return env.DB.batch<T>(statements);
+    },
+  } as D1Database;
 }
 
 async function seedGenerationFixture(
@@ -572,6 +593,352 @@ describe("local generation Workflow", () => {
       reserved_units: 1,
       job_count: 1,
       audit_count: 1,
+    });
+  });
+
+  it("rolls back reservation when the catalogue part is archived before the batch", async () => {
+    const raceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-catalogue-reservation-race",
+      userId: "user-local-catalogue-reservation-race",
+      partId: "part-local-catalogue-reservation-race",
+      assetId: "asset-local-catalogue-reservation-race",
+      sourceSha256: "5".repeat(64),
+      slug: "local-catalogue-reservation-race",
+      idempotencyKey: "local-catalogue-reservation-race-request-001",
+    };
+    await seedGenerationFixture(raceFixture);
+    const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
+      [];
+    const createdIds = new Set<string>();
+    const workflow = {
+      async create(
+        options?: WorkflowInstanceCreateOptions<AssetGenerationParams>,
+      ) {
+        if (options) {
+          creates.push(options);
+          if (options.id) {
+            createdIds.add(options.id);
+          }
+        }
+        return { id: options?.id ?? "generated" } as WorkflowInstance;
+      },
+      async get(id: string) {
+        return {
+          id,
+          async status() {
+            return createdIds.has(id)
+              ? { status: "running" as const }
+              : { status: "unknown" as const };
+          },
+        } as WorkflowInstance;
+      },
+    } as Workflow<AssetGenerationParams>;
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(raceFixture.workspaceId, raceFixture.partId)
+        .run();
+    });
+    const routeEnv = {
+      ASSET_GENERATION: workflow,
+      DB: racingDb,
+      GENERATION_MODE: "simulation",
+      GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: env.PRIVATE_ASSETS,
+    };
+
+    await expect(
+      generationJobStartResponse(
+        generationRequest(raceFixture),
+        routeEnv,
+        requestContextFor(raceFixture),
+        raceFixture.assetId,
+        "request-local-catalogue-reservation-race",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_VERSION_CONFLICT",
+      message: expect.stringMatching(/更新.*reload/iu),
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT available_units, reserved_units,
+                (SELECT COUNT(*) FROM generation_jobs
+                 WHERE workspace_id = ?1) AS job_count,
+                (SELECT COUNT(*) FROM generation_credit_events
+                 WHERE workspace_id = ?1) AS credit_events,
+                (SELECT COUNT(*) FROM audit_events
+                 WHERE workspace_id = ?1 AND action = 'generation.request')
+                  AS audit_count
+         FROM generation_credit_accounts WHERE workspace_id = ?1`,
+      )
+        .bind(raceFixture.workspaceId)
+        .first(),
+    ).toEqual({
+      available_units: 2,
+      reserved_units: 0,
+      job_count: 0,
+      credit_events: 0,
+      audit_count: 0,
+    });
+    expect(creates).toHaveLength(0);
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'active'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(raceFixture.workspaceId, raceFixture.partId)
+      .run();
+    const recovered = await generationJobStartResponse(
+      generationRequest(raceFixture),
+      { ...routeEnv, DB: env.DB },
+      requestContextFor(raceFixture),
+      raceFixture.assetId,
+      "request-local-catalogue-reservation-recovered",
+    );
+    expect(recovered.status).toBe(202);
+    expect(creates).toHaveLength(1);
+    const replay = await generationJobStartResponse(
+      generationRequest(raceFixture),
+      { ...routeEnv, DB: env.DB },
+      requestContextFor(raceFixture),
+      raceFixture.assetId,
+      "request-local-catalogue-reservation-replay",
+    );
+    expect(replay.status).toBe(200);
+    expect(creates).toHaveLength(1);
+  });
+
+  it("releases once when the catalogue part is archived before Workflow claim", async () => {
+    const raceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-catalogue-claim-race",
+      userId: "user-local-catalogue-claim-race",
+      partId: "part-local-catalogue-claim-race",
+      assetId: "asset-local-catalogue-claim-race",
+      sourceSha256: "4".repeat(64),
+      slug: "local-catalogue-claim-race",
+      idempotencyKey: "local-catalogue-claim-race-request-001",
+    };
+    await seedGenerationFixture(raceFixture);
+    const introspector = await introspectWorkflow(env.ASSET_GENERATION);
+    try {
+      await introspector.modifyAll(async (modifier) => {
+        await modifier.disableRetryDelays();
+      });
+      const workflow = {
+        async create(
+          options?: WorkflowInstanceCreateOptions<AssetGenerationParams>,
+        ) {
+          await env.DB.prepare(
+            `UPDATE catalog_parts SET status = 'archived'
+             WHERE workspace_id = ?1 AND id = ?2`,
+          )
+            .bind(raceFixture.workspaceId, raceFixture.partId)
+            .run();
+          return env.ASSET_GENERATION.create(options);
+        },
+        get(id: string) {
+          return env.ASSET_GENERATION.get(id);
+        },
+      } as Workflow<AssetGenerationParams>;
+      const response = await generationJobStartResponse(
+        generationRequest(raceFixture),
+        {
+          ASSET_GENERATION: workflow,
+          DB: env.DB,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: env.PRIVATE_ASSETS,
+        },
+        requestContextFor(raceFixture),
+        raceFixture.assetId,
+        "request-local-catalogue-claim-race",
+      );
+      expect(response.status).toBe(202);
+      const created = (await response.json()) as { id: string };
+      const instances = await introspector.get();
+      expect(instances).toHaveLength(1);
+      await expect(
+        instances[0]!.waitForStatus("errored"),
+      ).resolves.not.toThrow();
+
+      expect(
+        await env.DB.prepare(
+          `SELECT j.status, j.failure_code, e.status AS entitlement_status,
+                  a.available_units, a.reserved_units, a.released_units,
+                  p.review_version, p.model_object_key,
+                  (SELECT COUNT(*) FROM generation_provider_attempts AS pa
+                   WHERE pa.workspace_id = j.workspace_id AND pa.job_id = j.id)
+                    AS provider_attempts,
+                  (SELECT COUNT(*) FROM generation_credit_events AS ce
+                   WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                     AND ce.event_type = 'release') AS release_events
+           FROM generation_jobs AS j
+           INNER JOIN generation_job_entitlements AS e
+             ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+           INNER JOIN generation_credit_accounts AS a
+             ON a.workspace_id = j.workspace_id
+           INNER JOIN product_assets AS p
+             ON p.workspace_id = j.workspace_id AND p.id = j.asset_id
+           WHERE j.workspace_id = ?1 AND j.id = ?2`,
+        )
+          .bind(raceFixture.workspaceId, created.id)
+          .first(),
+      ).toEqual({
+        status: "failed",
+        failure_code: "GENERATION_INPUT_STALE",
+        entitlement_status: "released",
+        available_units: 2,
+        reserved_units: 0,
+        released_units: 1,
+        review_version: 2,
+        model_object_key: null,
+        provider_attempts: 0,
+        release_events: 1,
+      });
+      const modelObjects = await env.PRIVATE_ASSETS.list({
+        prefix: `workspaces/${raceFixture.workspaceId}/assets/${raceFixture.assetId}/model/`,
+      });
+      expect(modelObjects.objects).toHaveLength(0);
+
+      const replay = await generationJobStartResponse(
+        generationRequest(raceFixture),
+        env,
+        requestContextFor(raceFixture),
+        raceFixture.assetId,
+        "request-local-catalogue-claim-race-replay",
+      );
+      expect(replay.status).toBe(200);
+      await expect(replay.json()).resolves.toMatchObject({
+        id: created.id,
+        status: "failed",
+        failureCode: "GENERATION_INPUT_STALE",
+        entitlementStatus: "released",
+      });
+      expect(await introspector.get()).toHaveLength(1);
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
+  it("cleans the draft and releases once when the catalogue part is archived before staging", async () => {
+    const raceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-catalogue-stage-race",
+      userId: "user-local-catalogue-stage-race",
+      partId: "part-local-catalogue-stage-race",
+      assetId: "asset-local-catalogue-stage-race",
+      sourceSha256: "3".repeat(64),
+      slug: "local-catalogue-stage-race",
+      idempotencyKey: "local-catalogue-stage-race-request-001",
+    };
+    await seedGenerationFixture(raceFixture);
+    const jobId = "generation-local-catalogue-stage-race";
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE generation_credit_accounts
+         SET available_units = 1, reserved_units = 1
+         WHERE workspace_id = ?1`,
+      ).bind(raceFixture.workspaceId),
+      env.DB.prepare(
+        `INSERT INTO generation_jobs (
+           id, workspace_id, asset_id, requested_by, status, execution_mode,
+           idempotency_key, workflow_instance_id, requested_review_version,
+           input_sha256, max_cost_minor, max_provider_cost_units
+         ) VALUES (?1, ?2, ?3, ?4, 'validating', 'simulation', ?5, ?1, 2, ?6, 0, 1)`,
+      ).bind(
+        jobId,
+        raceFixture.workspaceId,
+        raceFixture.assetId,
+        raceFixture.userId,
+        raceFixture.idempotencyKey,
+        raceFixture.sourceSha256,
+      ),
+      env.DB.prepare(
+        `INSERT INTO generation_job_entitlements (
+           workspace_id, job_id, units, status
+         ) VALUES (?1, ?2, 1, 'reserved')`,
+      ).bind(raceFixture.workspaceId, jobId),
+      env.DB.prepare(
+        `INSERT INTO generation_credit_events (
+           id, workspace_id, job_id, event_type, units, reason_code
+         ) VALUES (?1, ?2, ?3, 'reserve', 1, 'generation_requested')`,
+      ).bind(crypto.randomUUID(), raceFixture.workspaceId, jobId),
+    ]);
+    const bytes = createSyntheticDraftGlb();
+    const objectKey = `workspaces/${raceFixture.workspaceId}/assets/${raceFixture.assetId}/model/catalogue-stage-race`;
+    await env.PRIVATE_ASSETS.put(objectKey, bytes, {
+      httpMetadata: {
+        contentType: "model/gltf-binary",
+        cacheControl: "no-store",
+      },
+    });
+    const params: AssetGenerationParams = {
+      workspaceId: raceFixture.workspaceId,
+      assetId: raceFixture.assetId,
+      jobId,
+      requestedReviewVersion: 2,
+    };
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(raceFixture.workspaceId, raceFixture.partId)
+        .run();
+    });
+
+    await expect(
+      stageGeneratedDraft(
+        { DB: racingDb, PRIVATE_ASSETS: env.PRIVATE_ASSETS },
+        params,
+        {
+          attemptKey: "primary",
+          contentType: "model/gltf-binary",
+          durationMs: 0,
+          objectKey,
+          providerCostUnits: 1,
+          sha256: await sha256Hex(bytes),
+          sizeBytes: bytes.byteLength,
+          validation: validateGeneratedGlb(bytes, generationOutputRequirements),
+        },
+      ),
+    ).rejects.toMatchObject({ code: "GENERATION_INPUT_STALE" });
+    expect(await env.PRIVATE_ASSETS.head(objectKey)).toBeNull();
+    expect(
+      await env.DB.prepare(
+        `SELECT j.status, j.failure_code, j.output_object_key,
+                e.status AS entitlement_status,
+                a.available_units, a.reserved_units, a.released_units,
+                p.review_version, p.model_object_key,
+                p.source_rights_confirmed,
+                (SELECT COUNT(*) FROM generation_credit_events AS ce
+                 WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                   AND ce.event_type = 'release') AS release_events
+         FROM generation_jobs AS j
+         INNER JOIN generation_job_entitlements AS e
+           ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+         INNER JOIN generation_credit_accounts AS a
+           ON a.workspace_id = j.workspace_id
+         INNER JOIN product_assets AS p
+           ON p.workspace_id = j.workspace_id AND p.id = j.asset_id
+         WHERE j.workspace_id = ?1 AND j.id = ?2`,
+      )
+        .bind(raceFixture.workspaceId, jobId)
+        .first(),
+    ).toEqual({
+      status: "failed",
+      failure_code: "GENERATION_INPUT_STALE",
+      output_object_key: null,
+      entitlement_status: "released",
+      available_units: 2,
+      reserved_units: 0,
+      released_units: 1,
+      review_version: 2,
+      model_object_key: null,
+      source_rights_confirmed: 1,
+      release_events: 1,
     });
   });
 
