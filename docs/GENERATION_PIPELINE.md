@@ -62,6 +62,7 @@ Stable validation codes are stored; raw parser/provider errors are not returned 
 - Any unrecognized mode or non-zero monetary simulation cap resolves to `disabled`.
 - Production starts with the kill switch disabled in tracked configuration.
 - A missing/resolved entitlement, archived catalogue part, missing or drifted R2 source, source replacement, review-version change, loss of rights confirmation or asset approval invalidates an in-flight job. A catalogue archive before claim records `GENERATION_INPUT_STALE` without a provider attempt; an archive before staging removes the late draft. A source failure after reservation records `GENERATION_INPUT_MISSING`, creates no provider attempt and releases the credit once.
+- Compensation removes only one exact private R2 key, retries one transient delete failure and then stops without reversing committed D1 state; a persistent failure can leave an inactive private orphan and is not claimed as guaranteed deletion.
 - Dimension, triangle, texture, byte-range, self-containment, length or checksum failure rejects the output before approval.
 - Workflow and API responses expose no R2 key, checksum, provider reference, user identity or deployment coordinate.
 - Failure records use stable codes. Raw provider and platform errors are not returned or added to audit metadata.

@@ -6,6 +6,8 @@ import {
 } from "../../shared/domain/asset-files";
 import { sha256Hex } from "./digest";
 
+const PRIVATE_OBJECT_DELETE_ATTEMPTS = 2;
+
 type PrivateObjectExpectation = {
   contentType: string;
   digestBytes: Uint8Array;
@@ -191,16 +193,27 @@ export async function privateModelObjectMatches(
 }
 
 export async function deletePrivateObjectQuietly(
-  bucket: R2Bucket,
+  bucket: Pick<R2Bucket, "delete">,
   objectKey: string | null,
 ): Promise<void> {
   if (!objectKey) {
     return;
   }
-  try {
-    await bucket.delete(objectKey);
-  } catch {
-    // A stale private object is safer than failing a committed D1 transition.
+
+  for (
+    let attempt = 0;
+    attempt < PRIVATE_OBJECT_DELETE_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      await bucket.delete(objectKey);
+      return;
+    } catch {
+      if (attempt + 1 === PRIVATE_OBJECT_DELETE_ATTEMPTS) {
+        // A stale private object is safer than failing a committed D1 transition.
+        return;
+      }
+    }
   }
 }
 
