@@ -60,7 +60,7 @@ Returns at most 50 active draft summaries from the resolved workspace, ordered b
 
 ## `POST /api/builds`
 
-Explicitly creates one workspace-scoped draft. Viewer roles cannot mutate. The bounded JSON body contains a name and at most nine unique active catalogue part IDs, with no more than one part per component category. The build, selections and minimal audit event are submitted in one D1 batch.
+Explicitly creates one workspace-scoped draft. Viewer roles cannot mutate. The bounded JSON body contains a name and at most nine unique active catalogue part IDs, with no more than one part per component category. The build, selections and minimal audit event are submitted in one D1 batch. A database trigger rechecks that every selected part remains active at insertion time; an archive race returns `BUILD_SELECTION_INVALID` and rolls back the complete batch.
 
 ## `GET /api/builds/:buildId`
 
@@ -68,7 +68,7 @@ Returns one draft with its selected catalogue records, current total price, dete
 
 ## `PATCH /api/builds/:buildId`
 
-Updates the name and complete selected-part set, or logically archives the draft. Viewer roles cannot mutate. Both actions require `expectedVersion`. Update statements use a new server-only mutation token to gate deletion, replacement selections and the minimal audit event in one D1 batch. A stale version cannot replace a newer selection.
+Updates the name and complete selected-part set, or logically archives the draft. Viewer roles cannot mutate. Both actions require `expectedVersion`. Update statements use a new server-only mutation token to gate deletion, replacement selections and the minimal audit event in one D1 batch. A stale version cannot replace a newer selection, and a part archived after selection validation aborts the batch without removing the previous selection.
 
 ## `GET /api/builds/:buildId/export`
 

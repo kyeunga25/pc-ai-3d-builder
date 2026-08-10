@@ -70,6 +70,20 @@ function buildVersionConflict(): ApiError {
   );
 }
 
+function buildSelectionInvalid(): ApiError {
+  return new ApiError(
+    409,
+    "BUILD_SELECTION_INVALID",
+    "組裝選擇包含不存在、已封存或重複類別的產品。",
+  );
+}
+
+function isInactiveBuildSelectionError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.includes("BUILD_SELECTION_INACTIVE")
+  );
+}
+
 function validateBuildId(buildId: string): void {
   if (!buildRecordIdPattern.test(buildId)) {
     throw buildNotFound();
@@ -150,11 +164,7 @@ async function loadSelectedParts(
       return duplicate;
     })
   ) {
-    throw new ApiError(
-      409,
-      "BUILD_SELECTION_INVALID",
-      "組裝選擇包含不存在、已封存或重複類別的產品。",
-    );
+    throw buildSelectionInvalid();
   }
   return parts;
 }
@@ -322,7 +332,14 @@ export async function buildCreateResponse(
         mutationToken,
       ),
   ];
-  await db.batch(statements);
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (isInactiveBuildSelectionError(error)) {
+      throw buildSelectionInvalid();
+    }
+    throw error;
+  }
 
   return Response.json(
     await loadBuildRecord(db, context.currentWorkspace.id, buildId),
@@ -458,7 +475,15 @@ export async function buildMutationResponse(
       ),
   );
 
-  const [updateResult] = await db.batch(statements);
+  let updateResult: D1Result<unknown> | undefined;
+  try {
+    [updateResult] = await db.batch(statements);
+  } catch (error) {
+    if (isInactiveBuildSelectionError(error)) {
+      throw buildSelectionInvalid();
+    }
+    throw error;
+  }
   if (updateResult?.meta.changes !== 1) {
     const existing = await findBuild(db, context.currentWorkspace.id, buildId);
     if (!existing) {

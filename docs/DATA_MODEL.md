@@ -44,7 +44,7 @@ Stores workspace-scoped draft identity, logical status, optimistic record versio
 
 ## `build_items`
 
-Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. A referenced catalogue part keeps its category until every build reference is removed; other catalogue fields remain editable through optimistic version checks. Archived catalogue parts remain referentially intact for existing builds but cannot be newly selected.
+Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. A referenced catalogue part keeps its category until every build reference is removed; other catalogue fields remain editable through optimistic version checks. Archived catalogue parts remain referentially intact for existing builds, while an insertion trigger rejects new selections if a part becomes inactive after application validation.
 
 ## `generation_jobs`
 

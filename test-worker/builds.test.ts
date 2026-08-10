@@ -6,6 +6,7 @@ import type { CatalogPart } from "../src/shared/domain/schemas";
 import type { WorkspaceRole } from "../src/shared/domain/session";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import {
+  buildCreateResponse,
   buildDetailResponse,
   buildExportResponse,
   buildMutationResponse,
@@ -102,6 +103,22 @@ function updateRequest(
       selectedPartIds,
     }),
   });
+}
+
+function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
+  let pending = true;
+  return {
+    prepare(query: string) {
+      return env.DB.prepare(query);
+    },
+    async batch<T = unknown>(statements: D1PreparedStatement[]) {
+      if (pending) {
+        pending = false;
+        await beforeBatch();
+      }
+      return env.DB.batch<T>(statements);
+    },
+  } as D1Database;
 }
 
 async function seedWorkspace(fixture: WorkspaceFixture): Promise<void> {
@@ -370,6 +387,170 @@ describe("persistent build runtime boundaries", () => {
          WHERE workspace_id = ?1 AND request_id = ?2`,
       )
         .bind(requesterFixture.workspaceId, "request-build-runtime-foreign")
+        .first(),
+    ).toEqual({ count: 0 });
+  });
+
+  it("rolls back creation when a selected part is archived before the batch", async () => {
+    const racePartId = "part-build-create-archive-race";
+    const requestId = "request-build-create-archive-race";
+    const buildName = "建立競態保護組裝";
+    await env.DB.prepare(
+      `INSERT INTO catalog_parts (
+         id, workspace_id, sku, category, manufacturer, model,
+         specifications_json, specification_status, created_by, updated_by
+       ) VALUES (
+         ?1, ?2, 'BUILD-CREATE-RACE-001', 'storage', 'Fixture',
+         'Create Race Storage', '{}', 'verified', ?3, ?3
+       )`,
+    )
+      .bind(racePartId, protectedFixture.workspaceId, protectedFixture.userId)
+      .run();
+    const request = new Request("https://local.invalid/api/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: buildName, selectedPartIds: [racePartId] }),
+    });
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, racePartId)
+        .run();
+    });
+
+    await expect(
+      buildCreateResponse(
+        request,
+        racingDb,
+        context(protectedFixture),
+        requestId,
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "BUILD_SELECTION_INVALID",
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM builds
+         WHERE workspace_id = ?1 AND name = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, buildName)
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM audit_events
+         WHERE workspace_id = ?1 AND request_id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, requestId)
+        .first(),
+    ).toEqual({ count: 0 });
+  });
+
+  it("preserves the previous selection when replacement loses its active part", async () => {
+    const originalPartId = "part-build-update-race-original";
+    const replacementPartId = "part-build-update-race-replacement";
+    const raceBuildId = "build-update-archive-race";
+    const requestId = "request-build-update-archive-race";
+    await env.DB.batch([
+      ...[
+        {
+          id: originalPartId,
+          sku: "BUILD-UPDATE-RACE-ORIGINAL",
+          model: "Original Race Processor",
+        },
+        {
+          id: replacementPartId,
+          sku: "BUILD-UPDATE-RACE-REPLACEMENT",
+          model: "Replacement Race Processor",
+        },
+      ].map((part) =>
+        env.DB.prepare(
+          `INSERT INTO catalog_parts (
+             id, workspace_id, sku, category, manufacturer, model,
+             specifications_json, specification_status, created_by, updated_by
+           ) VALUES (?1, ?2, ?3, 'cpu', 'Fixture', ?4, '{}', 'verified', ?5, ?5)`,
+        ).bind(
+          part.id,
+          protectedFixture.workspaceId,
+          part.sku,
+          part.model,
+          protectedFixture.userId,
+        ),
+      ),
+      env.DB.prepare(
+        `INSERT INTO builds (
+           id, workspace_id, name, mutation_token, created_by, updated_by
+         ) VALUES (?1, ?2, 'Original Race Build', ?3, ?4, ?4)`,
+      ).bind(
+        raceBuildId,
+        protectedFixture.workspaceId,
+        "build-update-race-mutation",
+        protectedFixture.userId,
+      ),
+      env.DB.prepare(
+        `INSERT INTO build_items (
+           workspace_id, build_id, category, catalog_part_id
+         ) VALUES (?1, ?2, 'cpu', ?3)`,
+      ).bind(protectedFixture.workspaceId, raceBuildId, originalPartId),
+    ]);
+    const request = new Request(
+      `https://local.invalid/api/builds/${raceBuildId}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          expectedVersion: 0,
+          name: "Invalid Race Replacement",
+          selectedPartIds: [replacementPartId],
+        }),
+      },
+    );
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, replacementPartId)
+        .run();
+    });
+
+    await expect(
+      buildMutationResponse(
+        request,
+        racingDb,
+        context(protectedFixture),
+        raceBuildId,
+        requestId,
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "BUILD_SELECTION_INVALID",
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT b.name, b.record_version, bi.catalog_part_id
+         FROM builds AS b
+         INNER JOIN build_items AS bi
+           ON bi.workspace_id = b.workspace_id AND bi.build_id = b.id
+         WHERE b.workspace_id = ?1 AND b.id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, raceBuildId)
+        .first(),
+    ).toEqual({
+      name: "Original Race Build",
+      record_version: 0,
+      catalog_part_id: originalPartId,
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM audit_events
+         WHERE workspace_id = ?1 AND request_id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, requestId)
         .first(),
     ).toEqual({ count: 0 });
   });
