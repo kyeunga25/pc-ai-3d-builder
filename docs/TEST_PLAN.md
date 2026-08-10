@@ -39,7 +39,7 @@ Current unit tests cover:
 - atomic review and audit statement construction without identity data in metadata;
 - deterministic build compatibility pass, warning, error and unknown outcomes;
 - workspace-scoped build list, role checks, guarded optimistic mutations and portable export;
-- export exclusion of build/workspace identity, price, stock and private-asset fields;
+- schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state and identity exclusion;
 - guarded logical archive for a build draft.
 - generation capability fail-closed parsing and disabled-provider behavior;

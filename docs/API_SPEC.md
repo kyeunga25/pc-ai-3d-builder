@@ -74,7 +74,7 @@ Updates the name and complete selected-part set, or logically archives the draft
 
 ## `GET /api/builds/:buildId/export`
 
-Returns a portable JSON attachment only when every fixed compatibility rule has neither an `error` nor an `unknown` result. Warnings remain visible. The response omits users, workspace and internal build IDs, price, stock, asset metadata, object keys, checksums and deployment data.
+Returns a schema-2 portable JSON attachment only when every fixed compatibility rule has neither an `error` nor an `unknown` result. Warnings remain visible. It includes the build record version and each component's catalogue record version so two exports can identify a changed source revision even when the build selection version is unchanged. This is current-state revision evidence, not an immutable snapshot or digest. The response omits users, workspace and internal build IDs, price, stock, asset metadata, object keys, checksums and deployment data.
 
 ## `GET /api/assets/review-queue`
 

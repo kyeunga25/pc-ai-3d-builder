@@ -202,12 +202,40 @@ describe("persistent build runtime boundaries", () => {
       buildId,
     );
     const exportedText = await exported.text();
+    const exportedBody = JSON.parse(exportedText) as {
+      build: {
+        components: Array<{ catalogueVersion: number; sku: string }>;
+        version: number;
+      };
+      schemaVersion: number;
+    };
     expect(exported.status).toBe(200);
+    expect(exportedBody).toMatchObject({
+      schemaVersion: 2,
+      build: {
+        version: 0,
+        components: expect.arrayContaining(
+          selectedParts.map((part) =>
+            expect.objectContaining({
+              catalogueVersion: part.version,
+              sku: part.sku,
+            }),
+          ),
+        ),
+      },
+    });
     expect(exportedText).not.toContain(protectedFixture.workspaceId);
     expect(exportedText).not.toContain(buildId);
     expect(exportedText).not.toContain("priceMinor");
     expect(exportedText).not.toContain("stockStatus");
     expect(exportedText).not.toContain("assetId");
+
+    const viewerExport = await buildExportResponse(
+      env.DB,
+      context({ ...protectedFixture, role: "viewer" }),
+      buildId,
+    );
+    expect(viewerExport.status).toBe(200);
 
     await expect(
       buildDetailResponse(env.DB, context(requesterFixture), buildId),
@@ -231,6 +259,63 @@ describe("persistent build runtime boundaries", () => {
         .bind(protectedFixture.workspaceId, requesterFixture.workspaceId)
         .first(),
     ).toEqual({ count: 0 });
+  });
+
+  it("exposes a changed catalogue revision without mutating the build", async () => {
+    const target = selectedParts.find((part) => part.category === "storage")!;
+    const before = JSON.parse(
+      await (
+        await buildExportResponse(env.DB, context(protectedFixture), buildId)
+      ).text(),
+    ) as {
+      build: {
+        components: Array<{ catalogueVersion: number; sku: string }>;
+        version: number;
+      };
+    };
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts
+       SET record_version = record_version + 1
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedFixture.workspaceId, target.id)
+      .run();
+    try {
+      const after = JSON.parse(
+        await (
+          await buildExportResponse(env.DB, context(protectedFixture), buildId)
+        ).text(),
+      ) as typeof before;
+      const beforeTarget = before.build.components.find(
+        (part) => part.sku === target.sku,
+      );
+      const afterTarget = after.build.components.find(
+        (part) => part.sku === target.sku,
+      );
+
+      expect(before.build.version).toBe(0);
+      expect(after.build.version).toBe(0);
+      expect(afterTarget?.catalogueVersion).toBe(
+        (beforeTarget?.catalogueVersion ?? -1) + 1,
+      );
+      expect(
+        await env.DB.prepare(
+          `SELECT record_version FROM builds
+           WHERE workspace_id = ?1 AND id = ?2`,
+        )
+          .bind(protectedFixture.workspaceId, buildId)
+          .first(),
+      ).toEqual({ record_version: 0 });
+    } finally {
+      await env.DB.prepare(
+        `UPDATE catalog_parts
+         SET record_version = record_version - 1
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, target.id)
+        .run();
+    }
   });
 
   it("allows warnings but blocks errors and unknown compatibility results", async () => {

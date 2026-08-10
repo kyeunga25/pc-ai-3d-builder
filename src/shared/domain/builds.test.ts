@@ -84,8 +84,21 @@ describe("build compatibility", () => {
         updatedAt: "2026-07-26T00:00:00Z",
       }),
     );
-    const serialized = JSON.stringify(portableBuildExport(build));
+    const exported = portableBuildExport(build);
+    const serialized = JSON.stringify(exported);
 
+    expect(exported).toMatchObject({
+      schemaVersion: 2,
+      build: {
+        version: 3,
+        components: selectedFixtureParts.map((part) =>
+          expect.objectContaining({
+            sku: part.sku,
+            catalogueVersion: part.version,
+          }),
+        ),
+      },
+    });
     expect(serialized).not.toContain("build-private-id");
     expect(serialized).not.toContain("priceMinor");
     expect(serialized).not.toContain("stockStatus");

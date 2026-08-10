@@ -29,7 +29,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。
 - 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
-- 安全 JSON 匯出不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料。
+- 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
 - 受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制的生成工作 API；同一素材只可有一項進行中或等待人工決定的保留工作。
 - 零成本 synthetic adapter 可在本地或明確控制的非正式環境驗證 Workflow、GLB 格式、安全檢查、私人 R2 draft ingestion 及人工審批銜接。

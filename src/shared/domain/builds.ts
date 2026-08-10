@@ -542,7 +542,7 @@ export function isBuildExportReady(build: BuildRecord): boolean {
 
 export function portableBuildExport(build: BuildRecord) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     product: "RigStage",
     build: {
       name: build.name,
@@ -550,6 +550,7 @@ export function portableBuildExport(build: BuildRecord) {
       components: build.selectedParts.map((part) => ({
         category: part.category,
         sku: part.sku,
+        catalogueVersion: part.version,
         manufacturer: part.manufacturer,
         model: part.model,
         specificationStatus: part.specificationStatus,

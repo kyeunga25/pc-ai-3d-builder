@@ -20,7 +20,7 @@ The active rules cover CPU socket, memory type, motherboard form factor, GPU len
 
 A build selects at most one active catalogue part per component category. Reads are bounded and do not auto-create a draft. Explicit writes use an optimistic record version plus a server-only mutation token to gate the complete D1 selection batch.
 
-Portable JSON includes component identity, verified specifications and bilingual compatibility evidence. It deliberately omits build and workspace identifiers, users, price, stock, private files, checksums and deployment values.
+Portable schema-2 JSON includes the build record version, each component's current catalogue record version, component identity, verified specifications and bilingual compatibility evidence. It deliberately omits build and workspace identifiers, users, price, stock, private files, checksums and deployment values. The revision fields improve traceability but do not claim an immutable snapshot or content digest.
 
 Build archive is a logical state transition with the same optimistic version boundary. The interface requires a separate second action before submitting it.
 

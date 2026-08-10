@@ -64,7 +64,7 @@ Build list reads are bounded to 50 records and never create data. Staff, admin a
 
 Compatibility is calculated at read time from current, verified structured specifications. Six fixed rules cover CPU socket, memory type, motherboard form factor, GPU clearance, cooler clearance and the recorded GPU power-supply recommendation. Missing selections, unverified specifications or absent required fields produce an `unknown` result rather than an inference.
 
-Portable export is a read-only response and is blocked while any rule is `error` or `unknown`. The JSON contains product identity, verified specifications and bilingual rule evidence only. It omits build and workspace IDs, users, pricing, stock, asset metadata, R2 locations and deployment configuration.
+Portable export is a read-only response and is blocked while any rule is `error` or `unknown`. Schema 2 records the build version and every selected component's current catalogue record version alongside product identity, verified specifications and bilingual rule evidence. This makes later catalogue revisions visible without representing the export as an immutable snapshot or digest. It omits build and workspace IDs, users, pricing, stock, asset metadata, R2 locations and deployment configuration.
 
 The builder may preview the currently selected component only when its asset is approved. It retrieves the model through the same protected private-file route used by review, creates a page-local object URL and revokes it when the selection changes. The GLB remains visual evidence only and never changes a compatibility result.
 
