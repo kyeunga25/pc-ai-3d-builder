@@ -103,4 +103,17 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain('role="status"');
     expect(markup).toContain("lucide-info");
   });
+
+  it("explains generation work and non-monetary credit bilingually", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("生成工作");
+    expect(markup).toContain("Generation job");
+    expect(markup).toContain("非貨幣 Credit");
+    expect(markup).toContain("Non-monetary credit");
+    expect(markup).toContain("零成本模擬");
+    expect(markup).toContain("Zero-cost simulation");
+    expect(markup).toContain("尚未有工作");
+    expect(markup).toContain("No job yet");
+  });
 });

@@ -50,6 +50,7 @@ Current unit tests cover:
 - read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links and schema rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft;
 - fixed-URL header-only generation targets, malformed-target rejection before body/D1/R2/Workflow, generic legacy-path logging, capability fail-closed parsing and disabled-provider behavior;
+- exhaustive bilingual generation-inspector mappings for every mode, job and entitlement enum, settled human-review distinction, non-monetary available/reserved and settled/released credit summaries, and bilingual absent-value copy;
 - runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;
 - 1–128-character uppercase alphanumeric/underscore generation diagnostic schemas, fail-closed job-list serialization and D1 insert/update triggers for job, job-event and provider-attempt codes;
 - owner/admin generation role checks, saved source-rights requirement, current review version and matching R2 source size, content type and SHA-256 before reservation;
@@ -95,6 +96,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - local preview starts with two clearly non-monetary capability credits and requires a saved source-rights confirmation before enabling zero-cost simulation;
 - local simulation reserves exactly one capability credit, creates a runtime synthetic GLB, records one provider cost unit, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
 - a second generation is blocked while the first reservation awaits review;
+- the generation inspector shows Traditional Chinese and English for the current mode, job lifecycle, entitlement, non-monetary credit, cost and validation states, wrapping at 390 px without horizontal overflow or provider/private-object detail;
 - approving the synthetic draft settles the reservation once and opens the approved synthetic model in Builder; rejecting or replacing it releases the reservation once;
 - production capability remains disabled unless a separately reviewed private configuration enables simulation;
 - a verified 9-category build reports six passing rules and enables export;

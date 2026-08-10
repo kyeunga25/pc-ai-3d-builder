@@ -42,7 +42,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - One active generation job is allowed per asset; the tracked kill switch is disabled and the current simulation cost cap is zero.
 - Workflow output is private, size/signature/structure/checksum validated and staged only while its source checksum and review version remain current.
 - Generated output resets all review evidence and remains unavailable to the Builder until a new human approval.
-- Job responses and audits exclude object keys, checksums, Workflow IDs, raw errors and provider references.
+- Job responses and audits exclude object keys, checksums, Workflow IDs, raw errors and provider references. The review inspector labels every mode, lifecycle and entitlement state bilingually, describes credit as non-monetary, and displays only the already bounded validation code rather than raw provider detail.
 - Payment is not reachable: the public payment adapter is disabled and has no route, binding, ledger or browser control.
 - API responses use `no-store`; static and API responses receive restrictive security headers.
 - Public API errors require Traditional Chinese and English copy at construction, retain only a stable code and per-request ID, and map detailed CSV, image and GLB parser failures to bounded user-safe messages. Internal labels, record identifiers and parser details are not copied into the public message.

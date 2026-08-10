@@ -506,6 +506,43 @@
   font-size: 13px;
 }
 
+.review-bilingual-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.review-bilingual-copy > span:first-child {
+  color: inherit;
+  font-size: inherit;
+}
+
+.review-bilingual-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.84em;
+  opacity: 0.78;
+}
+
+.generation-job-panel .technical-list > div {
+  align-items: flex-start;
+}
+
+.generation-job-panel .technical-list dt,
+.generation-job-panel .technical-list dd {
+  min-width: 0;
+}
+
+.generation-job-panel .technical-list dt {
+  flex: 0 1 42%;
+}
+
+.generation-job-panel .technical-list dd {
+  flex: 1 1 58%;
+  text-align: right;
+}
+
 .generation-job-panel > small {
   display: block;
   margin-top: 10px;

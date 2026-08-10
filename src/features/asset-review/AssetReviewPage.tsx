@@ -71,6 +71,14 @@ import {
   updateAssetReview,
 } from "./asset-review-api";
 import {
+  assetReviewGenerationCreditHistoryCopy,
+  assetReviewGenerationCreditSummaryCopy,
+  assetReviewGenerationEntitlementCopy,
+  assetReviewGenerationModeCopy,
+  assetReviewGenerationStatusCopy,
+  generationInspectorCopy,
+} from "./asset-review-generation-copy";
+import {
   assetReviewErrorNotice,
   assetReviewGenerationFailureNotice,
   assetReviewQueueNotice,
@@ -150,6 +158,15 @@ function BilingualActionLabel({ copy }: { copy: BilingualCopy }) {
   );
 }
 
+function BilingualInterfaceText({ copy }: { copy: BilingualCopy }) {
+  return (
+    <span className="review-bilingual-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
+
 function assetKey(asset: AssetReviewItem): string {
   return `${asset.id}:${asset.version}`;
 }
@@ -203,32 +220,6 @@ const sourceKindLabels: Record<AssetReviewItem["sourceKind"], string> = {
   uploaded: "私人上載素材",
   generated: "生成流程草稿",
 };
-
-const generationStatusLabels: Record<GenerationJob["status"], string> = {
-  queued: "已排入佇列",
-  running: "正在建立草稿",
-  validating: "正在驗證 GLB",
-  awaiting_review: "等待人工審核",
-  failed: "工作失敗",
-  cancelled: "工作已取消",
-};
-
-const generationEntitlementLabels: Record<
-  NonNullable<GenerationJob["entitlementStatus"]>,
-  string
-> = {
-  reserved: "已保留，等待人工決定",
-  settled: "已結算",
-  released: "已釋放",
-};
-
-function generationStatusLabel(job: GenerationJob) {
-  if (job.status === "awaiting_review" && job.entitlementStatus === "settled") {
-    return "人工審核已核准";
-  }
-
-  return generationStatusLabels[job.status];
-}
 
 const qualityLabels: Record<AssetReviewItem["quality"], string> = {
   unreviewed: "未審核",
@@ -591,6 +582,23 @@ export function AssetReviewPage() {
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
   const latestGenerationJob = generationState.items[0] ?? null;
+  const generationModeLabel = assetReviewGenerationModeCopy(
+    generationState.capability.mode,
+  );
+  const generationStatusLabel = latestGenerationJob
+    ? assetReviewGenerationStatusCopy(latestGenerationJob)
+    : generationInspectorCopy.noJob;
+  const generationCreditLabel = assetReviewGenerationCreditSummaryCopy(
+    generationState.capability.credits,
+  );
+  const generationCreditHistoryLabel = assetReviewGenerationCreditHistoryCopy(
+    generationState.capability.credits,
+  );
+  const generationEntitlementLabel = latestGenerationJob?.entitlementStatus
+    ? assetReviewGenerationEntitlementCopy(
+        latestGenerationJob.entitlementStatus,
+      )
+    : generationInspectorCopy.notApplicable;
   const generationActive = generationState.items.some(
     (job) =>
       ["queued", "running", "validating"].includes(job.status) ||
@@ -1466,66 +1474,106 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Sparkles aria-hidden="true" />
               <div>
-                <strong>生成工作</strong>
-                <span>只顯示中立狀態，不公開供應商或私人物件資料</span>
+                <strong className="review-bilingual-copy">
+                  <span>{generationInspectorCopy.heading.zhHant}</span>
+                  <span lang="en">
+                    {generationInspectorCopy.heading.english}
+                  </span>
+                </strong>
+                <BilingualInterfaceText
+                  copy={generationInspectorCopy.description}
+                />
               </div>
             </div>
             <dl className="technical-list">
               <div>
-                <dt>執行模式</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.executionMode}
+                  />
+                </dt>
                 <dd>
-                  {generationState.capability.mode === "simulation"
-                    ? "零成本模擬"
-                    : "未啟用"}
+                  <BilingualInterfaceText copy={generationModeLabel} />
                 </dd>
               </div>
               <div>
-                <dt>最新狀態</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.latestStatus}
+                  />
+                </dt>
                 <dd>
-                  {latestGenerationJob
-                    ? generationStatusLabel(latestGenerationJob)
-                    : "沒有工作"}
+                  <BilingualInterfaceText copy={generationStatusLabel} />
                 </dd>
               </div>
               <div>
-                <dt>Credit</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.credit}
+                  />
+                </dt>
                 <dd className="mono">
-                  {generationState.capability.credits.availableUnits} 可用 ·{" "}
-                  {generationState.capability.credits.reservedUnits} 保留
+                  <BilingualInterfaceText copy={generationCreditLabel} />
                 </dd>
               </div>
               <div>
-                <dt>累計</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.cumulativeCredit}
+                  />
+                </dt>
                 <dd className="mono">
-                  {generationState.capability.credits.settledUnits} 結算 ·{" "}
-                  {generationState.capability.credits.releasedUnits} 釋放
+                  <BilingualInterfaceText copy={generationCreditHistoryLabel} />
                 </dd>
               </div>
               <div>
-                <dt>權益狀態</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.entitlementStatus}
+                  />
+                </dt>
                 <dd>
-                  {latestGenerationJob?.entitlementStatus
-                    ? generationEntitlementLabels[
-                        latestGenerationJob.entitlementStatus
-                      ]
-                    : "—"}
+                  <BilingualInterfaceText copy={generationEntitlementLabel} />
                 </dd>
               </div>
               <div>
-                <dt>模擬成本單位</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.simulationCostUnits}
+                  />
+                </dt>
                 <dd className="mono">
-                  {latestGenerationJob?.providerCostUnits ?? "—"}
+                  {latestGenerationJob?.providerCostUnits === null ||
+                  latestGenerationJob?.providerCostUnits === undefined ? (
+                    <BilingualInterfaceText
+                      copy={generationInspectorCopy.noCostRecorded}
+                    />
+                  ) : (
+                    latestGenerationJob.providerCostUnits
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>GLB 驗證</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.glbValidation}
+                  />
+                </dt>
                 <dd className="mono">
-                  {latestGenerationJob?.validationCode ?? "—"}
+                  {latestGenerationJob?.validationCode ? (
+                    latestGenerationJob.validationCode
+                  ) : (
+                    <BilingualInterfaceText
+                      copy={generationInspectorCopy.notValidated}
+                    />
+                  )}
                 </dd>
               </div>
             </dl>
             <small>
-              模擬輸出仍是草稿，格式驗證通過後亦須重新核對身份、方向、尺寸、樞軸及使用權。
+              <BilingualInterfaceText
+                copy={generationInspectorCopy.explanation}
+              />
             </small>
           </div>
 
