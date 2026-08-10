@@ -1419,14 +1419,40 @@
   color: var(--accent-cyan);
 }
 
+.build-status-item--success > svg,
+.build-status-item--success strong {
+  color: var(--success);
+}
+
+.build-status-item--unknown > svg,
+.build-status-item--unknown strong,
 .build-status-item--warning > svg,
 .build-status-item--warning strong {
   color: var(--warning);
 }
 
-.build-status-item span {
+.build-status-item--error > svg,
+.build-status-item--error strong {
+  color: var(--danger);
+}
+
+.build-status-item > span {
   display: grid;
   min-width: 0;
+}
+
+.build-status-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.build-status-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.72em;
+  opacity: 0.78;
 }
 
 .build-status-item small {
@@ -1442,8 +1468,7 @@
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .build-status-actions {
@@ -1457,6 +1482,10 @@
 .build-status-actions .button {
   min-width: 120px;
   flex: 1;
+}
+
+.build-status-actions .build-status-copy {
+  justify-items: center;
 }
 
 .builder-page--state {

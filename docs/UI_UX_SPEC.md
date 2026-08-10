@@ -21,6 +21,8 @@ The Builder viewport shows camera presets, display modes, fit-view control, scen
 
 The Builder component rail shows all categories, step state, candidate count, stock state, current selection and persistence guidance in Traditional Chinese and English. Error, unknown, warning, pending and complete states use accessible text as well as the existing shape or colour. Desktop rows grow for bilingual labels; the compact step bar keeps bilingual short labels and a bilingual accessible state while hiding secondary status text. Low stock, unknown stock and out of stock remain visually distinct, and the rail scrolls internally instead of causing page-level overflow.
 
+The Builder status bar shows compatibility, selected-component count, workspace total and Save/Export in Traditional Chinese and English. Compatibility uses error, unknown, warning and success text plus distinct icons and semantic colour, in that fail-closed priority order. Bilingual values wrap instead of truncating; compact icon-only actions retain complete accessible names. The export title distinguishes ready and blocked states and states that the portable file excludes identity, pricing, stock and private assets.
+
 ## States
 
 Every data-dependent screen must represent loading, empty and error states. Synthetic demo values must be visibly distinguishable from verified merchant data.

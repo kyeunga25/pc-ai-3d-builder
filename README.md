@@ -34,6 +34,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 素材審核導向固定使用 `/asset-review`；指定素材只以 workspace 綁定的頁面記憶體交接，載入後即清除，不寫入 URL、history state 或持久儲存，畫面亦不顯示內部素材 ID。
 - 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；私人 build ID 只經固定 API 的受保護標頭傳送，不寫入 URL 或請求 body；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。建立、切換、儲存、封存及私隱安全匯出的即時狀態均提供繁中／英文及相符的成功、提示、警告或錯誤語意；單語技術錯誤不會直接顯示。Builder 檢查器的三個分頁、空白狀態、已知規格欄位、規格核實狀態、相容性嚴重程度、證據標籤及 3D 素材狀態／品質／使用條件亦完整雙語化；未知自訂欄位會保留原鍵並標示為自訂，不猜測含義或顯示私人素材 ID。
 - Builder 組件導覽列以完整型別映射顯示九個類別加總覽、一般步驟與總覽狀態、候選數、已選數、空候選、四種庫存狀態及目前選擇；英文數量正確處理單複數。錯誤、未選、待核實與警告的既有優先序保持不變，低庫存、未知及缺貨同時使用文字與相符顏色。介面說明只會使用目前 workspace 的目錄記錄，選擇必須明確按儲存才寫入 D1，且不顯示私人 part／asset ID。
+- Builder 底部狀態列以繁中優先、英文輔助顯示相容性、已選組件、workspace 總價及儲存／匯出操作。嚴重錯誤、未知結果、警告及通過依既有 fail-closed 優先序使用文字、圖示與語意顏色；英文計數正確處理單複數。狀態列可換行，390 px 圖示操作仍保留完整雙語無障礙名稱，匯出提示亦明確說明阻擋條件及不包含的私人／營運資料。
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
