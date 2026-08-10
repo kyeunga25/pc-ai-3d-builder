@@ -5,7 +5,11 @@ import {
   protectedWorkspaceLoginRedirect,
 } from "./auth/protected-routes";
 import { resolveRequestContext } from "./auth/workspace";
-import { ApiError, apiErrorResponse } from "./lib/api-error";
+import {
+  ApiError,
+  apiErrorResponse,
+  bilingualApiMessage,
+} from "./lib/api-error";
 import { logRequestRecord } from "./lib/log";
 import { enforcePilotRateLimit } from "./lib/rate-limit";
 import { withPublicSecurityHeaders } from "./lib/security-headers";
@@ -47,15 +51,16 @@ import {
 export { AssetGenerationWorkflow } from "./workflows/asset-generation";
 
 function apiNotFound(requestId: string): Response {
-  return Response.json(
-    {
-      error: {
-        code: "NOT_FOUND",
-        message: "所要求的 API 路徑不存在。",
-        requestId,
-      },
-    },
-    { status: 404, headers: { "cache-control": "no-store" } },
+  return apiErrorResponse(
+    new ApiError(
+      404,
+      "NOT_FOUND",
+      bilingualApiMessage(
+        "所要求的 API 路徑不存在。",
+        "The requested API path does not exist.",
+      ),
+    ),
+    requestId,
   );
 }
 
@@ -355,15 +360,16 @@ export default {
         error: "UNEXPECTED_ERROR",
       });
       return withPublicSecurityHeaders(
-        Response.json(
-          {
-            error: {
-              code: "INTERNAL_ERROR",
-              message: "無法完成要求。",
-              requestId,
-            },
-          },
-          { status: 500, headers: { "cache-control": "no-store" } },
+        apiErrorResponse(
+          new ApiError(
+            500,
+            "INTERNAL_ERROR",
+            bilingualApiMessage(
+              "無法完成要求。",
+              "The request could not be completed.",
+            ),
+          ),
+          requestId,
         ),
       );
     }

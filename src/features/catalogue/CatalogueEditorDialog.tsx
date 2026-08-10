@@ -191,7 +191,9 @@ export function CatalogueEditorDialog({
     }
     const input = parseDraft(draft);
     if (!input) {
-      setError("請檢查必填欄位、港幣售價、庫存數量及規格 JSON。");
+      setError(
+        "請檢查必填欄位、港幣售價、庫存數量及規格 JSON。 / Check the required fields, HKD price, stock quantity and specification JSON.",
+      );
       return;
     }
 
@@ -203,7 +205,7 @@ export function CatalogueEditorDialog({
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "無法儲存產品，請重新載入後再試。",
+          : "無法儲存產品，請重新載入後再試。 / Unable to save the product. Reload and retry.",
       );
     } finally {
       setSaving(false);
@@ -228,7 +230,7 @@ export function CatalogueEditorDialog({
       setError(
         archiveError instanceof Error
           ? archiveError.message
-          : "無法封存產品，請重新載入後再試。",
+          : "無法封存產品，請重新載入後再試。 / Unable to archive the product. Reload and retry.",
       );
     } finally {
       setSaving(false);
@@ -253,7 +255,7 @@ export function CatalogueEditorDialog({
       setError(
         uploadError instanceof Error
           ? uploadError.message
-          : "無法建立私人素材草稿。",
+          : "無法建立私人素材草稿。 / Unable to create the private asset draft.",
       );
     } finally {
       inputElement.value = "";

@@ -235,7 +235,9 @@ export function CataloguePage() {
             ...input,
           });
       if (!updated) {
-        throw new Error("產品更新沒有回傳有效資料。");
+        throw new Error(
+          "產品更新沒有回傳有效資料。 / The product update did not return valid data.",
+        );
       }
       setParts((current) =>
         current.map((part) => (part.id === updated.id ? updated : part)),
@@ -277,10 +279,14 @@ export function CataloguePage() {
 
   const createAssetDraft = async (file: File) => {
     if (!editorPart) {
-      throw new Error("請先儲存產品，然後再建立素材草稿。");
+      throw new Error(
+        "請先儲存產品，然後再建立素材草稿。 / Save the product before creating an asset draft.",
+      );
     }
     if (file.size > assetFileLimits.source) {
-      throw new AssetFileValidationError("來源圖片必須小於或等於 10 MiB。");
+      throw new AssetFileValidationError(
+        "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller.",
+      );
     }
     const contentType = validateAssetFileBytes(
       "source",
@@ -341,14 +347,18 @@ export function CataloguePage() {
 
   const importCsvFile = async (file: File) => {
     if (file.size > 256 * 1024) {
-      throw new Error("CSV 檔案不可超過 256 KiB。");
+      throw new Error(
+        "CSV 檔案不可超過 256 KiB。 / The CSV file must be 256 KiB or smaller.",
+      );
     }
 
     if (isLocalPreview) {
       const inputs = parseCatalogueCsvFile(await file.text());
       const existingSkus = new Set(parts.map((part) => part.sku.toLowerCase()));
       if (inputs.some((input) => existingSkus.has(input.sku.toLowerCase()))) {
-        throw new Error("目前目錄已經存在 CSV 內的其中一個 SKU。");
+        throw new Error(
+          "目前目錄已經存在 CSV 內的其中一個 SKU。 / The current catalogue already contains a SKU from the CSV file.",
+        );
       }
 
       const created = inputs.map((input) => ({
@@ -383,7 +393,11 @@ export function CataloguePage() {
       const createdCount = await importCsvFile(file);
       setNotice(`已匯入 ${createdCount} 件產品`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "無法匯入 CSV 檔案。");
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "無法匯入 CSV 檔案。 / Unable to import the CSV file.",
+      );
     } finally {
       inputElement.value = "";
       setImporting(false);

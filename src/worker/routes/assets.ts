@@ -110,7 +110,7 @@ export function resolveReviewTransition(
       throw new ApiError(
         409,
         "ASSET_APPROVAL_INCOMPLETE",
-        "所有核准項目及核實尺寸完成後才可核准素材。",
+        "所有核准項目及核實尺寸完成後才可核准素材。 / Complete every approval check and verified dimension before approving the asset.",
       );
     }
 
@@ -257,7 +257,11 @@ export async function assetReviewMutationResponse(
     await readBoundedJson(request),
   );
   if (!parsed.success) {
-    throw new ApiError(400, "VALIDATION_ERROR", "素材審核內容無效。");
+    throw new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "素材審核內容無效。 / The asset review data is invalid.",
+    );
   }
 
   const input = parsed.data;
@@ -435,7 +439,7 @@ export async function assetReviewMutationResponse(
     throw new ApiError(
       409,
       "ASSET_VERSION_CONFLICT",
-      "素材已由另一個審核動作更新，請重新載入後再試。",
+      "素材已由另一個審核動作更新，請重新載入後再試。 / The asset changed in another review action. Reload and try again.",
     );
   }
 

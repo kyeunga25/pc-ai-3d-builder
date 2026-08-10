@@ -97,6 +97,31 @@ function minimalGlb(extra: Record<string, unknown> = {}): Uint8Array {
 }
 
 describe("asset file validation", () => {
+  it.each([
+    [
+      "source size",
+      () => validateAssetFileBytes("source", "image/png", new Uint8Array()),
+    ],
+    [
+      "model media type",
+      () => validateAssetFileBytes("model", "text/plain", minimalGlb()),
+    ],
+    [
+      "GLB structure",
+      () => {
+        const glb = minimalGlb();
+        new DataView(glb.buffer).setUint32(8, glb.byteLength + 4, true);
+        return validateAssetFileBytes("model", "model/gltf-binary", glb);
+      },
+    ],
+  ])("returns bilingual public validation copy for %s", (_label, validate) => {
+    expect(validate).toThrowError(
+      expect.objectContaining({
+        message: expect.stringMatching(/[一-龥].+ \/ .+[A-Za-z]/u),
+      }),
+    );
+  });
+
   it("accepts bounded PNG, JPEG and WebP containers with matching MIME", () => {
     const png = createSyntheticSourcePng();
 

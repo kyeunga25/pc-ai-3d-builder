@@ -12,7 +12,7 @@ npm audit --audit-level=high
 
 Current unit tests cover:
 
-- domain schema and locale formatting;
+- domain schema, locale formatting and safe splitting of combined bilingual error copy;
 - synthetic session parsing;
 - Access JWT validation failures, deterministic concurrent claim normalization and accepted boundary values;
 - required identity-based application-token type plus rejection of expired, oversized or malformed assertions and bounded subject, email and display-name claims before Rate Limiting or D1;
@@ -25,12 +25,13 @@ Current unit tests cover:
 - read-only session responses plus fixed-URL, header-only workspace-selection requests;
 - audit helper serialization;
 - health response and public security headers;
+- construction-time rejection of single-language public API errors, bilingual 404/429/500 serialization and safe client fallback when an upstream message is absent;
 - exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;
 - bounded, workspace-scoped catalogue pagination and filters, including transient header-only cursor transport, rejection of URL or malformed cursors and unchanged workspace-first D1 binding;
 - catalogue writer fixed-URL header targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, role checks, SKU conflicts, optimistic versions and logical archive;
 - catalogue archive rejection while a linked generation credit remains reserved, followed by safe recovery after human rejection;
-- strict CSV parsing and transactional imports of at most 50 catalogue records;
-- image MIME, size, bounded-dimension and container validation, including PNG ordering/CRC, JPEG frame/scan/EOI bounds, WebP RIFF length/zero padding/still or animation-frame bitstream headers, 120-frame and aggregate-pixel animation caps, and rejection before R2 or D1 writes; plus strict GLB size, length and self-contained structure validation;
+- strict CSV parsing, bilingual row-level validation copy and transactional imports of at most 50 catalogue records;
+- image MIME, size, bounded-dimension and container validation, including PNG ordering/CRC, JPEG frame/scan/EOI bounds, WebP RIFF length/zero padding/still or animation-frame bitstream headers, 120-frame and aggregate-pixel animation caps, and rejection before R2 or D1 writes; plus strict GLB size, length and self-contained structure validation with detailed validator messages reduced to stable bilingual public categories;
 - fixed-URL header-only private-file targets with viewer and malformed-target rejection before body/D1/R2, generic legacy-path logging, workspace-scoped R2 creation with upload checksum enforcement, replacement, exact-key rollback cleanup, one bounded transient delete retry, persistent-failure suppression after two attempts and reads that fail closed on missing or drifted size, content type or SHA-256;
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
@@ -41,7 +42,7 @@ Current unit tests cover:
 - workspace-scoped build list, fixed-URL header-only build targets, malformed-target rejection before D1, generic logging of legacy dynamic paths, role checks, guarded optimistic mutations and portable export;
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links and schema rejection of asset IDs embedded in URLs;
-- guarded logical archive for a build draft.
+- guarded logical archive for a build draft;
 - fixed-URL header-only generation targets, malformed-target rejection before body/D1/R2/Workflow, generic legacy-path logging, capability fail-closed parsing and disabled-provider behavior;
 - runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;
 - owner/admin generation role checks, saved source-rights requirement, current review version and matching R2 source size, content type and SHA-256 before reservation;
@@ -50,7 +51,7 @@ Current unit tests cover:
 - idempotent, zero-cost job creation with exactly one capability reservation before Workflow start, including in-memory reuse after an ambiguous client result, key rotation for changed inputs, header-only transport and rejection of cross-asset or cross-version key reuse;
 - immutable provider-attempt disposition for duplicates, out-of-order results, conflicts and late completion;
 - exact-once capability settlement after approval and release after rejection, replacement, post-preflight source loss or terminal failure;
-- payment provider boundary remaining disconnected and disabled.
+- payment provider boundary remaining disconnected and disabled;
 - private owner-onboarding input validation, idempotent owner/workspace SQL and optional bounded credit-account creation.
 
 Workers Runtime integration tests apply the real migrations and use Miniflare/workerd D1, R2 and Workflow bindings. Workspace-auth tests suspend membership immediately before first-login subject binding or workspace-switch persistence, verify no identity/selection write, recover after reactivation, preserve a concurrent different-subject winner and accept a same-subject repeat. Catalogue-import tests verify workspace-scoped SKU uniqueness, replay rejection and full rollback of earlier rows and audit events when a later insert conflicts. Catalogue-write tests verify a bilingual category-lock conflict for build-referenced parts, permitted same-category edits, stale replay rejection, cross-workspace not-found behavior and unchanged references or audit history after denied writes. They also verify that a direct D1 update and the application archive both preserve an `awaiting_review` generated asset with reserved credit, expose no cross-workspace lock state, append no denied audit, and archive with the original catalogue version after human rejection releases the credit once. Asset-creation tests hide foreign parts, force an archive immediately before the insert batch, verify D1 rollback and R2 cleanup, recover after reactivation and reject a successful replay. Private-asset tests verify owning-workspace reads, reject drifted R2 size, content type or same-metadata checksum without state changes, hide both reads and replacements from another workspace, and force an archive before replacement commit to verify D1 rollback, new-object cleanup, old-object retention, same-version recovery and stale-replay rejection. Asset-review tests verify staff draft saves, admin approval, role denial, cross-workspace not-found behavior, stale replay rejection, missing and mismatched R2 model rejection, same-size/MIME invalid bytes and structurally valid checksum drift without review or audit writes, followed by successful recovery after the exact validated GLB is restored. They also prove direct and application asset updates abort without review or audit writes when the catalogue part is archived, then recover with the original version after reactivation. Persistent-build tests verify owning-workspace detail and portable export, cross-workspace not-found behavior, warning-only export, fail-closed hard-error or unknown compatibility results, one guarded full-selection replacement that rejects stale and foreign updates, and create/update rollback when a selected part is archived immediately before the D1 batch. Generation tests reject missing, metadata-drifted or same-metadata checksum-drifted R2 source storage without reservation, recover with the same idempotency key, fail a post-preflight source race before provider work with exact-once release, roll back the full reservation batch when catalogue archival wins job insertion, fail before a provider attempt when archival wins Workflow claim, remove the private draft when archival wins staging, safely replay terminal results, force a transient post-storage validation retry, and verify one successful provider attempt, one reservation, deterministic private output, stored R2 SHA-256 metadata, read-back validation and approval settlement. A terminal validation failure verifies draft cleanup and exact-once release.

@@ -31,6 +31,10 @@ export async function enforcePilotRateLimit(
   const result = await rateLimiter.limit({ key });
 
   if (!result.success) {
-    throw new ApiError(429, "RATE_LIMITED", "要求過於頻密，請稍後再試。");
+    throw new ApiError(
+      429,
+      "RATE_LIMITED",
+      "要求過於頻密，請稍後再試。 / Too many requests. Try again later.",
+    );
   }
 }

@@ -71,11 +71,21 @@ describe("catalogue CSV import", () => {
     expect(() =>
       parseCatalogueCsv(`${validCsv}
 case-001,case,Fixture,Second Case,799.00,in_stock,2,verified,{}`),
-    ).toThrowError(expect.objectContaining({ code: "CATALOGUE_SKU_CONFLICT" }));
+    ).toThrowError(
+      expect.objectContaining({
+        code: "CATALOGUE_SKU_CONFLICT",
+        message: expect.stringMatching(/相同 SKU.+same SKU/iu),
+      }),
+    );
 
     expect(() =>
       parseCatalogueCsv(validCsv.replace(",in_stock,6,", ",out_of_stock,6,")),
-    ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    ).toThrowError(
+      expect.objectContaining({
+        code: "VALIDATION_ERROR",
+        message: expect.stringMatching(/產品內容無效.+product data.+invalid/iu),
+      }),
+    );
   });
 });
 
@@ -105,7 +115,10 @@ describe("catalogue writes", () => {
         context("viewer"),
         "request-fixture",
       ),
-    ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
+    ).rejects.toMatchObject({
+      code: "ROLE_FORBIDDEN",
+      message: expect.stringMatching(/無權修改.+cannot modify/iu),
+    });
     expect(calls).toHaveLength(0);
   });
 

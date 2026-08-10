@@ -25,7 +25,7 @@ function roleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權修改產品目錄。",
+    "你目前的工作空間角色無權修改產品目錄。 / Your current workspace role cannot modify the catalogue.",
   );
 }
 
@@ -35,7 +35,9 @@ function assertCatalogueWriteRole(role: WorkspaceRole): void {
   }
 }
 
-function validationError(message = "產品目錄內容無效。"): ApiError {
+function validationError(
+  message = "產品目錄內容無效。 / The catalogue data is invalid.",
+): ApiError {
   return new ApiError(400, "VALIDATION_ERROR", message);
 }
 
@@ -43,7 +45,7 @@ function skuConflict(): ApiError {
   return new ApiError(
     409,
     "CATALOGUE_SKU_CONFLICT",
-    "同一工作空間內已經存在相同 SKU。",
+    "同一工作空間內已經存在相同 SKU。 / The same SKU already exists in this workspace.",
   );
 }
 
@@ -51,7 +53,7 @@ function versionConflict(): ApiError {
   return new ApiError(
     409,
     "CATALOGUE_VERSION_CONFLICT",
-    "產品已由另一個操作更新，請重新載入後再試。",
+    "產品已由另一個操作更新，請重新載入後再試。 / The product changed in another operation. Reload and try again.",
   );
 }
 

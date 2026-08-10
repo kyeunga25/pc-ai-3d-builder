@@ -44,6 +44,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Job responses and audits exclude object keys, checksums, Workflow IDs, raw errors and provider references.
 - Payment is not reachable: the public payment adapter is disabled and has no route, binding, ledger or browser control.
 - API responses use `no-store`; static and API responses receive restrictive security headers.
+- Public API errors require Traditional Chinese and English copy at construction, retain only a stable code and per-request ID, and map detailed CSV, image and GLB parser failures to bounded user-safe messages. Internal labels, record identifiers and parser details are not copied into the public message.
 - Unexpected exceptions are logged with a stable code rather than raw error text.
 - Production source maps and Wrangler telemetry are disabled.
 - Provider keys, Access values and Cloudflare identifiers must stay outside Git.

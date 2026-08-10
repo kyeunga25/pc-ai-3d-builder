@@ -171,7 +171,7 @@ export async function createAssetSourceResponse(
     throw new ApiError(
       409,
       "ASSET_ALREADY_EXISTS",
-      "此產品已經有素材記錄，請前往素材審核更新檔案。",
+      "此產品已經有素材記錄，請前往素材審核更新檔案。 / This product already has an asset record. Update its file in asset review.",
     );
   }
 
@@ -246,7 +246,7 @@ export async function createAssetSourceResponse(
       throw new ApiError(
         409,
         "ASSET_ALREADY_EXISTS",
-        "此產品已經有素材記錄，請前往素材審核更新檔案。",
+        "此產品已經有素材記錄，請前往素材審核更新檔案。 / This product already has an asset record. Update its file in asset review.",
       );
     }
     throw error;

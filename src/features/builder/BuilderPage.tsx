@@ -84,7 +84,9 @@ async function fetchBuilderCatalogue(
       return parts;
     }
   }
-  throw new Error("產品目錄超出組裝工具的 1,000 項讀取上限。");
+  throw new Error(
+    "產品目錄超出組裝工具的 1,000 項讀取上限。 / The catalogue exceeds the builder read limit of 1,000 products.",
+  );
 }
 
 function createLocalInitialBuild(parts: CatalogPart[]): BuildRecord {
@@ -289,7 +291,11 @@ export function BuilderPage() {
       setSelectedCategory("case");
       setSaveState(isLocalPreview ? "本地新組裝已建立" : "新組裝草稿已建立");
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法建立新組裝");
+      setSaveState(
+        error instanceof Error
+          ? error.message
+          : "無法建立新組裝。 / Unable to create a new build.",
+      );
     } finally {
       setBusy(false);
     }
@@ -325,7 +331,11 @@ export function BuilderPage() {
       setBuildCache((current) => ({ ...current, [loaded.id]: loaded }));
       setSaveState(`已載入版本 ${loaded.version}`);
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法切換組裝");
+      setSaveState(
+        error instanceof Error
+          ? error.message
+          : "無法切換組裝。 / Unable to switch builds.",
+      );
     } finally {
       controller.abort();
       setBusy(false);
@@ -353,7 +363,9 @@ export function BuilderPage() {
             selectedPartIds: build.selectedParts.map((part) => part.id),
           });
       if (!updated) {
-        throw new Error("組裝未有回傳更新內容。");
+        throw new Error(
+          "組裝未有回傳更新內容。 / The build update did not return updated data.",
+        );
       }
       setBuild(updated);
       setDraftName(updated.name);
@@ -370,10 +382,10 @@ export function BuilderPage() {
       setSaveState(
         error instanceof BuildRequestError &&
           error.code === "BUILD_VERSION_CONFLICT"
-          ? "組裝版本已改變，請重新載入"
+          ? "組裝版本已改變，請重新載入。 / The build version changed. Reload before retrying."
           : error instanceof Error
             ? error.message
-            : "無法儲存組裝",
+            : "無法儲存組裝。 / Unable to save the build.",
       );
     } finally {
       setBusy(false);
@@ -439,10 +451,10 @@ export function BuilderPage() {
       setSaveState(
         error instanceof BuildRequestError &&
           error.code === "BUILD_VERSION_CONFLICT"
-          ? "組裝版本已改變，請重新載入"
+          ? "組裝版本已改變，請重新載入。 / The build version changed. Reload before retrying."
           : error instanceof Error
             ? error.message
-            : "無法封存組裝",
+            : "無法封存組裝。 / Unable to archive the build.",
       );
     } finally {
       controller.abort();
@@ -472,7 +484,11 @@ export function BuilderPage() {
         "已匯出；檔案不含身份、工作空間識別資料、價格、庫存或私人素材",
       );
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法匯出組裝");
+      setSaveState(
+        error instanceof Error
+          ? error.message
+          : "無法匯出組裝。 / Unable to export the build.",
+      );
     } finally {
       setBusy(false);
     }

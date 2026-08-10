@@ -26,6 +26,8 @@ A requested workspace header never grants access by itself. The selected workspa
 
 All browser API requests include `X-Requested-With: XMLHttpRequest`, allowing Access to return a bounded `401` when an application session expires. The client then requires a top-level re-login navigation. Logout uses Cloudflare Access's same-origin `/cdn-cgi/access/logout` endpoint; the application does not create a parallel session or identity bypass.
 
+Every public API error crosses one shared response boundary with a stable code, a generated request ID and a message containing Traditional Chinese followed by English. The error constructor rejects single-language public copy. Request-body, catalogue, CSV, rate-limit and asset-file validation use the same contract; detailed GLB validator diagnostics are reduced to a stable validation code and a bounded bilingual category message. The browser splits that message only where the interface has separate language fields and uses safe bilingual fallback copy when an upstream response is malformed. Raw exceptions, parser labels and private record identifiers remain outside the response.
+
 Owner provisioning is an out-of-band private operation. The tracked tool reads the exact login identity only from a private environment, writes a short-lived mode-`0600` SQL file, executes it through Wrangler against the configured D1 binding, verifies only a boolean owner result and removes the temporary file. It never returns the identity, private SQL or deployment coordinates.
 
 ## Storage bindings

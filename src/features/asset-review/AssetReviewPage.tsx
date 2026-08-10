@@ -53,6 +53,7 @@ import {
 import { reviewAsset } from "../../shared/domain/mockData";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
+import { splitBilingualMessage } from "../../shared/i18n/locale";
 import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
@@ -122,6 +123,25 @@ function bilingualCopy(zhHant: string, english: string): BilingualCopy {
 
 function bilingualTitle(zhHant: string, english: string): string {
   return `${zhHant} / ${english}`;
+}
+
+function reviewErrorCopy(
+  error: unknown,
+  fallbackZhHant: string,
+  fallbackEnglish: string,
+): BilingualCopy {
+  if (
+    error instanceof AssetFileValidationError ||
+    error instanceof AssetReviewApiError
+  ) {
+    return splitBilingualMessage(
+      error.message,
+      fallbackEnglish,
+      fallbackZhHant,
+    );
+  }
+
+  return bilingualCopy(fallbackZhHant, fallbackEnglish);
 }
 
 const reviewActionCopy = {
@@ -873,8 +893,8 @@ export function AssetReviewPage() {
       if (file.size > assetFileLimits[kind]) {
         throw new AssetFileValidationError(
           kind === "source"
-            ? "來源圖片必須小於或等於 10 MiB。"
-            : "GLB 模型必須小於或等於 25 MiB。",
+            ? "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller."
+            : "GLB 模型必須小於或等於 25 MiB。 / The GLB model must be 25 MiB or smaller.",
         );
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -958,8 +978,9 @@ export function AssetReviewPage() {
       const fallbackChinese =
         kind === "source" ? "無法上載來源圖片" : "無法上載 GLB 模型";
       setReviewNotice(
-        bilingualCopy(
-          error instanceof Error ? error.message : fallbackChinese,
+        reviewErrorCopy(
+          error,
+          fallbackChinese,
           kind === "source"
             ? "Unable to upload the source image. Saved data was not changed; review the file and retry."
             : "Unable to upload the GLB. Saved data was not changed; review the file and retry.",
@@ -1097,10 +1118,9 @@ export function AssetReviewPage() {
         generationRequestLeaseRef.current = null;
       }
       setReviewNotice(
-        bilingualCopy(
-          error instanceof AssetReviewApiError
-            ? error.message
-            : "無法建立模擬生成工作；沒有產生供應商費用",
+        reviewErrorCopy(
+          error,
+          "無法建立模擬生成工作；沒有產生供應商費用",
           "Unable to create the simulated job. No provider cost was incurred; review the status and retry.",
         ),
       );
@@ -1214,8 +1234,9 @@ export function AssetReviewPage() {
               "The asset was updated by another review action. Reload before retrying.",
             )
           : error instanceof AssetReviewApiError
-            ? bilingualCopy(
-                error.message,
+            ? reviewErrorCopy(
+                error,
+                "無法儲存審核結果；原有資料未有變更",
                 "Unable to save the review. Saved data was not changed; review the message and retry.",
               )
             : bilingualCopy(

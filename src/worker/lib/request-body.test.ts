@@ -87,9 +87,24 @@ describe("bounded JSON request bodies", () => {
     await expect(readBoundedJson(request, 8)).rejects.toMatchObject({
       status: 413,
       code: "PAYLOAD_TOO_LARGE",
+      message: expect.stringMatching(/大小限制.+size limit/iu),
     });
     expect(cancelled).toBe(true);
     expect(pullCount).toBeLessThanOrEqual(chunks.length + 1);
+  });
+
+  it("returns bilingual copy for malformed UTF-8 or JSON", async () => {
+    const request = new Request("https://app.example/api/review", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{malformed",
+    });
+
+    await expect(readBoundedJson(request)).rejects.toMatchObject({
+      status: 400,
+      code: "VALIDATION_ERROR",
+      message: expect.stringMatching(/內容無效.+content is invalid/iu),
+    });
   });
 
   it("accepts bounded UTF-8 CSV bodies", async () => {

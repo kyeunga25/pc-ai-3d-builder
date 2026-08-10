@@ -54,7 +54,7 @@ describe("catalogue route", () => {
     ).toThrowError(
       expect.objectContaining({
         code: "VALIDATION_ERROR",
-        message: "產品目錄篩選條件無效。Invalid catalogue filters.",
+        message: "產品目錄篩選條件無效。 / The catalogue filters are invalid.",
       }),
     );
     expect(() =>

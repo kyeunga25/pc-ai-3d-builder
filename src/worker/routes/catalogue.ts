@@ -40,7 +40,7 @@ function validationError(): ApiError {
   return new ApiError(
     400,
     "VALIDATION_ERROR",
-    "產品目錄篩選條件無效。Invalid catalogue filters.",
+    "產品目錄篩選條件無效。 / The catalogue filters are invalid.",
   );
 }
 

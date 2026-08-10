@@ -24,6 +24,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("asset review API errors", () => {
+  it("uses a bilingual safe fallback when the response has no public message", () => {
+    expect(
+      new AssetReviewApiError(503, "ASSET_REVIEW_UNAVAILABLE").message,
+    ).toBe(
+      "暫時無法完成素材審核操作。 / Unable to complete the asset review operation right now.",
+    );
+  });
+});
+
 describe("generation request idempotency lease", () => {
   it("reuses one in-memory key for the same workspace asset version", () => {
     let created = 0;

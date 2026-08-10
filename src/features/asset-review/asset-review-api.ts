@@ -34,7 +34,7 @@ export class AssetReviewApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message = code,
+    message = "暫時無法完成素材審核操作。 / Unable to complete the asset review operation right now.",
   ) {
     super(message);
     this.name = "AssetReviewApiError";

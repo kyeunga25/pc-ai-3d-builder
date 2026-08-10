@@ -36,6 +36,10 @@ Uploads are bounded to 10 MiB for JPEG, PNG or WebP source images and 25 MiB for
 
 The builder may decode only the selected component's approved GLB. It uses the protected file route and a revocable browser object URL; model geometry remains non-authoritative.
 
+## Public errors are bilingual and bounded
+
+Every public API failure keeps a stable machine code and request ID while presenting Traditional Chinese first and English second. A shared construction guard rejects single-language public copy. Validation layers may keep detailed internal diagnostics for control flow, but CSV parser state, GLB structure labels, raw exceptions and private identifiers are reduced to bounded corrective categories before serialization. This preserves actionable error handling without turning parser details into a public debugging channel.
+
 ## Bounded asynchronous work
 
 Long-running jobs use a swappable provider boundary and an idempotent Workflow. A generation request is accepted only after its workspace-scoped job, initial event and audit record commit. The Workflow uses unique instance IDs, bounded retry/timeout settings and guarded D1 transitions.

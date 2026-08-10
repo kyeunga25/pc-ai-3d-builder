@@ -74,6 +74,7 @@ describe("pilot API rate limit", () => {
     ).rejects.toMatchObject({
       status: 429,
       code: "RATE_LIMITED",
+      message: expect.stringMatching(/稍後再試.+again later/iu),
     });
   });
 });

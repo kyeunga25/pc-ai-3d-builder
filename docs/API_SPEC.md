@@ -160,11 +160,13 @@ Successful creation returns `202`. The Workflow rechecks the active catalogue st
 {
   "error": {
     "code": "STABLE_CODE",
-    "message": "繁體中文訊息",
+    "message": "繁體中文訊息 / Actionable English message",
     "requestId": "generated-per-request"
   }
 }
 ```
+
+Every public error message uses the exact `繁體中文 / English` language order. Construction fails during development and tests if either language is absent. Validation messages describe the safe corrective category while preserving the stable error code: detailed CSV parser state, GLB structure labels, private record identifiers and raw exception text are never copied into the response. Clients with separate language fields split only the first ` / ` delimiter; malformed or legacy responses use generic bilingual fallback copy.
 
 Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `CATALOGUE_CATEGORY_LOCKED`, `CATALOGUE_GENERATION_LOCKED`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_CREDITS_REQUIRED`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 

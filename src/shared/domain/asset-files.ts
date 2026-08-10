@@ -52,7 +52,23 @@ function validateGlb(bytes: Uint8Array): void {
     validateGlbStructure(bytes);
   } catch (error) {
     if (error instanceof GlbValidationError) {
-      throw new AssetFileValidationError(error.message, error.code);
+      const publicMessage: Record<GlbValidationError["code"], string> = {
+        GLB_DIMENSIONS_EXCEEDED:
+          "GLB 幾何尺寸超出安全限制。 / The GLB geometry exceeds the safe dimension limit.",
+        GLB_EXTERNAL_URI:
+          "GLB 必須自包含，不可引用外部檔案。 / The GLB must be self-contained and cannot reference external files.",
+        GLB_HEADER_INVALID:
+          "GLB 檔案格式無效。 / The GLB file format is invalid.",
+        GLB_LENGTH_MISMATCH:
+          "GLB 檔案不完整或長度資料不一致。 / The GLB is incomplete or its length metadata does not match.",
+        GLB_POLYGON_LIMIT_EXCEEDED:
+          "GLB 三角形數量超出安全限制。 / The GLB triangle count exceeds the safe limit.",
+        GLB_STRUCTURE_INVALID:
+          "GLB 結構無效或不受支援。 / The GLB structure is invalid or unsupported.",
+        GLB_TEXTURE_LIMIT_EXCEEDED:
+          "GLB 貼圖數量或大小超出安全限制。 / The GLB texture count or size exceeds the safe limit.",
+      };
+      throw new AssetFileValidationError(publicMessage[error.code], error.code);
     }
     throw error;
   }
@@ -81,8 +97,8 @@ export function validateAssetFileBytes(
   if (bytes.byteLength === 0 || bytes.byteLength > assetFileLimits[kind]) {
     throw new AssetFileValidationError(
       kind === "source"
-        ? "來源圖片必須小於或等於 10 MiB。"
-        : "GLB 模型必須小於或等於 25 MiB。",
+        ? "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller."
+        : "GLB 模型必須小於或等於 25 MiB。 / The GLB model must be 25 MiB or smaller.",
     );
   }
 
@@ -103,7 +119,9 @@ export function validateAssetFileBytes(
     declaredContentType.toLowerCase() !== assetModelContentType &&
     declaredContentType.toLowerCase() !== "application/octet-stream"
   ) {
-    throw new AssetFileValidationError("模型必須使用 GLB 格式。");
+    throw new AssetFileValidationError(
+      "模型必須使用 GLB 格式。 / The model must use the GLB format.",
+    );
   }
   validateGlb(bytes);
   return assetModelContentType;
