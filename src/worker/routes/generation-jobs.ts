@@ -93,6 +93,14 @@ function assetVersionConflict(): ApiError {
   );
 }
 
+function idempotencyKeyReused(): ApiError {
+  return new ApiError(
+    409,
+    "IDEMPOTENCY_KEY_REUSED",
+    "此 Idempotency-Key 已用於另一組生成輸入。 / This Idempotency-Key was already used for different generation input.",
+  );
+}
+
 function mapGenerationJob(row: GenerationJobRow): GenerationJob {
   return generationJobSchema.parse({
     id: row.id,
@@ -298,12 +306,11 @@ export async function generationJobStartResponse(
     idempotencyKey,
   );
   if (existing) {
-    if (existing.asset_id !== assetId) {
-      throw new ApiError(
-        409,
-        "IDEMPOTENCY_KEY_REUSED",
-        "此 Idempotency-Key 已用於另一項生成要求。",
-      );
+    if (
+      existing.asset_id !== assetId ||
+      existing.requested_review_version !== parsed.data.expectedVersion
+    ) {
+      throw idempotencyKeyReused();
     }
     if (["queued", "running", "validating"].includes(existing.status)) {
       await ensureWorkflowStarted(

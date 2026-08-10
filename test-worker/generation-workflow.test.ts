@@ -67,6 +67,7 @@ const context: RequestContext = {
 
 function generationRequest(
   fixture: GenerationFixture = defaultFixture,
+  expectedVersion = 2,
 ): Request {
   return new Request(
     `https://local.invalid/api/assets/${fixture.assetId}/generation-jobs`,
@@ -76,7 +77,7 @@ function generationRequest(
         "content-type": "application/json",
         "idempotency-key": fixture.idempotencyKey,
       },
-      body: JSON.stringify({ expectedVersion: 2 }),
+      body: JSON.stringify({ expectedVersion }),
     },
   );
 }
@@ -299,6 +300,23 @@ describe("local generation Workflow", () => {
       );
       expect(repeated.status).toBe(200);
       expect(((await repeated.json()) as { id: string }).id).toBe(created.id);
+      expect(await introspector.get()).toHaveLength(1);
+
+      await expect(
+        generationJobStartResponse(
+          generationRequest(defaultFixture, 3),
+          env,
+          context,
+          assetId,
+          "request-local-generation-version-reuse",
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        code: "IDEMPOTENCY_KEY_REUSED",
+        message: expect.stringMatching(
+          /此 Idempotency-Key.+This Idempotency-Key/u,
+        ),
+      });
       expect(await introspector.get()).toHaveLength(1);
 
       const beforeApproval = await env.DB.prepare(

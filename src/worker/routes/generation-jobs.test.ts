@@ -130,7 +130,7 @@ function sourceBucketStub(
   return { bucket, heads };
 }
 
-function request() {
+function request(expectedVersion = 2) {
   return new Request(
     "https://app.example/api/assets/asset-fixture/generation-jobs",
     {
@@ -139,7 +139,7 @@ function request() {
         "content-type": "application/json",
         "idempotency-key": "request-fixture-001",
       },
-      body: JSON.stringify({ expectedVersion: 2 }),
+      body: JSON.stringify({ expectedVersion }),
     },
   );
 }
@@ -272,6 +272,39 @@ describe("generation job routes", () => {
       ),
     ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
     expect(creates).toHaveLength(0);
+  });
+
+  it("does not replay an idempotency key across different review versions", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [jobRow({ requested_review_version: 2 })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
+        request(3),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context(),
+        "asset-fixture",
+        "request-version-reuse",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "IDEMPOTENCY_KEY_REUSED",
+      message: expect.stringMatching(
+        /此 Idempotency-Key.+This Idempotency-Key/u,
+      ),
+    });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
   });
 
   it("replays the original job without another reservation or Workflow", async () => {

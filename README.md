@@ -31,7 +31,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
-- 受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制的生成工作 API；同一素材只可有一項進行中或等待人工決定的保留工作。
+- 受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制的生成工作 API；相同 key 只可重放同一素材版本，同一素材只可有一項進行中或等待人工決定的保留工作。
 - 零成本 synthetic adapter 可在本地或明確控制的非正式環境驗證 Workflow、GLB 格式、安全檢查、私人 R2 draft ingestion 及人工審批銜接。
 - Generation credit 會在要求時原子保留，在核准時結算，在拒絕、失敗、啟動失敗或草稿被取代時釋放；這是非貨幣 entitlement 記帳，不是付款、餘額或售價。
 - Provider attempt 以穩定 attempt key 去重，供應商邊界只接收假名化工作參考、來源檔案描述及明確輸出限制。生成 GLB 在寫入 R2 前及讀回後均檢查自包含結構、尺寸、三角形、貼圖、byte bounds 及 checksum。
