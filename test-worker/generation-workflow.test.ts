@@ -547,6 +547,81 @@ describe("local generation Workflow", () => {
     });
   });
 
+  it("remains fail-closed across repeated requests without available credit", async () => {
+    const noCreditFixture: GenerationFixture = {
+      workspaceId: "workspace-local-no-credit",
+      userId: "user-local-no-credit",
+      partId: "part-local-no-credit",
+      assetId: "asset-local-no-credit",
+      sourceSha256: "8".repeat(64),
+      slug: "local-no-credit",
+      idempotencyKey: "local-no-credit-request-001",
+    };
+    await seedGenerationFixture(noCreditFixture);
+    await env.DB.prepare(
+      `UPDATE generation_credit_accounts
+       SET available_units = 0 WHERE workspace_id = ?1`,
+    )
+      .bind(noCreditFixture.workspaceId)
+      .run();
+    const noCreditContext = requestContextFor(noCreditFixture);
+    const introspector = await introspectWorkflow(env.ASSET_GENERATION);
+    try {
+      for (const requestId of [
+        "request-local-no-credit",
+        "request-local-no-credit-repeat",
+      ]) {
+        await expect(
+          generationJobStartResponse(
+            generationRequest(noCreditFixture),
+            env,
+            noCreditContext,
+            noCreditFixture.assetId,
+            requestId,
+          ),
+        ).rejects.toMatchObject({
+          status: 409,
+          code: "GENERATION_CREDITS_REQUIRED",
+        });
+      }
+
+      const state = await env.DB.prepare(
+        `SELECT a.available_units, a.reserved_units, a.settled_units,
+                a.released_units, p.review_version,
+                p.source_rights_confirmed,
+                (SELECT COUNT(*) FROM generation_jobs AS j
+                 WHERE j.workspace_id = a.workspace_id) AS job_count,
+                (SELECT COUNT(*) FROM generation_credit_events AS ce
+                 WHERE ce.workspace_id = a.workspace_id) AS credit_events,
+                (SELECT COUNT(*) FROM generation_provider_attempts AS pa
+                 WHERE pa.workspace_id = a.workspace_id) AS provider_attempts,
+                (SELECT COUNT(*) FROM audit_events AS ae
+                 WHERE ae.workspace_id = a.workspace_id
+                   AND ae.action = 'generation.request') AS request_audits
+         FROM generation_credit_accounts AS a
+         INNER JOIN product_assets AS p ON p.workspace_id = a.workspace_id
+         WHERE a.workspace_id = ?1 AND p.id = ?2`,
+      )
+        .bind(noCreditFixture.workspaceId, noCreditFixture.assetId)
+        .first();
+      expect(state).toEqual({
+        available_units: 0,
+        reserved_units: 0,
+        settled_units: 0,
+        released_units: 0,
+        review_version: 2,
+        source_rights_confirmed: 1,
+        job_count: 0,
+        credit_events: 0,
+        provider_attempts: 0,
+        request_audits: 0,
+      });
+      expect(await introspector.get()).toHaveLength(0);
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
   it("releases a reserved credit exactly once after a terminal failure", async () => {
     const failedWorkspaceId = "workspace-local-failure";
     const failedUserId = "user-local-failure";
