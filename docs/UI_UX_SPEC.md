@@ -29,6 +29,8 @@ The source filmstrip labels each canonical view, authorized or missing private-i
 
 The Asset Review viewport shows each camera preset, tool accessibility name, selected-camera readout, private-model state and visual-evidence limitation in both languages. Its footer uses content-driven height and wrapping instead of clipping bilingual text. Shared private-GLB loading and decode-failure overlays remain centred, bounded to the viewport and readable without exposing parser detail.
 
+The Asset Review header and metadata inspector show the draft lifecycle state, source kind, quality, version and queue context in Traditional Chinese and English without displaying an internal asset ID. English queue counts use the correct singular or plural form. The pill-shaped status badge grows to two lines at narrow widths instead of clipping either language.
+
 Generation status uses provider-neutral queued, running, validating, waiting-for-review, failed and cancelled labels. Simulation must be identified as zero-cost synthetic validation and never described as AI or professional provider output. A disabled production capability remains visibly disabled with an explanatory title.
 
 The generation action is available only to owner/admin roles after a private source image and saved usage-rights confirmation exist with no unsaved review changes. A completed job reloads the new draft version and visibly resets every approval check and dimension.

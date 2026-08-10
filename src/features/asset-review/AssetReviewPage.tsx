@@ -90,6 +90,14 @@ import {
   generationInspectorCopy,
 } from "./asset-review-generation-copy";
 import {
+  assetReviewHeaderCopy,
+  assetReviewHeaderEyebrowCopy,
+  assetReviewQualityCopy,
+  assetReviewQueueSuffixCopy,
+  assetReviewSourceKindCopy,
+  assetReviewStatusPresentation,
+} from "./asset-review-metadata-copy";
+import {
   assetReviewErrorNotice,
   assetReviewGenerationFailureNotice,
   assetReviewQueueNotice,
@@ -166,9 +174,17 @@ function BilingualActionLabel({ copy }: { copy: BilingualCopy }) {
   );
 }
 
-function BilingualInterfaceText({ copy }: { copy: BilingualCopy }) {
+function BilingualInterfaceText({
+  copy,
+  className,
+}: {
+  copy: BilingualCopy;
+  className?: string;
+}) {
   return (
-    <span className="review-bilingual-copy">
+    <span
+      className={`review-bilingual-copy${className ? ` ${className}` : ""}`}
+    >
       <span>{copy.zhHant}</span>
       <span lang="en">{copy.english}</span>
     </span>
@@ -218,32 +234,6 @@ function parseDimension(value: string): number | null {
     ? parsed
     : null;
 }
-
-function reviewBadge(status: AssetReviewItem["status"]) {
-  switch (status) {
-    case "draft":
-      return { label: "草稿", tone: "info" as const };
-    case "in_review":
-      return { label: "需要審核", tone: "warning" as const };
-    case "approved":
-      return { label: "已核准", tone: "success" as const };
-    case "rejected":
-      return { label: "已拒絕", tone: "danger" as const };
-  }
-}
-
-const sourceKindLabels: Record<AssetReviewItem["sourceKind"], string> = {
-  synthetic: "合成測試素材",
-  uploaded: "私人上載素材",
-  generated: "生成流程草稿",
-};
-
-const qualityLabels: Record<AssetReviewItem["quality"], string> = {
-  unreviewed: "未審核",
-  draft: "草稿品質",
-  reviewed: "已審核",
-  approved: "已核准",
-};
 
 export function AssetReviewPage() {
   const { currentWorkspace } = useAuthenticatedSession();
@@ -577,7 +567,11 @@ export function AssetReviewPage() {
   const { asset } = form;
   const currentRejectKey = `${currentWorkspace.id}:${assetKey(asset)}`;
   const rejectArmed = rejectArmedKey === currentRejectKey;
-  const badge = reviewBadge(asset.status);
+  const badge = assetReviewStatusPresentation[asset.status];
+  const queueSuffix = assetReviewQueueSuffixCopy(
+    targetAssetId !== null,
+    queueCount,
+  );
   const visibleFileUrls =
     fileUrls.assetKey === assetKey(asset)
       ? fileUrls
@@ -1228,22 +1222,25 @@ export function AssetReviewPage() {
       />
       <header className="asset-review-header">
         <div>
-          <span className="eyebrow">私人素材 · 版本 {asset.version}</span>
+          <BilingualInterfaceText
+            className="eyebrow"
+            copy={assetReviewHeaderEyebrowCopy(asset.version)}
+          />
           <h1>
             {asset.part.manufacturer} {asset.part.model}
           </h1>
-          <p>所有生成或上載素材均為草稿，必須經授權人員核准才可使用。</p>
+          <p>
+            <BilingualInterfaceText copy={assetReviewHeaderCopy.guidance} />
+          </p>
         </div>
         <div className="asset-review-header__meta">
-          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+          <StatusBadge tone={badge.tone}>
+            <BilingualInterfaceText copy={badge.copy} />
+          </StatusBadge>
           <AssetReviewStatusView
             notice={reviewNotice}
-            zhHantSuffix={
-              targetAssetId ? " · 指定素材" : ` · 佇列 ${queueCount} 項`
-            }
-            englishSuffix={
-              targetAssetId ? " · Selected asset" : ` · ${queueCount} in queue`
-            }
+            zhHantSuffix={queueSuffix.zhHant}
+            englishSuffix={queueSuffix.english}
           />
         </div>
       </header>
@@ -1463,21 +1460,41 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Camera aria-hidden="true" />
               <div>
-                <strong>素材資料</strong>
-                <span>{sourceKindLabels[asset.sourceKind]}</span>
+                <BilingualStrongText
+                  copy={assetReviewHeaderCopy.metadataHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewSourceKindCopy[asset.sourceKind]}
+                />
               </div>
             </div>
             <dl className="technical-list">
               <div>
-                <dt>SKU</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.skuLabel}
+                  />
+                </dt>
                 <dd className="mono">{asset.part.sku}</dd>
               </div>
               <div>
-                <dt>品質</dt>
-                <dd>{qualityLabels[asset.quality]}</dd>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.qualityLabel}
+                  />
+                </dt>
+                <dd>
+                  <BilingualInterfaceText
+                    copy={assetReviewQualityCopy[asset.quality]}
+                  />
+                </dd>
               </div>
               <div>
-                <dt>審核版本</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.reviewVersionLabel}
+                  />
+                </dt>
                 <dd className="mono">v{asset.version}</dd>
               </div>
             </dl>

@@ -248,4 +248,44 @@ describe("AssetReviewPage", () => {
     expect(styles).not.toContain(".review-panel-heading span {");
     expect(styles).toContain(".review-panel-heading > div > span {");
   });
+
+  it("renders the asset header and review metadata bilingually", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("Private asset");
+    expect(markup).toContain("Version 0");
+    expect(markup).toContain(
+      "All generated or uploaded material remains a draft",
+    );
+    expect(markup).toContain("Needs review");
+    expect(markup).toContain("1 item in queue");
+    expect(markup).toContain("Asset details");
+    expect(markup).toContain("Synthetic test asset");
+    expect(markup).toContain("Product SKU");
+    expect(markup).toContain("Quality");
+    expect(markup).toContain("Draft quality");
+    expect(markup).toContain("Review version");
+  });
+
+  it.each([
+    ["draft", "Draft"],
+    ["in_review", "Needs review"],
+    ["approved", "Approved"],
+    ["rejected", "Rejected"],
+  ] as const)("renders %s status bilingually", (status, english) => {
+    const markup = renderPage({ ...reviewAsset, status });
+
+    expect(markup).toContain(english);
+  });
+
+  it("allows the bilingual header badge to wrap at narrow widths", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toMatch(
+      /\.asset-review-header__meta \.status-badge\s*\{[^}]*white-space:\s*normal;/u,
+    );
+  });
 });

@@ -41,6 +41,16 @@
   font-size: 13px;
 }
 
+.asset-review-header__meta .status-badge {
+  min-height: 42px;
+  white-space: normal;
+}
+
+.asset-review-header__meta .status-badge .review-bilingual-copy {
+  gap: 2px;
+  text-align: left;
+}
+
 .asset-review-status {
   display: grid;
   max-width: 460px;
