@@ -12,11 +12,11 @@ Represents an isolated merchant workspace. Protected queries must derive the wor
 
 ## `users`
 
-Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. A zero-row update must be re-read and accepted only when the persisted subject equals the requester.
+Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. The update itself requires the user, selected workspace and membership to remain active. A zero-row result is accepted only when the persisted subject equals the requester and that selected membership is still active; a revoked membership leaves the subject and workspace selection unchanged. Later `last_workspace_id` changes are conditional on the same bound subject and active membership.
 
 ## `workspace_memberships`
 
-Links users to workspaces with an explicit role and status. Server routes select only active memberships and active workspaces.
+Links users to workspaces with an explicit role and status. Server routes select only active memberships and active workspaces, and identity/workspace persistence repeats that check at its D1 write boundary so a concurrent suspension fails closed.
 
 Private owner onboarding activates one existing non-archived owner workspace or creates one generic owner workspace. It never seeds an identity or workspace in a migration. If the optional generation credit schema exists, onboarding may create a bounded non-monetary account without overwriting an existing ledger.
 

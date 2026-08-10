@@ -51,9 +51,10 @@ function fakeDatabase(
         bind(...values: unknown[]) {
           return {
             async first() {
-              if (sql.includes("SELECT access_subject")) {
+              if (sql.includes("AS has_active_membership")) {
                 return {
                   access_subject: options.boundSubjectAfterRace ?? null,
+                  has_active_membership: 1,
                 };
               }
               return user;
