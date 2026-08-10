@@ -22,47 +22,8 @@ import {
   parseLoginReason,
   type LoginReason,
 } from "./access-navigation";
+import { loginReasonCopy } from "./login-copy";
 import "./auth.css";
-
-const loginReasonCopy: Record<
-  LoginReason,
-  {
-    title: string;
-    description: string;
-    tone: "neutral" | "warning" | "danger";
-  }
-> = {
-  "sign-in": {
-    title: "準備安全登入",
-    description:
-      "使用已獲邀的 Cloudflare Access 身份繼續；登入成功後會返回相應的工作區區域。",
-    tone: "neutral",
-  },
-  "access-required": {
-    title: "需要先驗證 Access 身份",
-    description:
-      "RigStage 尚未收到有效的 Cloudflare Access 登入憑證。請重新登入，再返回所需的工作區區域。",
-    tone: "warning",
-  },
-  "session-expired": {
-    title: "登入時段已結束",
-    description:
-      "為保護工作區，已停止載入商戶資料。重新驗證後會返回相應的工作區區域。",
-    tone: "warning",
-  },
-  "not-authorized": {
-    title: "此身份未獲工作區授權",
-    description:
-      "這個 Access 身份未有有效邀請，或工作區成員資格已停用。網站沒有載入任何商戶資料。",
-    tone: "danger",
-  },
-  "service-unavailable": {
-    title: "暫時無法完成身份檢查",
-    description:
-      "身份服務暫時沒有回應。工作區資料仍然保持鎖定，你可以稍後重新嘗試。",
-    tone: "warning",
-  },
-};
 
 function reasonFromStatus(status: number): LoginReason {
   if (status === 401) {
@@ -160,15 +121,24 @@ export function LoginPage() {
           >
             <StatusIcon aria-hidden="true" />
             <div>
-              <h2 id="auth-status-title">{copy.title}</h2>
-              <p>{copy.description}</p>
+              <h2 id="auth-status-title">
+                {copy.title}
+                <small lang="en">{copy.titleEnglish}</small>
+              </h2>
+              <p>
+                {copy.description}
+                <span lang="en">{copy.descriptionEnglish}</span>
+              </p>
             </div>
           </div>
 
           {checkingSession ? (
             <p className="auth-card__checking" role="status">
               <LoaderCircle aria-hidden="true" />
-              正在檢查現有登入狀態
+              <span>
+                正在檢查現有登入狀態
+                <small lang="en">Checking existing sign-in status</small>
+              </span>
             </p>
           ) : null}
 

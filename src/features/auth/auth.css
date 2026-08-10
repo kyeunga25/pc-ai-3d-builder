@@ -183,12 +183,23 @@
 }
 
 .auth-card__status h2 {
+  display: grid;
+  gap: 4px;
   margin: 0 0 9px;
   font-family: var(--font-display);
   font-size: clamp(25px, 2.4vw, 34px);
   font-weight: 650;
   letter-spacing: -0.035em;
   line-height: 1.2;
+}
+
+.auth-card__status h2 small {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: 0;
+  line-height: 1.5;
 }
 
 .auth-card__status p {
@@ -198,6 +209,14 @@
   line-height: 1.75;
 }
 
+.auth-card__status p span {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 .auth-card__checking {
   display: flex;
   align-items: center;
@@ -205,6 +224,17 @@
   margin: 20px 0 0;
   color: var(--accent-cyan);
   font-size: 14px;
+}
+
+.auth-card__checking > span {
+  display: grid;
+  gap: 1px;
+}
+
+.auth-card__checking small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .auth-card__checking svg {

@@ -13,7 +13,12 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "types": ["vitest/globals", "@cloudflare/workers-types", "node"]
+    "types": [
+      "vitest/globals",
+      "vite/client",
+      "@cloudflare/workers-types",
+      "node"
+    ]
   },
   "include": ["src/**/*.test.ts"]
 }
