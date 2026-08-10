@@ -56,6 +56,14 @@ function roleError(): ApiError {
   );
 }
 
+function assetModelRequired(): ApiError {
+  return new ApiError(
+    409,
+    "ASSET_MODEL_REQUIRED",
+    "上載並檢查完整的 GLB 模型後才可核准素材。 / Upload and verify the complete GLB model before approving this asset.",
+  );
+}
+
 export function resolveReviewTransition(
   role: WorkspaceRole,
   input: AssetReviewMutation,
@@ -220,6 +228,7 @@ export async function assetReviewQueueResponse(
 export async function assetReviewMutationResponse(
   request: Request,
   db: D1Database,
+  bucket: R2Bucket,
   context: RequestContext,
   assetId: string,
   requestId: string,
@@ -236,24 +245,34 @@ export async function assetReviewMutationResponse(
   }
 
   const input = parsed.data;
+  const transition = resolveReviewTransition(
+    context.currentWorkspace.role,
+    input,
+  );
   let current: AssetReviewRow | null = null;
   if (input.action === "approve" || input.action === "reject") {
     current = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!current) {
       throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
     }
-    if (input.action === "approve" && !current.model_object_key) {
-      throw new ApiError(
-        409,
-        "ASSET_MODEL_REQUIRED",
-        "上載並檢查 GLB 模型後才可核准素材。",
-      );
+    if (input.action === "approve") {
+      if (
+        !current.model_object_key ||
+        !current.model_content_type ||
+        !current.model_size_bytes
+      ) {
+        throw assetModelRequired();
+      }
+      const storedModel = await bucket.head(current.model_object_key);
+      if (
+        !storedModel ||
+        storedModel.size !== current.model_size_bytes ||
+        storedModel.httpMetadata?.contentType !== current.model_content_type
+      ) {
+        throw assetModelRequired();
+      }
     }
   }
-  const transition = resolveReviewTransition(
-    context.currentWorkspace.role,
-    input,
-  );
   const orderedChecks = assetReviewChecks.filter((check) =>
     input.completedChecks.includes(check),
   );

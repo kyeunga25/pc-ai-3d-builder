@@ -49,6 +49,15 @@ const assetRow = {
   model_sha256: "b".repeat(64),
 };
 
+const privateAssets = {
+  async head() {
+    return {
+      size: 256,
+      httpMetadata: { contentType: "model/gltf-binary" },
+    };
+  },
+} as unknown as R2Bucket;
+
 function context(role: WorkspaceRole = "owner"): RequestContext {
   return {
     user: {
@@ -216,6 +225,7 @@ describe("asset review routes", () => {
     const response = await assetReviewMutationResponse(
       request,
       db,
+      privateAssets,
       context(),
       "asset-fixture",
       "request-fixture",
@@ -252,6 +262,7 @@ describe("asset review routes", () => {
       assetReviewMutationResponse(
         request,
         db,
+        privateAssets,
         context(),
         "asset-fixture",
         "request-fixture",
@@ -260,6 +271,35 @@ describe("asset review routes", () => {
       status: 409,
       code: "ASSET_MODEL_REQUIRED",
     });
+  });
+
+  it("does not collapse an R2 lookup failure into a missing-model conflict", async () => {
+    const { batches, db } = fakeDatabase();
+    const unavailableAssets = {
+      async head() {
+        throw new Error("Synthetic R2 lookup unavailable.");
+      },
+    } as unknown as R2Bucket;
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/review",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(reviewInput()),
+      },
+    );
+
+    await expect(
+      assetReviewMutationResponse(
+        request,
+        db,
+        unavailableAssets,
+        context(),
+        "asset-fixture",
+        "request-fixture",
+      ),
+    ).rejects.toThrowError("Synthetic R2 lookup unavailable.");
+    expect(batches).toHaveLength(0);
   });
 
   it("rejects a stale review version without appending state transitions", async () => {
@@ -277,6 +317,7 @@ describe("asset review routes", () => {
       assetReviewMutationResponse(
         request,
         db,
+        privateAssets,
         context(),
         "asset-fixture",
         "request-fixture",

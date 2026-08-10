@@ -159,6 +159,7 @@ describe("asset review runtime boundaries", () => {
         depth: null,
       }),
       env.DB,
+      env.PRIVATE_ASSETS,
       context(staffFixture),
       assetId,
       "request-asset-review-draft",
@@ -191,6 +192,7 @@ describe("asset review runtime boundaries", () => {
       assetReviewMutationResponse(
         approvalRequest(),
         env.DB,
+        env.PRIVATE_ASSETS,
         context(staffFixture),
         assetId,
         "request-asset-review-staff-approval",
@@ -200,15 +202,57 @@ describe("asset review runtime boundaries", () => {
       assetReviewMutationResponse(
         approvalRequest(),
         env.DB,
+        env.PRIVATE_ASSETS,
         context(foreignFixture),
         assetId,
         "request-asset-review-foreign",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
 
+    expect(await env.PRIVATE_ASSETS.head(modelObjectKey)).toBeNull();
+    await expect(
+      assetReviewMutationResponse(
+        approvalRequest(),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(adminFixture),
+        assetId,
+        "request-asset-review-missing-model",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_MODEL_REQUIRED",
+    });
+    await env.PRIVATE_ASSETS.put(modelObjectKey, new Uint8Array(255), {
+      httpMetadata: {
+        contentType: "application/octet-stream",
+        cacheControl: "no-store",
+      },
+    });
+    await expect(
+      assetReviewMutationResponse(
+        approvalRequest(),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(adminFixture),
+        assetId,
+        "request-asset-review-model-mismatch",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_MODEL_REQUIRED",
+    });
+    await env.PRIVATE_ASSETS.put(modelObjectKey, new Uint8Array(256), {
+      httpMetadata: {
+        contentType: "model/gltf-binary",
+        cacheControl: "no-store",
+      },
+    });
+
     const approval = await assetReviewMutationResponse(
       approvalRequest(),
       env.DB,
+      env.PRIVATE_ASSETS,
       context(adminFixture),
       assetId,
       "request-asset-review-approval",
@@ -227,6 +271,7 @@ describe("asset review runtime boundaries", () => {
       assetReviewMutationResponse(
         approvalRequest(),
         env.DB,
+        env.PRIVATE_ASSETS,
         context(adminFixture),
         assetId,
         "request-asset-review-replay",

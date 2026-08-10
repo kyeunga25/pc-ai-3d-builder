@@ -32,7 +32,7 @@ Stores workspace-scoped product identity, pricing, stock state and structured-sp
 
 Stores one current visual-asset review record per workspace catalogue part. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from private source-image and GLB metadata.
 
-Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. They never appear in browser API records, audit metadata, logs or checked-in fixtures.
+Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. Asset approval rechecks model existence, byte size and content type through R2 metadata before committing a review transition. Private file metadata never appears in browser API records, audit metadata, logs or checked-in fixtures.
 
 ## `asset_review_events`
 

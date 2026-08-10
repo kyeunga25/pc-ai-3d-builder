@@ -286,6 +286,7 @@ async function routeRequest(
       return assetReviewMutationResponse(
         request,
         env.DB,
+        env.PRIVATE_ASSETS,
         context,
         assetReviewMatch[1]!,
         requestId,

@@ -284,6 +284,7 @@ describe("local generation Workflow", () => {
       const approval = await assetReviewMutationResponse(
         reviewRequest("approve"),
         env.DB,
+        env.PRIVATE_ASSETS,
         context,
         assetId,
         "request-local-approval",
@@ -294,6 +295,7 @@ describe("local generation Workflow", () => {
         assetReviewMutationResponse(
           reviewRequest("approve"),
           env.DB,
+          env.PRIVATE_ASSETS,
           context,
           assetId,
           "request-local-approval-repeat",
@@ -751,6 +753,7 @@ describe("local generation Workflow", () => {
       const rejection = await assetReviewMutationResponse(
         reviewRequest("reject", rejectionFixture),
         env.DB,
+        env.PRIVATE_ASSETS,
         rejectionContext,
         rejectionFixture.assetId,
         "request-local-rejection",
@@ -761,6 +764,7 @@ describe("local generation Workflow", () => {
         assetReviewMutationResponse(
           reviewRequest("reject", rejectionFixture),
           env.DB,
+          env.PRIVATE_ASSETS,
           rejectionContext,
           rejectionFixture.assetId,
           "request-local-rejection-repeat",
