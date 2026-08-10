@@ -50,6 +50,7 @@ Current unit tests cover:
 - guarded logical archive for a build draft;
 - fixed-URL header-only generation targets, malformed-target rejection before body/D1/R2/Workflow, generic legacy-path logging, capability fail-closed parsing and disabled-provider behavior;
 - runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;
+- 1–128-character uppercase alphanumeric/underscore generation diagnostic schemas, fail-closed job-list serialization and D1 insert/update triggers for job, job-event and provider-attempt codes;
 - owner/admin generation role checks, saved source-rights requirement, current review version and matching R2 source size, content type and SHA-256 before reservation;
 - generation reservation, Workflow claim and draft staging fail closed when the catalogue part is archived at each D1 boundary;
 - workspace-scoped generation job listing without private object or Workflow data;
@@ -63,7 +64,7 @@ Workers Runtime integration tests apply the real migrations and use Miniflare/wo
 
 ## Migration check
 
-Apply all numbered migrations to an empty local database and confirm schema phase `14`, the active-build-selection, active-asset-creation, active-asset-mutation, current-generation-input and reserved-generation-archive triggers, catalogue record-version column, private asset-file metadata columns, `builds`, `build_items`, `generation_jobs`, `generation_job_events`, `generation_credit_accounts`, `generation_credit_events`, `generation_job_entitlements` and `generation_provider_attempts`, and no rows from `PRAGMA foreign_key_check`. Confirm that inactive catalogue selections, asset creation, asset mutation or generation-job insertion for an inactive part, stale generation inputs, archive of an `awaiting_review` reserved generation, duplicate workspace idempotency keys, duplicate provider-attempt references and concurrent active jobs for one asset are rejected. Insert only synthetic workspace, catalogue, asset, generation-job, capability and build fixtures when checking relational constraints. Never use a local copy of production data.
+Apply all numbered migrations to an empty local database and confirm schema phase `15`, the active-build-selection, active-asset-creation, active-asset-mutation, current-generation-input, reserved-generation-archive and bounded-generation-code triggers, catalogue record-version column, private asset-file metadata columns, `builds`, `build_items`, `generation_jobs`, `generation_job_events`, `generation_credit_accounts`, `generation_credit_events`, `generation_job_entitlements` and `generation_provider_attempts`, and no rows from `PRAGMA foreign_key_check`. Confirm that inactive catalogue selections, asset creation, asset mutation or generation-job insertion for an inactive part, stale generation inputs, archive of an `awaiting_review` reserved generation, malformed generation diagnostic codes, duplicate workspace idempotency keys, duplicate provider-attempt references and concurrent active jobs for one asset are rejected. Insert only synthetic workspace, catalogue, asset, generation-job, capability and build fixtures when checking relational constraints. Never use a local copy of production data.
 
 ## Browser check
 

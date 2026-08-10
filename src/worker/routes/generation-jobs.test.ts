@@ -214,6 +214,42 @@ describe("generation job routes", () => {
     expect(JSON.stringify(body)).not.toContain("private/output");
   });
 
+  it.each([
+    { failure_code: "private parser detail" },
+    { validation_code: "GLB-VALID" },
+    { failure_code: `A${"B".repeat(128)}` },
+  ])("fails closed on an unsafe stored diagnostic code: %j", async (code) => {
+    const { db } = createD1Stub({
+      firstResults: [
+        assetRow(),
+        {
+          available_units: 0,
+          reserved_units: 0,
+          settled_units: 0,
+          released_units: 0,
+        },
+      ],
+      allResults: [[jobRow({ status: "failed", ...code })]],
+    });
+    const { workflow } = workflowStub();
+
+    await expect(
+      generationJobListResponse(
+        new Request("https://app.example/api/assets/item/generation-jobs", {
+          headers: { "x-rigstage-asset-id": "asset-fixture" },
+        }),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "disabled",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context("viewer"),
+      ),
+    ).rejects.toThrow();
+  });
+
   it.each([null, "../../escape"])(
     "rejects a missing or malformed job-list target before database work: %s",
     async (assetId) => {

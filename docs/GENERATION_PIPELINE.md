@@ -55,7 +55,7 @@ The output must be a complete, self-contained glTF 2.0 GLB and satisfy all of th
 - at most 16 JPEG/PNG/WebP textures and 16 MiB combined texture data;
 - identical size and SHA-256 after the private R2 read-back.
 
-Stable validation codes are stored; raw parser/provider errors are not returned to the browser or audit metadata.
+Stable validation codes are stored; raw parser/provider errors are not returned to the browser or audit metadata. Every non-null public failure or validation code is limited to 1–128 ASCII uppercase letters, digits or underscores by both the shared response schema and phase-15 D1 insert/update triggers.
 
 ## Fail-closed controls
 

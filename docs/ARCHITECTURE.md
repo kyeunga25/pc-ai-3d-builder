@@ -59,7 +59,7 @@ Each Workflow side effect lives inside a named, bounded, retryable step: claim t
 
 The customer-facing credit remains reserved while the draft awaits a human decision. Approval settles it. Rejection, terminal failure, Workflow-start failure or replacement of the generated draft releases it once. Provider cost units and customer credit units are separate bounded integer ledgers; neither is a price, payment balance or claim that a billable provider ran.
 
-Any source replacement, review-version change, missing rights confirmation, approval, missing entitlement, invalid output, cost-cap breach or disabled kill switch fails closed. Job APIs omit object keys, checksums, raw provider references, deployment data and identities. They expose only the provider-neutral cost-unit result, entitlement state and stable validation code required to review local orchestration. See [Generation pipeline](GENERATION_PIPELINE.md).
+Any source replacement, review-version change, missing rights confirmation, approval, missing entitlement, invalid output, cost-cap breach or disabled kill switch fails closed. Job APIs omit object keys, checksums, raw provider references, deployment data and identities. They expose only the provider-neutral cost-unit result, entitlement state and stable validation code required to review local orchestration. Failure and validation codes cross a shared 1–128-character uppercase alphanumeric/underscore schema; phase-15 D1 triggers apply the same rule to job, job-event and provider-attempt inserts and updates, including an in-place validation pass over existing non-null values. See [Generation pipeline](GENERATION_PIPELINE.md).
 
 ## Builds, compatibility and export
 

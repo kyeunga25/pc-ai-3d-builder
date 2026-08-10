@@ -54,7 +54,7 @@ The current adapter creates a zero-cost synthetic GLB solely to exercise storage
 
 The Workflow validates a private output object before it changes any review record. The asset source checksum, saved rights confirmation and optimistic review version must still match. Staging increments the review version and resets checklist, dimensions and approval fields. It never marks an asset approved or modifies compatibility evidence.
 
-Generation-job API records are provider-neutral and omit object keys, checksums, Workflow IDs, requester identity, currency and price. They may expose a bounded neutral provider-cost unit and capability state so an authorized reviewer can understand reservation and settlement. Stable failure codes replace raw provider or platform errors.
+Generation-job API records are provider-neutral and omit object keys, checksums, Workflow IDs, requester identity, currency and price. They may expose a bounded neutral provider-cost unit and capability state so an authorized reviewer can understand reservation and settlement. Stable failure codes replace raw provider or platform errors. Public failure and validation codes use one 1–128-character uppercase alphanumeric/underscore contract enforced by both the shared response schema and D1 insert/update triggers; malformed stored values fail closed rather than becoming UI text.
 
 ## Payment remains a private future boundary
 
