@@ -5,9 +5,11 @@ import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
   createAssetFromSource,
+  fetchAssetFileBlob,
   fetchAssetReview,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
+  uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
 
@@ -191,5 +193,61 @@ describe("asset review target API", () => {
     expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
     expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
     expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+  });
+});
+
+describe("private asset file target API", () => {
+  it("keeps the private asset ID out of the replacement URL and body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
+    vi.stubGlobal("fetch", fetchMock);
+    const source = new File([new Uint8Array([0x89])], "fixture.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      uploadAssetFile(
+        "workspace-fixture",
+        "asset-private-fixture",
+        "source",
+        3,
+        source,
+      ),
+    ).resolves.toEqual(reviewAsset);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/file");
+    expect(url).not.toContain("asset-private-fixture");
+    expect(init.body).toBe(source);
+    expect(String(init.body)).not.toContain("asset-private-fixture");
+    expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
+    expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
+    expect(headers.get("x-rigstage-expected-version")).toBe("3");
+  });
+
+  it("keeps the private asset ID out of the protected file-read URL", async () => {
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(bytes, { headers: { "content-type": "image/png" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blob = await fetchAssetFileBlob(
+      new AbortController().signal,
+      "workspace-fixture",
+      "asset-private-fixture",
+      "source",
+    );
+
+    expect(blob.size).toBe(bytes.byteLength);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/file");
+    expect(url).not.toContain("asset-private-fixture");
+    expect(init.body).toBeUndefined();
+    expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
+    expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
   });
 });

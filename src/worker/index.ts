@@ -247,18 +247,9 @@ async function routeRequest(
       return assetDetailResponse(request, env.DB, context);
     }
 
-    const assetFileMatch = /^\/api\/assets\/([^/]+)\/files\/([^/]+)$/u.exec(
-      url.pathname,
-    );
-    if (assetFileMatch) {
+    if (url.pathname === "/api/assets/item/file") {
       if (request.method === "GET") {
-        return assetFileResponse(
-          env.DB,
-          env.PRIVATE_ASSETS,
-          context,
-          assetFileMatch[1]!,
-          assetFileMatch[2]!,
-        );
+        return assetFileResponse(request, env.DB, env.PRIVATE_ASSETS, context);
       }
       if (request.method === "PUT") {
         return assetFileUploadResponse(
@@ -266,8 +257,6 @@ async function routeRequest(
           env.DB,
           env.PRIVATE_ASSETS,
           context,
-          assetFileMatch[1]!,
-          assetFileMatch[2]!,
           requestId,
         );
       }

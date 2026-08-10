@@ -6,6 +6,10 @@ import {
   type AssetFileKind,
 } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import {
+  assetFileKindHeader,
+  assetTargetHeader,
+} from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 import type { RequestContext } from "../auth/workspace";
 import {
@@ -38,7 +42,7 @@ function writeRoleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權上載私人素材。",
+    "你目前的工作空間角色無權上載私人素材。 / Your current workspace role cannot upload private asset files.",
   );
 }
 
@@ -48,12 +52,18 @@ function assertWriteRole(role: WorkspaceRole): void {
   }
 }
 
-function validationError(message = "素材上載內容無效。"): ApiError {
+function validationError(
+  message = "素材上載內容無效。 / The asset upload is invalid.",
+): ApiError {
   return new ApiError(400, "VALIDATION_ERROR", message);
 }
 
 function assetNotFound(): ApiError {
-  return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  return new ApiError(
+    404,
+    "ASSET_NOT_FOUND",
+    "找不到所要求的素材。 / The requested asset was not found.",
+  );
 }
 
 function cataloguePartNotFound(): ApiError {
@@ -76,7 +86,7 @@ function assetVersionConflict(): ApiError {
   return new ApiError(
     409,
     "ASSET_VERSION_CONFLICT",
-    "素材已由另一個操作更新，請重新載入後再試。",
+    "素材已由另一個操作更新，請重新載入後再試。 / The asset changed in another operation. Reload and retry.",
   );
 }
 
@@ -256,11 +266,15 @@ export async function createAssetSourceResponse(
 function expectedVersion(request: Request): number {
   const rawVersion = request.headers.get("x-rigstage-expected-version");
   if (!rawVersion || !/^\d{1,10}$/u.test(rawVersion)) {
-    throw validationError("素材上載必須包含有效的目前版本。");
+    throw validationError(
+      "素材上載必須包含有效的目前版本。 / The upload must include a valid current asset version.",
+    );
   }
   const version = Number(rawVersion);
   if (!Number.isSafeInteger(version)) {
-    throw validationError("素材上載版本無效。");
+    throw validationError(
+      "素材上載版本無效。 / The asset upload version is invalid.",
+    );
   }
   return version;
 }
@@ -270,13 +284,13 @@ export async function assetFileUploadResponse(
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
-  rawKind: string,
   requestId: string,
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
+  const assetId = request.headers.get(assetTargetHeader);
+  const rawKind = request.headers.get(assetFileKindHeader);
   const kindResult = assetFileKindSchema.safeParse(rawKind);
-  if (!assetRecordIdPattern.test(assetId) || !kindResult.success) {
+  if (!assetId || !assetRecordIdPattern.test(assetId) || !kindResult.success) {
     throw assetNotFound();
   }
   const kind = kindResult.data;
@@ -285,7 +299,11 @@ export async function assetFileUploadResponse(
     throw assetNotFound();
   }
   if (current.status === "approved") {
-    throw new ApiError(409, "ASSET_LOCKED", "已核准素材不可直接取代。");
+    throw new ApiError(
+      409,
+      "ASSET_LOCKED",
+      "已核准素材不可直接取代。 / An approved asset cannot be replaced directly.",
+    );
   }
 
   const currentVersion = expectedVersion(request);
@@ -472,14 +490,15 @@ function fileExtension(kind: AssetFileKind, contentType: string): string {
 }
 
 export async function assetFileResponse(
+  request: Request,
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
-  rawKind: string,
 ): Promise<Response> {
+  const assetId = request.headers.get(assetTargetHeader);
+  const rawKind = request.headers.get(assetFileKindHeader);
   const kindResult = assetFileKindSchema.safeParse(rawKind);
-  if (!assetRecordIdPattern.test(assetId) || !kindResult.success) {
+  if (!assetId || !assetRecordIdPattern.test(assetId) || !kindResult.success) {
     throw assetFileNotFound();
   }
   const kind = kindResult.data;

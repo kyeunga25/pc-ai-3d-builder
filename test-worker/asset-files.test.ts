@@ -81,17 +81,25 @@ function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
 }
 
 function replacementRequest(expectedVersion = 0): Request {
-  return new Request(
-    `https://local.invalid/api/assets/${assetId}/files/source`,
-    {
-      method: "PUT",
-      headers: {
-        "content-type": "image/png",
-        "x-rigstage-expected-version": String(expectedVersion),
-      },
-      body: replacementBytes.buffer as ArrayBuffer,
+  return new Request("https://local.invalid/api/assets/item/file", {
+    method: "PUT",
+    headers: {
+      "content-type": "image/png",
+      "x-rigstage-asset-file-kind": "source",
+      "x-rigstage-asset-id": assetId,
+      "x-rigstage-expected-version": String(expectedVersion),
     },
-  );
+    body: replacementBytes.buffer as ArrayBuffer,
+  });
+}
+
+function fileReadRequest(): Request {
+  return new Request("https://local.invalid/api/assets/item/file", {
+    headers: {
+      "x-rigstage-asset-file-kind": "source",
+      "x-rigstage-asset-id": assetId,
+    },
+  });
 }
 
 async function seedWorkspace(fixture: WorkspaceFixture): Promise<void> {
@@ -161,11 +169,10 @@ describe("private asset file workspace isolation", () => {
     await seedFixtures();
 
     const allowed = await assetFileResponse(
+      fileReadRequest(),
       env.DB,
       env.PRIVATE_ASSETS,
       context(protectedFixture),
-      assetId,
-      "source",
     );
     expect(allowed.status).toBe(200);
     expect(new Uint8Array(await allowed.arrayBuffer())).toEqual(sourceBytes);
@@ -175,11 +182,10 @@ describe("private asset file workspace isolation", () => {
     });
     await expect(
       assetFileResponse(
+        fileReadRequest(),
         env.DB,
         env.PRIVATE_ASSETS,
         context(protectedFixture),
-        assetId,
-        "source",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
 
@@ -188,11 +194,10 @@ describe("private asset file workspace isolation", () => {
     });
     await expect(
       assetFileResponse(
+        fileReadRequest(),
         env.DB,
         env.PRIVATE_ASSETS,
         context(protectedFixture),
-        assetId,
-        "source",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
 
@@ -203,11 +208,10 @@ describe("private asset file workspace isolation", () => {
     });
     await expect(
       assetFileResponse(
+        fileReadRequest(),
         env.DB,
         env.PRIVATE_ASSETS,
         context(protectedFixture),
-        assetId,
-        "source",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
 
@@ -215,31 +219,31 @@ describe("private asset file workspace isolation", () => {
       httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
     });
     const recovered = await assetFileResponse(
+      fileReadRequest(),
       env.DB,
       env.PRIVATE_ASSETS,
       context(protectedFixture),
-      assetId,
-      "source",
     );
     expect(recovered.status).toBe(200);
     expect(new Uint8Array(await recovered.arrayBuffer())).toEqual(sourceBytes);
 
     await expect(
       assetFileResponse(
+        fileReadRequest(),
         env.DB,
         env.PRIVATE_ASSETS,
         context(requesterFixture),
-        assetId,
-        "source",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
 
     const replacement = new Request(
-      `https://local.invalid/api/assets/${assetId}/files/source`,
+      "https://local.invalid/api/assets/item/file",
       {
         method: "PUT",
         headers: {
           "content-type": "image/png",
+          "x-rigstage-asset-file-kind": "source",
+          "x-rigstage-asset-id": assetId,
           "x-rigstage-expected-version": "0",
         },
         body: sourceBytes.buffer as ArrayBuffer,
@@ -251,8 +255,6 @@ describe("private asset file workspace isolation", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(requesterFixture),
-        assetId,
-        "source",
         "request-file-isolation",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
@@ -303,8 +305,6 @@ describe("private asset file workspace isolation", () => {
         racingDb,
         env.PRIVATE_ASSETS,
         context(protectedFixture),
-        assetId,
-        "source",
         "request-file-archive-race",
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
@@ -345,8 +345,6 @@ describe("private asset file workspace isolation", () => {
       env.DB,
       env.PRIVATE_ASSETS,
       context(protectedFixture),
-      assetId,
-      "source",
       "request-file-archive-recovery",
     );
     expect(recoveredUpload.status).toBe(200);
@@ -367,8 +365,6 @@ describe("private asset file workspace isolation", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(protectedFixture),
-        assetId,
-        "source",
         "request-file-archive-stale-replay",
       ),
     ).rejects.toMatchObject({

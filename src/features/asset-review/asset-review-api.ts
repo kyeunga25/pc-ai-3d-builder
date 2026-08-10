@@ -17,7 +17,10 @@ import {
   type GenerationJobStartInput,
 } from "../../shared/domain/generation-jobs";
 import { apiFetch } from "../../shared/lib/api-fetch";
-import { assetTargetHeader } from "../../shared/lib/asset-target";
+import {
+  assetFileKindHeader,
+  assetTargetHeader,
+} from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
 const apiErrorSchema = z.object({
@@ -180,16 +183,15 @@ export async function uploadAssetFile(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", uploadContentType(kind, file));
+  headers.set(assetFileKindHeader, kind);
+  headers.set(assetTargetHeader, assetId);
   headers.set("x-rigstage-expected-version", String(expectedVersion));
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/files/${kind}`,
-    {
-      method: "PUT",
-      credentials: "same-origin",
-      headers,
-      body: file,
-    },
-  );
+  const response = await apiFetch("/api/assets/item/file", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers,
+    body: file,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -202,14 +204,14 @@ export async function fetchAssetFileBlob(
   assetId: string,
   kind: AssetFileKind,
 ): Promise<Blob> {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/files/${kind}`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetFileKindHeader, kind);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/file", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }

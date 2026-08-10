@@ -17,10 +17,8 @@ describe("request log route templates", () => {
     ["/api/catalogue/part_private_123", "/api/*"],
     ["/api/assets/item/review", "/api/assets/item/review"],
     ["/api/assets/item", "/api/assets/item"],
-    [
-      "/api/assets/asset_private_123/files/source-private-key",
-      "/api/assets/:assetId/files/:fileKind",
-    ],
+    ["/api/assets/item/file", "/api/assets/item/file"],
+    ["/api/assets/asset_private_123/files/source-private-key", "/api/*"],
     [
       "/api/assets/asset_private_123/generation-jobs",
       "/api/assets/:assetId/generation-jobs",
