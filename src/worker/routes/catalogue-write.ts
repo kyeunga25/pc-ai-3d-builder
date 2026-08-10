@@ -54,6 +54,14 @@ function versionConflict(): ApiError {
   );
 }
 
+function categoryLocked(): ApiError {
+  return new ApiError(
+    409,
+    "CATALOGUE_CATEGORY_LOCKED",
+    "此產品已被組裝引用，不能更改類別；請保留原類別或建立新產品。 / This part is used by a build, so its category cannot be changed. Keep the current category or create a new part.",
+  );
+}
+
 function notFound(): ApiError {
   return new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
 }
@@ -344,6 +352,9 @@ export async function catalogueMutationResponse(
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw skuConflict();
+    }
+    if (error instanceof Error && error.message.includes("FOREIGN KEY")) {
+      throw categoryLocked();
     }
     throw error;
   }

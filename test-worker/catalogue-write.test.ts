@@ -1,0 +1,249 @@
+import { env } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
+
+import type { ComponentCategory } from "../src/shared/domain/schemas";
+import type { WorkspaceRole } from "../src/shared/domain/session";
+import type { RequestContext } from "../src/worker/auth/workspace";
+import { catalogueMutationResponse } from "../src/worker/routes/catalogue-write";
+
+type WorkspaceFixture = {
+  role: WorkspaceRole;
+  slug: string;
+  userId: string;
+  workspaceId: string;
+};
+
+const protectedFixture: WorkspaceFixture = {
+  role: "owner",
+  slug: "catalogue-write-protected",
+  userId: "user-catalogue-write-protected",
+  workspaceId: "workspace-catalogue-write-protected",
+};
+
+const foreignFixture: WorkspaceFixture = {
+  role: "owner",
+  slug: "catalogue-write-foreign",
+  userId: "user-catalogue-write-foreign",
+  workspaceId: "workspace-catalogue-write-foreign",
+};
+
+const partId = "part-catalogue-write-locked";
+const buildId = "build-catalogue-write-reference";
+
+function context(fixture: WorkspaceFixture): RequestContext {
+  return {
+    user: {
+      id: fixture.userId,
+      email: `${fixture.userId}@example.invalid`,
+      displayName: "Catalogue Write Fixture",
+    },
+    currentWorkspace: {
+      id: fixture.workspaceId,
+      slug: fixture.slug,
+      name: "Catalogue Write Fixture",
+      locale: "zh-Hant-HK",
+      currency: "HKD",
+      role: fixture.role,
+    },
+    workspaces: [],
+  };
+}
+
+function updateRequest(
+  expectedVersion: number,
+  category: ComponentCategory,
+  model: string,
+): Request {
+  return new Request(`https://local.invalid/api/catalogue/${partId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      action: "update",
+      expectedVersion,
+      sku: "LOCKED-CATEGORY-001",
+      category,
+      manufacturer: "Fixture",
+      model,
+      priceMinor: 89_900,
+      stockStatus: "in_stock",
+      stockCount: 4,
+      specificationStatus: "verified",
+      specifications: {},
+    }),
+  });
+}
+
+async function seedWorkspace(fixture: WorkspaceFixture): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO workspaces (id, slug, name) VALUES (?1, ?2, ?3)",
+    ).bind(fixture.workspaceId, fixture.slug, "Catalogue Write Fixture"),
+    env.DB.prepare(
+      `INSERT INTO users (id, email, display_name, last_workspace_id)
+       VALUES (?1, ?2, ?3, ?4)`,
+    ).bind(
+      fixture.userId,
+      `${fixture.userId}@example.invalid`,
+      "Catalogue Write Fixture",
+      fixture.workspaceId,
+    ),
+    env.DB.prepare(
+      `INSERT INTO workspace_memberships (workspace_id, user_id, role)
+       VALUES (?1, ?2, ?3)`,
+    ).bind(fixture.workspaceId, fixture.userId, fixture.role),
+  ]);
+}
+
+async function seedFixtures(): Promise<void> {
+  await seedWorkspace(protectedFixture);
+  await seedWorkspace(foreignFixture);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO catalog_parts (
+         id, workspace_id, sku, category, manufacturer, model,
+         price_minor, stock_status, stock_count, specifications_json,
+         specification_status, created_by, updated_by
+       ) VALUES (
+         ?1, ?2, 'LOCKED-CATEGORY-001', 'case', 'Fixture', 'Referenced Case',
+         89900, 'in_stock', 4, '{}', 'verified', ?3, ?3
+       )`,
+    ).bind(partId, protectedFixture.workspaceId, protectedFixture.userId),
+    env.DB.prepare(
+      `INSERT INTO builds (
+         id, workspace_id, name, mutation_token, created_by, updated_by
+       ) VALUES (?1, ?2, 'Referenced Build', ?3, ?4, ?4)`,
+    ).bind(
+      buildId,
+      protectedFixture.workspaceId,
+      "catalogue-write-build-mutation",
+      protectedFixture.userId,
+    ),
+    env.DB.prepare(
+      `INSERT INTO build_items (
+         workspace_id, build_id, category, catalog_part_id
+       ) VALUES (?1, ?2, 'case', ?3)`,
+    ).bind(protectedFixture.workspaceId, buildId, partId),
+  ]);
+}
+
+describe("catalogue write runtime constraints", () => {
+  it("maps referenced category changes and preserves guarded updates", async () => {
+    await seedFixtures();
+
+    await expect(
+      catalogueMutationResponse(
+        updateRequest(0, "cpu", "Invalid Category Change"),
+        env.DB,
+        context(protectedFixture),
+        partId,
+        "request-catalogue-category-locked",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "CATALOGUE_CATEGORY_LOCKED",
+      message: expect.stringMatching(
+        /不能更改類別.*category cannot be changed/iu,
+      ),
+    });
+
+    expect(
+      await env.DB.prepare(
+        `SELECT category, model, record_version
+         FROM catalog_parts
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, partId)
+        .first(),
+    ).toEqual({
+      category: "case",
+      model: "Referenced Case",
+      record_version: 0,
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT category, catalog_part_id
+         FROM build_items
+         WHERE workspace_id = ?1 AND build_id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, buildId)
+        .first(),
+    ).toEqual({ category: "case", catalog_part_id: partId });
+
+    const updated = await catalogueMutationResponse(
+      updateRequest(0, "case", "Updated Referenced Case"),
+      env.DB,
+      context(protectedFixture),
+      partId,
+      "request-catalogue-same-category",
+    );
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      id: partId,
+      category: "case",
+      model: "Updated Referenced Case",
+      version: 1,
+    });
+
+    await expect(
+      catalogueMutationResponse(
+        updateRequest(0, "case", "Stale Replay"),
+        env.DB,
+        context(protectedFixture),
+        partId,
+        "request-catalogue-stale-replay",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "CATALOGUE_VERSION_CONFLICT",
+    });
+    await expect(
+      catalogueMutationResponse(
+        updateRequest(1, "case", "Foreign Update"),
+        env.DB,
+        context(foreignFixture),
+        partId,
+        "request-catalogue-foreign-update",
+      ),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "CATALOGUE_PART_NOT_FOUND",
+    });
+
+    expect(
+      await env.DB.prepare(
+        `SELECT category, model, record_version
+         FROM catalog_parts
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, partId)
+        .first(),
+    ).toEqual({
+      category: "case",
+      model: "Updated Referenced Case",
+      record_version: 1,
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT action, request_id
+         FROM audit_events
+         WHERE workspace_id = ?1 AND target_id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, partId)
+        .all(),
+    ).toMatchObject({
+      results: [
+        {
+          action: "catalogue.part.update",
+          request_id: "request-catalogue-same-category",
+        },
+      ],
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM audit_events WHERE workspace_id = ?1",
+      )
+        .bind(foreignFixture.workspaceId)
+        .first(),
+    ).toEqual({ count: 0 });
+  });
+});
