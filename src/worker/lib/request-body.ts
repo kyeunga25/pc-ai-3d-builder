@@ -4,6 +4,16 @@ function bodyError(status: number, code: string, message: string): ApiError {
   return new ApiError(status, code, message);
 }
 
+function requestMediaType(request: Request): string {
+  return (
+    request.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase() ?? ""
+  );
+}
+
 async function readBoundedBody(
   request: Request,
   maxBytes: number,
@@ -72,12 +82,11 @@ export async function readBoundedJson(
   request: Request,
   maxBytes = 32 * 1024,
 ): Promise<unknown> {
-  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!contentType.startsWith("application/json")) {
+  if (requestMediaType(request) !== "application/json") {
     throw bodyError(
       415,
       "UNSUPPORTED_MEDIA_TYPE",
-      "要求內容必須使用 JSON 格式。",
+      "要求內容必須使用 JSON 格式。 / Request content must use application/json.",
     );
   }
 
@@ -94,12 +103,11 @@ export async function readBoundedCsv(
   request: Request,
   maxBytes = 256 * 1024,
 ): Promise<string> {
-  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!contentType.startsWith("text/csv")) {
+  if (requestMediaType(request) !== "text/csv") {
     throw bodyError(
       415,
       "UNSUPPORTED_MEDIA_TYPE",
-      "CSV 匯入必須使用 text/csv 格式。",
+      "CSV 匯入必須使用 text/csv 格式。 / CSV imports must use text/csv.",
     );
   }
 

@@ -25,6 +25,7 @@ Current unit tests cover:
 - read-only session responses;
 - audit helper serialization;
 - health response and public security headers;
+- exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;
 - bounded, workspace-scoped catalogue pagination and filters;
 - catalogue writer role checks, SKU conflicts, optimistic versions and logical archive;
 - catalogue archive rejection while a linked generation credit remains reserved, followed by safe recovery after human rejection;

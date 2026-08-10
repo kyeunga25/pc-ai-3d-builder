@@ -226,4 +226,27 @@ describe("catalogue writes", () => {
       ),
     ).toHaveLength(1);
   });
+
+  it("rejects a CSV media-type prefix spoof before database work", async () => {
+    const { calls, db } = createD1Stub();
+    const request = new Request("https://app.example/api/catalogue/import", {
+      method: "POST",
+      headers: { "content-type": "text/csv-malicious" },
+      body: validCsv,
+    });
+
+    await expect(
+      catalogueImportResponse(
+        request,
+        db,
+        context("admin"),
+        "request-media-type-spoof",
+      ),
+    ).rejects.toMatchObject({
+      status: 415,
+      code: "UNSUPPORTED_MEDIA_TYPE",
+    });
+    expect(request.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
 });

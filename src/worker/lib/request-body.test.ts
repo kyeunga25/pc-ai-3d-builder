@@ -28,6 +28,36 @@ describe("bounded JSON request bodies", () => {
     });
   });
 
+  it.each(["application/jsonp", "application/json-evil"])(
+    "rejects the JSON prefix spoof %s before reading its body",
+    async (contentType) => {
+      const request = new Request("https://app.example/api/review", {
+        method: "PATCH",
+        headers: { "content-type": contentType },
+        body: JSON.stringify({ action: "save_draft" }),
+      });
+
+      await expect(readBoundedJson(request)).rejects.toMatchObject({
+        status: 415,
+        code: "UNSUPPORTED_MEDIA_TYPE",
+        message: expect.stringMatching(/JSON.*JSON/iu),
+      });
+      expect(request.bodyUsed).toBe(false);
+    },
+  );
+
+  it("accepts a case-insensitive JSON media type with parameters", async () => {
+    const request = new Request("https://app.example/api/review", {
+      method: "PATCH",
+      headers: { "content-type": "Application/JSON ; Charset=UTF-8" },
+      body: JSON.stringify({ action: "save_draft" }),
+    });
+
+    await expect(readBoundedJson(request)).resolves.toEqual({
+      action: "save_draft",
+    });
+  });
+
   it("stops reading when a streamed body exceeds the limit", async () => {
     const encoder = new TextEncoder();
     const chunks = [encoder.encode('{"a":'), encoder.encode('"value"}')];
@@ -71,4 +101,22 @@ describe("bounded JSON request bodies", () => {
 
     await expect(readBoundedCsv(request, 128)).resolves.toContain("CASE-001");
   });
+
+  it.each(["text/csvx", "text/csv-malicious"])(
+    "rejects the CSV prefix spoof %s before reading its body",
+    async (contentType) => {
+      const request = new Request("https://app.example/api/catalogue/import", {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body: "sku,category\nCASE-001,case",
+      });
+
+      await expect(readBoundedCsv(request)).rejects.toMatchObject({
+        status: 415,
+        code: "UNSUPPORTED_MEDIA_TYPE",
+        message: expect.stringMatching(/CSV.*CSV/iu),
+      });
+      expect(request.bodyUsed).toBe(false);
+    },
+  );
 });

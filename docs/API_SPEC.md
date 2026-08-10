@@ -2,6 +2,8 @@
 
 All responses include public security headers. API responses use `Cache-Control: no-store`.
 
+JSON mutation routes require the exact `application/json` media-type token and CSV import requires the exact `text/csv` token; media-type matching is case-insensitive and permits parameters such as `charset=utf-8`. Prefix lookalikes such as `application/jsonp` or `text/csvx` return bilingual `UNSUPPORTED_MEDIA_TYPE` before the Worker reads the body or performs a D1/R2 write. Correcting the header permits a safe retry under the route's existing role, workspace, version and idempotency rules.
+
 ## `GET /api/health`
 
 Public lightweight health check.
@@ -44,7 +46,7 @@ The catalogue row and a minimal audit event are submitted in one D1 batch. The r
 
 ## `POST /api/catalogue/import`
 
-Imports a CSV document using `Content-Type: text/csv`. The body is limited to 256 KiB and must contain the exact documented template headers and between 1 and 50 valid rows. Duplicate SKU values within the document or the resolved workspace reject the complete import.
+Imports a CSV document using the exact `Content-Type: text/csv` media-type token, with optional parameters. The body is limited to 256 KiB and must contain the exact documented template headers and between 1 and 50 valid rows. Duplicate SKU values within the document or the resolved workspace reject the complete import.
 
 Every catalogue insert and its minimal audit event are submitted in one transactional D1 batch. The route never partially imports a rejected document.
 
