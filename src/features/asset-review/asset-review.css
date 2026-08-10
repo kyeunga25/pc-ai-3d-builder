@@ -601,6 +601,13 @@
   min-height: 54px;
 }
 
+.review-actions .button--danger.is-armed {
+  border-color: var(--warning);
+  background: rgba(255, 176, 32, 0.12);
+  box-shadow: 0 0 0 2px rgba(255, 176, 32, 0.12);
+  color: var(--warning);
+}
+
 .review-action-label {
   display: grid;
   min-width: 0;

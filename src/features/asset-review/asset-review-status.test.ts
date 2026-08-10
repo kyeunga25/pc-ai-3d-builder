@@ -5,9 +5,11 @@ import { AssetReviewApiError } from "./asset-review-api";
 import {
   assetReviewErrorNotice,
   assetReviewNotice,
+  assetReviewRejectActionLabel,
   assetReviewSavedNotice,
   assetReviewSavingNotice,
   assetReviewStatusCopy,
+  nextAssetReviewRejectIntent,
 } from "./asset-review-status";
 
 const bilingualPattern = /[\u3400-\u9fff].*[A-Za-z]/u;
@@ -49,6 +51,57 @@ describe("Asset Review status copy", () => {
       expect(notice.english).not.toContain("Saved data was not changed");
     },
   );
+
+  it("keeps reject confirmation separate from the submitting state", () => {
+    expect(assetReviewRejectActionLabel(false, false)).toEqual({
+      english: "Reject",
+      zhHant: "拒絕",
+    });
+    expect(assetReviewRejectActionLabel(true, false)).toEqual({
+      english: "Confirm rejection",
+      zhHant: "確認拒絕",
+    });
+    expect(assetReviewRejectActionLabel(true, true)).toEqual({
+      english: "Rejecting…",
+      zhHant: "拒絕中…",
+    });
+    expect(assetReviewStatusCopy.confirmReject).toMatchObject({
+      tone: "warning",
+    });
+    expect(assetReviewStatusCopy.confirmReject.zhHant).toContain(
+      "不會刪除私人檔案",
+    );
+    expect(assetReviewStatusCopy.confirmReject.english).toContain(
+      "reserved credit",
+    );
+  });
+
+  it("submits rejection only after two requests for the same asset version", () => {
+    const firstRequest = nextAssetReviewRejectIntent(
+      null,
+      "workspace-a:asset-a:3",
+    );
+    expect(firstRequest).toEqual({
+      nextArmedKey: "workspace-a:asset-a:3",
+      shouldSubmit: false,
+    });
+
+    expect(
+      nextAssetReviewRejectIntent(
+        firstRequest.nextArmedKey,
+        "workspace-a:asset-a:3",
+      ),
+    ).toEqual({ nextArmedKey: null, shouldSubmit: true });
+    expect(
+      nextAssetReviewRejectIntent(
+        firstRequest.nextArmedKey,
+        "workspace-a:asset-a:4",
+      ),
+    ).toEqual({
+      nextArmedKey: "workspace-a:asset-a:4",
+      shouldSubmit: false,
+    });
+  });
 
   it("retains bounded bilingual API and file-validation messages", () => {
     const apiMessage =

@@ -117,6 +117,11 @@ export const assetReviewStatusCopy = {
     "The verified dimensions have unsaved changes",
     "warning",
   ),
+  confirmReject: assetReviewNotice(
+    "再次按下「確認拒絕」才會標記此素材為已拒絕，並可能釋放保留 credit；不會刪除私人檔案。",
+    "Press Confirm rejection again to mark this asset as rejected and possibly release reserved credit; private files will not be deleted.",
+    "warning",
+  ),
   uploadingSource: assetReviewNotice(
     "正在驗證及上載來源圖片…",
     "Validating and uploading the source image…",
@@ -188,6 +193,29 @@ export const assetReviewStatusCopy = {
     "error",
   ),
 } as const;
+
+export function assetReviewRejectActionLabel(
+  armed: boolean,
+  submitting: boolean,
+): BilingualCopy {
+  if (submitting) {
+    return bilingualCopy("拒絕中…", "Rejecting…");
+  }
+  if (armed) {
+    return bilingualCopy("確認拒絕", "Confirm rejection");
+  }
+  return bilingualCopy("拒絕", "Reject");
+}
+
+export function nextAssetReviewRejectIntent(
+  armedKey: string | null,
+  currentKey: string,
+): { nextArmedKey: string | null; shouldSubmit: boolean } {
+  if (armedKey === currentKey) {
+    return { nextArmedKey: null, shouldSubmit: true };
+  }
+  return { nextArmedKey: currentKey, shouldSubmit: false };
+}
 
 export function assetReviewQueueNotice(count: number): AssetReviewNotice {
   return assetReviewNotice(

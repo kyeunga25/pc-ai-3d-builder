@@ -74,11 +74,13 @@ import {
   assetReviewErrorNotice,
   assetReviewGenerationFailureNotice,
   assetReviewQueueNotice,
+  assetReviewRejectActionLabel,
   assetReviewSavedNotice,
   assetReviewSavingNotice,
   assetReviewStatusCopy,
   bilingualCopy,
   bilingualTitle,
+  nextAssetReviewRejectIntent,
   type AssetReviewNotice,
   type BilingualCopy,
 } from "./asset-review-status";
@@ -134,8 +136,6 @@ const reviewActionCopy = {
   builder: bilingualCopy("在 Builder 檢查", "Check in Builder"),
   create: bilingualCopy("建立模擬 GLB 草稿", "Create simulated GLB draft"),
   creating: bilingualCopy("建立中…", "Creating…"),
-  reject: bilingualCopy("拒絕", "Reject"),
-  rejecting: bilingualCopy("拒絕中…", "Rejecting…"),
   running: bilingualCopy("模擬工作進行中", "Simulation in progress"),
   save: bilingualCopy("儲存草稿", "Save draft"),
   saving: bilingualCopy("儲存中…", "Saving…"),
@@ -288,6 +288,7 @@ export function AssetReviewPage() {
     AssetReviewMutation["action"] | null
   >(null);
   const submitting = submittingAction !== null;
+  const [rejectArmedKey, setRejectArmedKey] = useState<string | null>(null);
   const [reviewNotice, setReviewNotice] = useState<AssetReviewNotice>(() =>
     isLocalPreview
       ? localNavigationState?.localAsset?.sourceKind === "uploaded"
@@ -566,6 +567,8 @@ export function AssetReviewPage() {
   }
 
   const { asset } = form;
+  const currentRejectKey = `${currentWorkspace.id}:${assetKey(asset)}`;
+  const rejectArmed = rejectArmedKey === currentRejectKey;
   const badge = reviewBadge(asset.status);
   const visibleFileUrls =
     fileUrls.assetKey === assetKey(asset)
@@ -619,10 +622,10 @@ export function AssetReviewPage() {
     submittingAction === "approve"
       ? reviewActionCopy.approving
       : reviewActionCopy.approve;
-  const rejectActionLabel =
-    submittingAction === "reject"
-      ? reviewActionCopy.rejecting
-      : reviewActionCopy.reject;
+  const rejectActionLabel = assetReviewRejectActionLabel(
+    rejectArmed,
+    submittingAction === "reject",
+  );
   const saveActionLabel =
     submittingAction === "save_draft"
       ? reviewActionCopy.saving
@@ -670,6 +673,15 @@ export function AssetReviewPage() {
     : bilingualTitle(
         "上載並檢查 GLB 模型後才可核准",
         "Upload and inspect a GLB model before approval",
+      );
+  const rejectActionTitle = rejectArmed
+    ? bilingualTitle(
+        "再次按下以確認拒絕；私人檔案不會被刪除",
+        "Press again to confirm rejection; private files will not be deleted",
+      )
+    : bilingualTitle(
+        "拒絕會更新審核狀態",
+        "Rejection updates the review status",
       );
 
   const transitionLocalReservedGeneration = (
@@ -729,6 +741,7 @@ export function AssetReviewPage() {
     if (!isLocalPreview || !currentForm || !canEdit || uploadingKind) {
       return;
     }
+    setRejectArmedKey(null);
     const bytes = createSyntheticSourcePng();
     const contentType = validateAssetFileBytes("source", "image/png", bytes);
     const objectUrl = URL.createObjectURL(
@@ -785,6 +798,7 @@ export function AssetReviewPage() {
     if (!canEdit) {
       return;
     }
+    setRejectArmedKey(null);
 
     setForm((current) => {
       if (!current) {
@@ -809,6 +823,7 @@ export function AssetReviewPage() {
     if (!canEdit) {
       return;
     }
+    setRejectArmedKey(null);
 
     setForm((current) =>
       current
@@ -833,6 +848,7 @@ export function AssetReviewPage() {
       return;
     }
 
+    setRejectArmedKey(null);
     setUploadingKind(kind);
     setReviewNotice(
       kind === "source"
@@ -936,6 +952,7 @@ export function AssetReviewPage() {
     if (!currentForm || !canRequestGeneration) {
       return;
     }
+    setRejectArmedKey(null);
     setGenerationSubmitting(true);
     setReviewNotice(assetReviewStatusCopy.creatingGeneration);
     try {
@@ -1056,6 +1073,7 @@ export function AssetReviewPage() {
     if (!currentForm || submitting) {
       return;
     }
+    setRejectArmedKey(null);
     const hadReservedGeneration = generationState.items.some(
       (job) =>
         job.assetId === currentForm.asset.id &&
@@ -1139,6 +1157,22 @@ export function AssetReviewPage() {
     } finally {
       setSubmittingAction(null);
     }
+  };
+
+  const requestReject = () => {
+    if (!canDecide || submitting) {
+      return;
+    }
+    const intent = nextAssetReviewRejectIntent(
+      rejectArmedKey,
+      currentRejectKey,
+    );
+    setRejectArmedKey(intent.nextArmedKey);
+    if (!intent.shouldSubmit) {
+      setReviewNotice(assetReviewStatusCopy.confirmReject);
+      return;
+    }
+    void submitReview("reject");
   };
 
   return (
@@ -1555,10 +1589,12 @@ export function AssetReviewPage() {
       <footer className="review-actions">
         <div>
           <button
-            className="button button--danger"
+            className={`button button--danger${rejectArmed ? " is-armed" : ""}`}
             type="button"
             disabled={!canDecide || submitting}
-            onClick={() => void submitReview("reject")}
+            aria-pressed={rejectArmed}
+            title={rejectActionTitle}
+            onClick={requestReject}
           >
             <X aria-hidden="true" />
             <BilingualActionLabel copy={rejectActionLabel} />

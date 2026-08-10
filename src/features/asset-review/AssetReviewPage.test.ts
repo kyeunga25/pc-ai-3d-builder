@@ -80,6 +80,10 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("核准素材");
     expect(markup).toContain("Approve asset");
     expect(markup).toContain('lang="en"');
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).toContain(
+      "拒絕會更新審核狀態 / Rejection updates the review status",
+    );
     expect(markup).not.toContain(reviewAsset.id);
   });
 

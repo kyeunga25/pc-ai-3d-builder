@@ -26,7 +26,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 受 workspace 限制的分頁產品目錄 API；私人分頁游標只經受保護請求標頭傳送，不寫入瀏覽器 URL，production 介面亦具備載入、空白與錯誤狀態。
 - Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。新增、編輯、封存、素材草稿及 CSV 匯入均使用繁中／英文的提示、成功、警告或錯誤狀態；單語技術例外會換成安全文案，無法確認的寫入結果會要求重新載入才重試。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
-- 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。保存、核准、拒絕、檔案上載及模擬生成狀態均以繁中／英文及相符的提示、成功、警告或錯誤語意顯示；網絡中斷後不會假定寫入或工作未發生，而會要求先重新載入。
+- 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。保存、核准、拒絕、檔案上載及模擬生成狀態均以繁中／英文及相符的提示、成功、警告或錯誤語意顯示；網絡中斷後不會假定寫入或工作未發生，而會要求先重新載入。拒絕採用同一素材版本內的兩步確認，先說明可能釋放保留 credit、但不會刪除私人檔案，第二次按下才送出審核 mutation；切換素材或進行其他表單操作會解除確認。
 - 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；可上載最多 10 MiB 的 JPEG／PNG／WebP 來源圖片，上載前會核對 MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF frame 結構，以及每邊最多 32,768 px、總像素最多 100 MP 的安全上限。
 - 透過固定檔案 API 與受保護的 asset／file-kind 標頭，上載最多 25 MiB 的自包含 glTF 2.0 GLB；經授權讀取後在審核室及 Builder 以 Three.js 人手預覽，私人 asset ID 不進檔案 URL 或 body。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。瀏覽器的短期 Blob URL 綁定目前檔案要求的 abort signal，切換 workspace／素材或卸載畫面便冪等撤銷，遲到的已取消回應不會建立新 URL。回滾及取代只清理單一明確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交狀態。
@@ -163,7 +163,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - 目錄及素材查詢必須同時限制 workspace；審核及檔案更新使用版本條件，並在 D1 commit 邊界重查產品仍為 active，避免覆寫其他人變更或寫入已封存產品。
 - 組裝讀寫必須同時限制 workspace；讀取空清單不會建立資料，更新使用版本及一次性 mutation token。
 - 匯出在有嚴重錯誤或未知相容性結果時會停止，並排除身份、營運及私人素材欄位。
-- Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。
+- Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。前端拒絕確認只減少誤按，伺服器仍獨立執行角色、workspace、素材版本及狀態檢查。
 - 限流在任何 protected D1 工作前，把已驗證 Access subject 轉成版本化、domain-separated SHA-256 opaque key；raw subject、JWT 及電郵均不會傳入 Rate Limiting binding 或 request log。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
 - Builder 只讀取已核准素材的私人 GLB，並在選擇切換或頁面卸載時撤銷瀏覽器 object URL。

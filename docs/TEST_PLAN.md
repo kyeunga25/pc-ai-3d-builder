@@ -38,6 +38,7 @@ Current unit tests cover:
 - abort-bound browser object URLs for remote private files, including no materialization after cancellation, immediate cleanup when cancellation wins during creation and exact-once revocation after abort or explicit release;
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
 - typed bilingual Asset Review progress/success/warning/error notices, status-versus-alert semantics, operation-specific ambiguous-result fallbacks, preservation of bounded bilingual API/file-validation messages and action-specific progress copy;
+- rejection intent that arms without submitting on the first request, submits only on a second request for the same workspace and asset version, and re-arms without submission for a changed version;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
 - bounded JSON mutation bodies;
 - fixed-URL header-only asset detail/review targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, viewer rejection, complete-approval requirements and stale-version rejection;
@@ -90,6 +91,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - a synthetic GLB unlocks the manual Three.js preview and remains required for approval;
 - desktop and 390 px layouts show source and model controls without page-level horizontal overflow;
 - completing the final asset checklist item enables approval, and approval locks the reviewed fields;
+- the first reject press shows a bilingual warning, changes the button to an explicit confirmation state and sends no review request; another form action or asset/version change cancels it, while a second press for the unchanged asset submits rejection without deleting its private files;
 - local preview starts with two clearly non-monetary capability credits and requires a saved source-rights confirmation before enabling zero-cost simulation;
 - local simulation reserves exactly one capability credit, creates a runtime synthetic GLB, records one provider cost unit, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
 - a second generation is blocked while the first reservation awaits review;
