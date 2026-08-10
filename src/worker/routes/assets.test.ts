@@ -7,6 +7,7 @@ import {
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
 import {
+  assetDetailResponse,
   assetReviewMutationResponse,
   assetReviewQueueResponse,
   resolveReviewTransition,
@@ -150,6 +151,33 @@ describe("asset review business rules", () => {
 });
 
 describe("asset review routes", () => {
+  it("returns safe asset detail from a workspace-bound lookup", async () => {
+    const { db, prepared } = fakeDatabase();
+
+    const response = await assetDetailResponse(
+      db,
+      context("viewer"),
+      "asset-fixture",
+    );
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(prepared[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
+    expect(text).not.toContain("private/source-fixture");
+    expect(text).not.toContain("source_sha256");
+    expect(text).not.toContain("workspace-fixture");
+  });
+
+  it("treats an asset outside the resolved workspace as not found", async () => {
+    const { db, prepared } = fakeDatabase({ rows: [] });
+
+    await expect(
+      assetDetailResponse(db, context("viewer"), "asset-foreign"),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(prepared[0]?.values).toEqual(["workspace-fixture", "asset-foreign"]);
+  });
+
   it("returns only the verified workspace review queue", async () => {
     const { db, prepared } = fakeDatabase({
       rows: [{ ...assetRow, status: "in_review", quality: "draft" }],

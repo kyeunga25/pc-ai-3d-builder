@@ -7,6 +7,7 @@ import type { RequestContext } from "../auth/workspace";
 import { createD1Stub } from "../test/d1-stub";
 import {
   buildCreateResponse,
+  buildDetailResponse,
   buildExportResponse,
   buildListResponse,
   buildMutationResponse,
@@ -86,6 +87,36 @@ describe("persistent build routes", () => {
     });
     expect(calls[0]?.values).toEqual(["workspace-fixture"]);
     expect(calls[0]?.sql).toContain("LIMIT 50");
+  });
+
+  it("reads build detail only through workspace-bound lookups", async () => {
+    const selectedPart = catalogParts[0]!;
+    const { calls, db } = createD1Stub({
+      firstResults: [buildRow],
+      allResults: [[catalogueRow(selectedPart)]],
+    });
+
+    const response = await buildDetailResponse(
+      db,
+      context("viewer"),
+      "build-fixture",
+    );
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(calls[0]?.values).toEqual(["workspace-fixture", "build-fixture"]);
+    expect(calls[1]?.values).toEqual(["workspace-fixture", "build-fixture"]);
+    expect(text).not.toContain("workspace-fixture");
+  });
+
+  it("treats a build outside the resolved workspace as not found", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [null] });
+
+    await expect(
+      buildDetailResponse(db, context("viewer"), "build-foreign"),
+    ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
+    expect(calls[0]?.values).toEqual(["workspace-fixture", "build-foreign"]);
   });
 
   it("rejects viewer creation before reading the request or database", async () => {
