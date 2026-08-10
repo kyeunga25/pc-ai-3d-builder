@@ -494,7 +494,9 @@ export function AssetReviewPage() {
       <div className="page asset-review-page">
         <EmptyState
           title="沒有等待審核的素材"
+          titleEnglish="No assets are waiting for review"
           message="請先在產品目錄為一項產品上載私人來源圖片，建立新的素材草稿。"
+          messageEnglish="First upload a private source image to a catalogue product to create a new asset draft."
         />
       </div>
     );

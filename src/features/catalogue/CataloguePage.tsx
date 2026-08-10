@@ -532,10 +532,20 @@ export function CataloguePage() {
               title={
                 parts.length === 0 ? "產品目錄仍是空白" : "找不到相符的目錄組件"
               }
+              titleEnglish={
+                parts.length === 0
+                  ? "The catalogue is empty"
+                  : "No matching catalogue parts"
+              }
               message={
                 parts.length === 0
                   ? "使用「新增產品」或 CSV 匯入，建立這個工作空間的第一項產品。"
                   : "請嘗試其他 SKU、品牌或組件分類。"
+              }
+              messageEnglish={
+                parts.length === 0
+                  ? "Use Add product or CSV import to create the first product in this workspace."
+                  : "Try another SKU, brand, or component category."
               }
             />
           ) : (

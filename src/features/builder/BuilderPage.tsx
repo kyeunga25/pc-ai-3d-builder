@@ -510,10 +510,16 @@ export function BuilderPage() {
       <div className="page builder-page builder-page--state">
         <EmptyState
           title="目前沒有組裝草稿"
+          titleEnglish="No build drafts yet"
           message={
             canWrite
               ? "讀取空清單不會自動建立資料。按下方按鈕明確建立第一個工作空間組裝草稿。"
               : "你的角色可查看組裝，但目前工作空間尚未建立任何草稿。"
+          }
+          messageEnglish={
+            canWrite
+              ? "Reading an empty list does not create data. Use the button below to create the first workspace build draft explicitly."
+              : "Your role can view builds, but this workspace does not have any drafts yet."
           }
         />
         {canWrite ? (

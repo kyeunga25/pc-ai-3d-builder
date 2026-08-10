@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ErrorState, LoadingState } from "./AsyncState";
+import { EmptyState, ErrorState, LoadingState } from "./AsyncState";
 
 describe("shared async states", () => {
   it("renders a bilingual loading status", () => {
@@ -36,5 +36,22 @@ describe("shared async states", () => {
     expect(markup).toContain("No merchant data was changed.");
     expect(markup).toContain("重試");
     expect(markup).toContain("Retry");
+  });
+
+  it("renders a bilingual empty state without implying a write", () => {
+    const markup = renderToStaticMarkup(
+      createElement(EmptyState, {
+        title: "目前沒有組裝草稿",
+        titleEnglish: "No build drafts yet",
+        message: "讀取空清單不會自動建立資料。",
+        messageEnglish: "Reading an empty list does not create data.",
+      }),
+    );
+
+    expect(markup).toContain("目前沒有組裝草稿");
+    expect(markup).toContain("No build drafts yet");
+    expect(markup).toContain("讀取空清單不會自動建立資料。");
+    expect(markup).toContain("Reading an empty list does not create data.");
+    expect(markup).toContain('lang="en"');
   });
 });

@@ -24,16 +24,26 @@ export function LoadingState({
 
 export function EmptyState({
   title,
+  titleEnglish,
   message,
+  messageEnglish,
 }: {
   title: string;
+  titleEnglish: string;
   message: string;
+  messageEnglish: string;
 }) {
   return (
     <div className="async-state">
       <Inbox aria-hidden="true" />
-      <strong>{title}</strong>
-      <span>{message}</span>
+      <strong>
+        {title}
+        <small lang="en">{titleEnglish}</small>
+      </strong>
+      <span className="async-state__message">{message}</span>
+      <span className="async-state__secondary" lang="en">
+        {messageEnglish}
+      </span>
     </div>
   );
 }

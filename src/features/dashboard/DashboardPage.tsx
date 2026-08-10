@@ -318,7 +318,9 @@ export function DashboardPage() {
           ) : (
             <EmptyState
               title="目前沒有待辦工作"
+              titleEnglish="No tasks need attention"
               message="新增目錄產品或建立組裝草稿後，最近工作會顯示在此。"
+              messageEnglish="Recent work will appear here after you add catalogue products or create build drafts."
             />
           )}
           <Link className="text-link" to="/asset-review">
