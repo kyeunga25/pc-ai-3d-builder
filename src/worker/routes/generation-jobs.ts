@@ -16,7 +16,7 @@ import {
 } from "../generation/accounting";
 import { generationRuntimeConfig } from "../generation/provider";
 import { ApiError } from "../lib/api-error";
-import { privateObjectMetadataMatches } from "../lib/private-assets";
+import { privateObjectMatches } from "../lib/private-assets";
 import { readBoundedJson } from "../lib/request-body";
 import { assetRecordIdPattern, findAsset } from "./assets";
 
@@ -358,11 +358,13 @@ export async function generationJobStartResponse(
     );
   }
   if (
-    !(await privateObjectMetadataMatches(
+    !(await privateObjectMatches(
       env.PRIVATE_ASSETS,
       asset.source_object_key,
+      "source",
       asset.source_content_type,
       asset.source_size_bytes,
+      asset.source_sha256,
     ))
   ) {
     throw generationSourceRequired();

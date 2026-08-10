@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { WorkspaceRole } from "../src/shared/domain/session";
 import type { RequestContext } from "../src/worker/auth/workspace";
+import { sha256Hex } from "../src/worker/lib/digest";
 import {
   assetFileResponse,
   assetFileUploadResponse,
@@ -34,9 +35,9 @@ const requesterFixture: WorkspaceFixture = {
 
 const assetId = "asset-file-isolation-protected";
 const sourceBytes = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
 ]);
-const sourceDigest = "f".repeat(64);
+const sourceDigest = await sha256Hex(sourceBytes);
 const sourceObjectKey =
   "workspaces/workspace-file-isolation-protected/assets/asset-file-isolation-protected/source/fixture";
 
@@ -150,6 +151,21 @@ describe("private asset file workspace isolation", () => {
 
     await env.PRIVATE_ASSETS.put(sourceObjectKey, sourceBytes, {
       httpMetadata: { contentType: "image/jpeg", cacheControl: "no-store" },
+    });
+    await expect(
+      assetFileResponse(
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        assetId,
+        "source",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+
+    const checksumDriftBytes = sourceBytes.slice();
+    checksumDriftBytes[checksumDriftBytes.byteLength - 1] = 0x01;
+    await env.PRIVATE_ASSETS.put(sourceObjectKey, checksumDriftBytes, {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
     });
     await expect(
       assetFileResponse(

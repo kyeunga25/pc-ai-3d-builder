@@ -20,7 +20,9 @@ const workspaceId = "workspace-local-generation";
 const userId = "user-local-generation";
 const partId = "part-local-generation";
 const assetId = "asset-local-generation";
-const sourceSha256 = "a".repeat(64);
+const sourceBytes = new Uint8Array(128);
+sourceBytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const sourceSha256 = await sha256Hex(sourceBytes);
 
 type GenerationFixture = {
   workspaceId: string;
@@ -192,7 +194,7 @@ async function seedGenerationFixture(
        VALUES (?1, 2)`,
     ).bind(fixture.workspaceId),
   ]);
-  await env.PRIVATE_ASSETS.put(sourceObjectKey(fixture), new Uint8Array(128), {
+  await env.PRIVATE_ASSETS.put(sourceObjectKey(fixture), sourceBytes, {
     httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
   });
 }
@@ -256,7 +258,9 @@ describe("local generation Workflow", () => {
       expect(privateObject?.httpMetadata?.contentType).toBe(
         "model/gltf-binary",
       );
+      expect(privateObject?.checksums.sha256).toBeDefined();
       const outputBytes = new Uint8Array(await privateObject!.arrayBuffer());
+      expect(await sha256Hex(outputBytes)).toBe(job!.output_sha256);
       expect(
         validateGeneratedGlb(outputBytes, generationOutputRequirements),
       ).toMatchObject({
@@ -395,7 +399,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-isolation-protected",
       partId: "part-local-isolation-protected",
       assetId: "asset-local-isolation-protected",
-      sourceSha256: "d".repeat(64),
+      sourceSha256,
       slug: "local-isolation-protected",
       idempotencyKey: "local-isolation-protected-request-001",
     };
@@ -404,7 +408,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-isolation-requester",
       partId: "part-local-isolation-requester",
       assetId: "asset-local-isolation-requester",
-      sourceSha256: "e".repeat(64),
+      sourceSha256,
       slug: "local-isolation-requester",
       idempotencyKey: "local-isolation-requester-request-001",
     };
@@ -453,7 +457,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-source-preflight",
       partId: "part-local-source-preflight",
       assetId: "asset-local-source-preflight",
-      sourceSha256: "7".repeat(64),
+      sourceSha256,
       slug: "local-source-preflight",
       idempotencyKey: "local-source-preflight-request-001",
     };
@@ -522,7 +526,7 @@ describe("local generation Workflow", () => {
       ),
     ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
 
-    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(128), {
+    await env.PRIVATE_ASSETS.put(sourceKey, sourceBytes, {
       httpMetadata: { contentType: "image/jpeg", cacheControl: "no-store" },
     });
     await expect(
@@ -532,6 +536,21 @@ describe("local generation Workflow", () => {
         sourceContext,
         sourceFixture.assetId,
         "request-local-source-type-drift",
+      ),
+    ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
+
+    const checksumDriftBytes = sourceBytes.slice();
+    checksumDriftBytes[checksumDriftBytes.byteLength - 1] = 0x01;
+    await env.PRIVATE_ASSETS.put(sourceKey, checksumDriftBytes, {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+    });
+    await expect(
+      generationJobStartResponse(
+        generationRequest(sourceFixture),
+        routeEnv,
+        sourceContext,
+        sourceFixture.assetId,
+        "request-local-source-checksum-drift",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
 
@@ -555,7 +574,7 @@ describe("local generation Workflow", () => {
     });
     expect(creates).toHaveLength(0);
 
-    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(128), {
+    await env.PRIVATE_ASSETS.put(sourceKey, sourceBytes, {
       httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
     });
     const recovered = await generationJobStartResponse(
@@ -602,7 +621,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-catalogue-reservation-race",
       partId: "part-local-catalogue-reservation-race",
       assetId: "asset-local-catalogue-reservation-race",
-      sourceSha256: "5".repeat(64),
+      sourceSha256,
       slug: "local-catalogue-reservation-race",
       idempotencyKey: "local-catalogue-reservation-race-request-001",
     };
@@ -717,7 +736,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-catalogue-claim-race",
       partId: "part-local-catalogue-claim-race",
       assetId: "asset-local-catalogue-claim-race",
-      sourceSha256: "4".repeat(64),
+      sourceSha256,
       slug: "local-catalogue-claim-race",
       idempotencyKey: "local-catalogue-claim-race-request-001",
     };
@@ -829,7 +848,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-catalogue-stage-race",
       partId: "part-local-catalogue-stage-race",
       assetId: "asset-local-catalogue-stage-race",
-      sourceSha256: "3".repeat(64),
+      sourceSha256,
       slug: "local-catalogue-stage-race",
       idempotencyKey: "local-catalogue-stage-race-request-001",
     };
@@ -942,13 +961,13 @@ describe("local generation Workflow", () => {
     });
   });
 
-  it("releases once when source storage disappears after route preflight", async () => {
+  it("releases once when source bytes drift after route preflight", async () => {
     const raceFixture: GenerationFixture = {
       workspaceId: "workspace-local-source-race",
       userId: "user-local-source-race",
       partId: "part-local-source-race",
       assetId: "asset-local-source-race",
-      sourceSha256: "6".repeat(64),
+      sourceSha256,
       slug: "local-source-race",
       idempotencyKey: "local-source-race-request-001",
     };
@@ -958,10 +977,20 @@ describe("local generation Workflow", () => {
       await introspector.modifyAll(async (modifier) => {
         await modifier.disableRetryDelays();
       });
-      const disappearingBucket = {
+      const racingBucket = {
         async head(key: string) {
-          const object = await env.PRIVATE_ASSETS.head(key);
-          await env.PRIVATE_ASSETS.delete(key);
+          return env.PRIVATE_ASSETS.head(key);
+        },
+        async get(key: string) {
+          const object = await env.PRIVATE_ASSETS.get(key);
+          const checksumDriftBytes = sourceBytes.slice();
+          checksumDriftBytes[checksumDriftBytes.byteLength - 1] = 0x01;
+          await env.PRIVATE_ASSETS.put(key, checksumDriftBytes, {
+            httpMetadata: {
+              contentType: "image/png",
+              cacheControl: "no-store",
+            },
+          });
           return object;
         },
       } as unknown as R2Bucket;
@@ -972,7 +1001,7 @@ describe("local generation Workflow", () => {
           DB: env.DB,
           GENERATION_MODE: "simulation",
           GENERATION_MAX_COST_MINOR: "0",
-          PRIVATE_ASSETS: disappearingBucket,
+          PRIVATE_ASSETS: racingBucket,
         },
         requestContextFor(raceFixture),
         raceFixture.assetId,
@@ -1042,7 +1071,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-start-failure",
       partId: "part-local-start-failure",
       assetId: "asset-local-start-failure",
-      sourceSha256: "9".repeat(64),
+      sourceSha256,
       slug: "local-start-failure",
       idempotencyKey: "local-start-failure-request-001",
     };
@@ -1173,7 +1202,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-no-credit",
       partId: "part-local-no-credit",
       assetId: "asset-local-no-credit",
-      sourceSha256: "8".repeat(64),
+      sourceSha256,
       slug: "local-no-credit",
       idempotencyKey: "local-no-credit-request-001",
     };
@@ -1341,7 +1370,7 @@ describe("local generation Workflow", () => {
       userId: "user-local-rejection",
       partId: "part-local-rejection",
       assetId: "asset-local-rejection",
-      sourceSha256: "c".repeat(64),
+      sourceSha256,
       slug: "local-rejection",
       idempotencyKey: "local-rejection-request-001",
     };

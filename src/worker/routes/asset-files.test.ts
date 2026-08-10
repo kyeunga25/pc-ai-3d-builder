@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
+import { sha256Hex } from "../lib/digest";
 import { createD1Stub } from "../test/d1-stub";
 import {
   assetFileResponse,
@@ -28,6 +29,15 @@ function context(role: WorkspaceRole = "owner"): RequestContext {
     workspaces: [],
   };
 }
+
+const minimalSource = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+const minimalSourceSha256 = await sha256Hex(minimalSource);
+const minimalSourceDigest = await crypto.subtle.digest(
+  "SHA-256",
+  minimalSource,
+);
 
 function minimalGlb(): Uint8Array {
   const rawJson = new TextEncoder().encode(
@@ -65,7 +75,7 @@ function assetRow(overrides: Record<string, unknown> = {}) {
     source_object_key: "private/source-fixture",
     source_content_type: "image/png",
     source_size_bytes: 8,
-    source_sha256: "a".repeat(64),
+    source_sha256: minimalSourceSha256,
     model_object_key: null,
     model_content_type: null,
     model_size_bytes: null,
@@ -79,16 +89,23 @@ function createR2Stub(
     key: string;
     bytes: Uint8Array;
     contentType?: string;
+    sha256?: ArrayBuffer;
   }> = [],
 ) {
   const objects = new Map(
-    initial.map(({ key, bytes, contentType }) => [key, { bytes, contentType }]),
+    initial.map(({ key, bytes, contentType, sha256 }) => [
+      key,
+      { bytes, contentType, sha256 },
+    ]),
   );
   const puts: string[] = [];
+  const putChecksums: Array<R2PutOptions["sha256"]> = [];
+  const materializedReads: string[] = [];
   const deletes: string[] = [];
   const bucket = {
     async put(key: string, value: Uint8Array, options?: R2PutOptions) {
       puts.push(key);
+      putChecksums.push(options?.sha256);
       const metadata = options?.httpMetadata;
       objects.set(key, {
         bytes: value,
@@ -96,6 +113,7 @@ function createR2Stub(
           metadata instanceof Headers
             ? (metadata.get("content-type") ?? undefined)
             : metadata?.contentType,
+        sha256: undefined,
       });
       return { key };
     },
@@ -106,6 +124,11 @@ function createR2Stub(
       }
       return {
         body: new Response(object.bytes.buffer as ArrayBuffer).body,
+        arrayBuffer: async () => {
+          materializedReads.push(key);
+          return object.bytes.slice().buffer;
+        },
+        checksums: object.sha256 ? { sha256: object.sha256 } : {},
         size: object.bytes.byteLength,
         httpMetadata: object.contentType
           ? { contentType: object.contentType }
@@ -117,7 +140,7 @@ function createR2Stub(
       objects.delete(key);
     },
   } as unknown as R2Bucket;
-  return { bucket, deletes, objects, puts };
+  return { bucket, deletes, materializedReads, objects, putChecksums, puts };
 }
 
 describe("private asset routes", () => {
@@ -125,10 +148,8 @@ describe("private asset routes", () => {
     const { calls, db } = createD1Stub({
       firstResults: [{ id: "part-fixture" }, null, assetRow()],
     });
-    const { bucket, puts } = createR2Stub();
-    const source = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
+    const { bucket, putChecksums, puts } = createR2Stub();
+    const source = minimalSource;
     const request = new Request(
       "https://app.example/api/catalogue/part-fixture/assets/source",
       {
@@ -156,6 +177,7 @@ describe("private asset routes", () => {
       },
     });
     expect(puts).toHaveLength(1);
+    expect(putChecksums[0]).toEqual(new Uint8Array(minimalSourceDigest));
     const auditCall = calls.find((call) =>
       call.sql.includes("asset.file.source.create"),
     );
@@ -319,9 +341,7 @@ describe("private asset routes", () => {
   });
 
   it("removes only the new object when an optimistic update loses a race", async () => {
-    const source = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
+    const source = minimalSource;
     const current = assetRow({ source_object_key: "private/old-source" });
     const { db } = createD1Stub({
       batchChanges: 0,
@@ -364,17 +384,16 @@ describe("private asset routes", () => {
   });
 
   it("streams a private file only after a workspace-scoped asset lookup", async () => {
-    const source = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
+    const source = minimalSource;
     const { calls, db } = createD1Stub({
       firstResults: [assetRow()],
     });
-    const { bucket } = createR2Stub([
+    const { bucket, materializedReads } = createR2Stub([
       {
         key: "private/source-fixture",
         bytes: source,
         contentType: "image/png",
+        sha256: minimalSourceDigest,
       },
     ]);
 
@@ -396,6 +415,7 @@ describe("private asset routes", () => {
       "private/source-fixture",
     );
     expect((await response.arrayBuffer()).byteLength).toBe(8);
+    expect(materializedReads).toEqual([]);
     expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
   });
 
@@ -408,6 +428,17 @@ describe("private asset routes", () => {
         key: "private/source-fixture",
         bytes: new Uint8Array(7),
         contentType: "image/png",
+      },
+    },
+    {
+      label: "source checksum",
+      kind: "source",
+      row: assetRow(),
+      stored: {
+        key: "private/source-fixture",
+        bytes: minimalSource,
+        contentType: "image/png",
+        sha256: new Uint8Array(32).fill(0xff).buffer,
       },
     },
     {

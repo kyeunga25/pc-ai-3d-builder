@@ -101,6 +101,7 @@ function workflowStub(instanceStatus = "unknown") {
 
 function sourceBucketStub(
   options: {
+    checksumByte?: number;
     contentType?: string;
     error?: Error;
     missing?: boolean;
@@ -118,6 +119,9 @@ function sourceBucketStub(
         return null;
       }
       return {
+        checksums: {
+          sha256: new Uint8Array(32).fill(options.checksumByte ?? 0xaa).buffer,
+        },
         size: options.size ?? 8,
         httpMetadata: { contentType: options.contentType ?? "image/png" },
       };
@@ -396,6 +400,7 @@ describe("generation job routes", () => {
     { label: "missing object", options: { missing: true } },
     { label: "size drift", options: { size: 7 } },
     { label: "content-type drift", options: { contentType: "image/jpeg" } },
+    { label: "checksum drift", options: { checksumByte: 0xbb } },
   ])(
     "rejects generation for a $label before reserving credit",
     async ({ options }) => {

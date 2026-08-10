@@ -16,6 +16,7 @@ import { sha256Hex } from "../lib/digest";
 import {
   assetObjectKey,
   deletePrivateObjectQuietly,
+  getVerifiedPrivateObject,
   putPrivateObject,
 } from "../lib/private-assets";
 import { readBoundedBinary } from "../lib/request-body";
@@ -170,7 +171,13 @@ export async function createAssetSourceResponse(
     assetId,
     "source",
   );
-  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
+  await putPrivateObject(
+    bucket,
+    objectKey,
+    file.bytes,
+    file.contentType,
+    file.sha256,
+  );
 
   try {
     await db.batch([
@@ -299,7 +306,13 @@ export async function assetFileUploadResponse(
         )
       : null;
   const nextVersion = currentVersion + 1;
-  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
+  await putPrivateObject(
+    bucket,
+    objectKey,
+    file.bytes,
+    file.contentType,
+    file.sha256,
+  );
 
   const updateStatement =
     kind === "source"
@@ -474,18 +487,20 @@ export async function assetFileResponse(
     kind === "source" ? asset.source_content_type : asset.model_content_type;
   const sizeBytes =
     kind === "source" ? asset.source_size_bytes : asset.model_size_bytes;
-  if (!objectKey || !contentType || sizeBytes === null) {
+  const sha256 = kind === "source" ? asset.source_sha256 : asset.model_sha256;
+  if (!objectKey || !contentType || sizeBytes === null || !sha256) {
     throw assetFileNotFound();
   }
 
-  const object = await bucket.get(objectKey);
-  if (!object || !("body" in object)) {
-    throw assetFileNotFound();
-  }
-  if (
-    object.size !== sizeBytes ||
-    object.httpMetadata?.contentType !== contentType
-  ) {
+  const object = await getVerifiedPrivateObject(
+    bucket,
+    objectKey,
+    kind,
+    contentType,
+    sizeBytes,
+    sha256,
+  );
+  if (!object) {
     throw assetFileNotFound();
   }
 
@@ -493,7 +508,7 @@ export async function assetFileResponse(
     headers: {
       "cache-control": "private, no-store",
       "content-disposition": `inline; filename="${kind}.${fileExtension(kind, contentType)}"`,
-      "content-length": String(object.size),
+      "content-length": String(object.sizeBytes),
       "content-type": contentType,
     },
   });

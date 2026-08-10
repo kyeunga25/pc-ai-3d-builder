@@ -38,7 +38,7 @@ import { pseudonymousGenerationRef, sha256Hex } from "../lib/digest";
 import {
   assetObjectKey,
   deletePrivateObjectQuietly,
-  privateObjectMetadataMatches,
+  privateObjectMatches,
   putPrivateObject,
 } from "../lib/private-assets";
 
@@ -610,11 +610,13 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
         "verify source object",
         stepConfig,
         () =>
-          privateObjectMetadataMatches(
+          privateObjectMatches(
             this.env.PRIVATE_ASSETS,
             claim.source.objectKey,
+            "source",
             claim.source.contentType,
             claim.source.sizeBytes,
+            claim.source.sha256,
           ),
       );
       if (!sourceReady) {
@@ -709,6 +711,7 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
           objectKey,
           generated.bytes,
           contentType,
+          sha256,
         );
         return {
           attemptKey,
