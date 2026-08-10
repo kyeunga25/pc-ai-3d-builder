@@ -7,6 +7,20 @@ export function assetObjectKey(
   return `workspaces/${workspaceId}/assets/${assetId}/${kind}/${objectId}`;
 }
 
+export async function privateObjectMetadataMatches(
+  bucket: R2Bucket,
+  objectKey: string,
+  contentType: string,
+  sizeBytes: number,
+): Promise<boolean> {
+  const stored = await bucket.head(objectKey);
+  return (
+    stored !== null &&
+    stored.size === sizeBytes &&
+    stored.httpMetadata?.contentType === contentType
+  );
+}
+
 export async function deletePrivateObjectQuietly(
   bucket: R2Bucket,
   objectKey: string | null,

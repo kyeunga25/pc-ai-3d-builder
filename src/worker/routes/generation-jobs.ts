@@ -16,6 +16,7 @@ import {
 } from "../generation/accounting";
 import { generationRuntimeConfig } from "../generation/provider";
 import { ApiError } from "../lib/api-error";
+import { privateObjectMetadataMatches } from "../lib/private-assets";
 import { readBoundedJson } from "../lib/request-body";
 import { assetRecordIdPattern, findAsset } from "./assets";
 
@@ -40,6 +41,7 @@ type GenerationRouteEnv = {
   DB: D1Database;
   GENERATION_MAX_COST_MINOR: string;
   GENERATION_MODE: string;
+  PRIVATE_ASSETS: R2Bucket;
 };
 
 const idempotencyKeyPattern = /^[A-Za-z0-9._:-]{8,128}$/u;
@@ -73,6 +75,14 @@ function assertGenerationRole(role: WorkspaceRole): void {
 
 function assetNotFound(): ApiError {
   return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+}
+
+function generationSourceRequired(): ApiError {
+  return new ApiError(
+    409,
+    "GENERATION_SOURCE_REQUIRED",
+    "必須先上載可安全讀取的私人來源圖片。 / Upload a safely readable private source image before generating.",
+  );
 }
 
 function mapGenerationJob(row: GenerationJobRow): GenerationJob {
@@ -326,12 +336,15 @@ export async function generationJobStartResponse(
       "素材已更新，請重新載入後再建立生成工作。",
     );
   }
-  if (!asset.source_object_key || !asset.source_sha256) {
-    throw new ApiError(
-      409,
-      "GENERATION_SOURCE_REQUIRED",
-      "必須先上載私人來源圖片。",
-    );
+  if (
+    !asset.source_object_key ||
+    !asset.source_content_type ||
+    !Number.isSafeInteger(asset.source_size_bytes) ||
+    asset.source_size_bytes === null ||
+    asset.source_size_bytes <= 0 ||
+    !asset.source_sha256
+  ) {
+    throw generationSourceRequired();
   }
   if (asset.source_rights_confirmed !== 1) {
     throw new ApiError(
@@ -339,6 +352,16 @@ export async function generationJobStartResponse(
       "GENERATION_RIGHTS_REQUIRED",
       "必須先儲存來源圖片使用權確認。",
     );
+  }
+  if (
+    !(await privateObjectMetadataMatches(
+      env.PRIVATE_ASSETS,
+      asset.source_object_key,
+      asset.source_content_type,
+      asset.source_size_bytes,
+    ))
+  ) {
+    throw generationSourceRequired();
   }
 
   const jobId = `generation_${crypto.randomUUID()}`;

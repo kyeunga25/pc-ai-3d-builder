@@ -50,7 +50,7 @@ Stores at most one selected catalogue part per build and component category. Com
 
 Stores one durable, workspace-scoped orchestration record per explicit request. The record includes the asset, requester, unique idempotency key, unique Workflow instance ID, requested review version, input checksum, execution mode, zero monetary cap, provider cost-unit cap, state, stable failure/validation codes and private output metadata.
 
-The browser representation omits the input checksum, Workflow ID, object keys, output checksum, requester and private attempt identifiers. It may return bounded provider-neutral cost units, entitlement state and a stable validation code; these values contain no price or provider identity. A partial unique index permits at most one queued, running or validating job for a workspace asset, while the request guard also blocks a new job when an `awaiting_review` job still owns a reserved entitlement. The currently valid execution mode is `simulation`; no external-provider identifier appears in the table or public domain model.
+The browser representation omits the input checksum, Workflow ID, object keys, output checksum, requester and private attempt identifiers. It may return bounded provider-neutral cost units, entitlement state and a stable validation code; these values contain no price or provider identity. Source R2 existence, size and content type are checked before the reservation batch and again inside the Workflow before a provider attempt. A missing source at the second boundary records `GENERATION_INPUT_MISSING` and releases the entitlement once. A partial unique index permits at most one queued, running or validating job for a workspace asset, while the request guard also blocks a new job when an `awaiting_review` job still owns a reserved entitlement. The currently valid execution mode is `simulation`; no external-provider identifier appears in the table or public domain model.
 
 ## `generation_job_events`
 
@@ -83,7 +83,7 @@ Stores one internal attempt row per `(workspace, job, attempt_key)`. A row moves
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
 - Build selection updates must use an expected version and server-only mutation token in one D1 batch.
-- Generation requests must reserve an available entitlement and persist the job, entitlement, credit event, initial job event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
+- Generation requests must validate matching private source metadata before reserving an available entitlement, then persist the job, entitlement, credit event, initial job event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
 - Generated output may update an asset only while its source checksum, saved rights confirmation and review version still match the requested input.
 - Staging a generated draft must update the asset review version, job state, job event and minimal audit record in one guarded batch; output remains private and unapproved.
 - Approval must settle a reserved entitlement; rejection, terminal failure, start failure or generated-draft replacement must release it. Retried terminal transitions must make no additional account or event change.

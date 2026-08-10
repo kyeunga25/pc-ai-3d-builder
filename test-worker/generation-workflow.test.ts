@@ -37,6 +37,10 @@ const defaultFixture: GenerationFixture = {
   idempotencyKey: "local-generation-request-001",
 };
 
+function sourceObjectKey(fixture: GenerationFixture): string {
+  return `workspaces/${fixture.workspaceId}/assets/${fixture.assetId}/source/fixture`;
+}
+
 const context: RequestContext = {
   user: {
     id: userId,
@@ -158,7 +162,7 @@ async function seedGenerationFixture(
       fixture.workspaceId,
       fixture.partId,
       JSON.stringify(["source_rights"]),
-      `workspaces/${fixture.workspaceId}/assets/${fixture.assetId}/source/fixture`,
+      sourceObjectKey(fixture),
       fixture.sourceSha256,
       fixture.userId,
     ),
@@ -167,6 +171,9 @@ async function seedGenerationFixture(
        VALUES (?1, 2)`,
     ).bind(fixture.workspaceId),
   ]);
+  await env.PRIVATE_ASSETS.put(sourceObjectKey(fixture), new Uint8Array(128), {
+    httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+  });
 }
 
 describe("local generation Workflow", () => {
@@ -419,6 +426,249 @@ describe("local generation Workflow", () => {
     }
   });
 
+  it("rejects unavailable source storage before reservation and recovers with the same key", async () => {
+    const sourceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-source-preflight",
+      userId: "user-local-source-preflight",
+      partId: "part-local-source-preflight",
+      assetId: "asset-local-source-preflight",
+      sourceSha256: "7".repeat(64),
+      slug: "local-source-preflight",
+      idempotencyKey: "local-source-preflight-request-001",
+    };
+    await seedGenerationFixture(sourceFixture);
+    const sourceKey = sourceObjectKey(sourceFixture);
+    const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
+      [];
+    const createdIds = new Set<string>();
+    const workflow = {
+      async create(
+        options?: WorkflowInstanceCreateOptions<AssetGenerationParams>,
+      ) {
+        if (options) {
+          creates.push(options);
+          if (options.id) {
+            createdIds.add(options.id);
+          }
+        }
+        return { id: options?.id ?? "generated" } as WorkflowInstance;
+      },
+      async get(id: string) {
+        return {
+          id,
+          async status() {
+            return createdIds.has(id)
+              ? { status: "running" as const }
+              : { status: "unknown" as const };
+          },
+        } as WorkflowInstance;
+      },
+    } as Workflow<AssetGenerationParams>;
+    const routeEnv = {
+      ASSET_GENERATION: workflow,
+      DB: env.DB,
+      GENERATION_MODE: "simulation",
+      GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: env.PRIVATE_ASSETS,
+    };
+    const sourceContext = requestContextFor(sourceFixture);
+
+    await env.PRIVATE_ASSETS.delete(sourceKey);
+    await expect(
+      generationJobStartResponse(
+        generationRequest(sourceFixture),
+        routeEnv,
+        sourceContext,
+        sourceFixture.assetId,
+        "request-local-source-missing",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "GENERATION_SOURCE_REQUIRED",
+      message: expect.stringMatching(/來源.*source/iu),
+    });
+
+    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(127), {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+    });
+    await expect(
+      generationJobStartResponse(
+        generationRequest(sourceFixture),
+        routeEnv,
+        sourceContext,
+        sourceFixture.assetId,
+        "request-local-source-size-drift",
+      ),
+    ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
+
+    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(128), {
+      httpMetadata: { contentType: "image/jpeg", cacheControl: "no-store" },
+    });
+    await expect(
+      generationJobStartResponse(
+        generationRequest(sourceFixture),
+        routeEnv,
+        sourceContext,
+        sourceFixture.assetId,
+        "request-local-source-type-drift",
+      ),
+    ).rejects.toMatchObject({ code: "GENERATION_SOURCE_REQUIRED" });
+
+    expect(
+      await env.DB.prepare(
+        `SELECT available_units, reserved_units,
+                (SELECT COUNT(*) FROM generation_jobs
+                 WHERE workspace_id = ?1) AS job_count,
+                (SELECT COUNT(*) FROM audit_events
+                 WHERE workspace_id = ?1 AND action = 'generation.request')
+                  AS audit_count
+         FROM generation_credit_accounts WHERE workspace_id = ?1`,
+      )
+        .bind(sourceFixture.workspaceId)
+        .first(),
+    ).toEqual({
+      available_units: 2,
+      reserved_units: 0,
+      job_count: 0,
+      audit_count: 0,
+    });
+    expect(creates).toHaveLength(0);
+
+    await env.PRIVATE_ASSETS.put(sourceKey, new Uint8Array(128), {
+      httpMetadata: { contentType: "image/png", cacheControl: "no-store" },
+    });
+    const recovered = await generationJobStartResponse(
+      generationRequest(sourceFixture),
+      routeEnv,
+      sourceContext,
+      sourceFixture.assetId,
+      "request-local-source-recovered",
+    );
+    expect(recovered.status).toBe(202);
+    expect(creates).toHaveLength(1);
+    const replay = await generationJobStartResponse(
+      generationRequest(sourceFixture),
+      routeEnv,
+      sourceContext,
+      sourceFixture.assetId,
+      "request-local-source-replay",
+    );
+    expect(replay.status).toBe(200);
+    expect(creates).toHaveLength(1);
+    expect(
+      await env.DB.prepare(
+        `SELECT available_units, reserved_units,
+                (SELECT COUNT(*) FROM generation_jobs
+                 WHERE workspace_id = ?1) AS job_count,
+                (SELECT COUNT(*) FROM audit_events
+                 WHERE workspace_id = ?1 AND action = 'generation.request')
+                  AS audit_count
+         FROM generation_credit_accounts WHERE workspace_id = ?1`,
+      )
+        .bind(sourceFixture.workspaceId)
+        .first(),
+    ).toEqual({
+      available_units: 1,
+      reserved_units: 1,
+      job_count: 1,
+      audit_count: 1,
+    });
+  });
+
+  it("releases once when source storage disappears after route preflight", async () => {
+    const raceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-source-race",
+      userId: "user-local-source-race",
+      partId: "part-local-source-race",
+      assetId: "asset-local-source-race",
+      sourceSha256: "6".repeat(64),
+      slug: "local-source-race",
+      idempotencyKey: "local-source-race-request-001",
+    };
+    await seedGenerationFixture(raceFixture);
+    const introspector = await introspectWorkflow(env.ASSET_GENERATION);
+    try {
+      await introspector.modifyAll(async (modifier) => {
+        await modifier.disableRetryDelays();
+      });
+      const disappearingBucket = {
+        async head(key: string) {
+          const object = await env.PRIVATE_ASSETS.head(key);
+          await env.PRIVATE_ASSETS.delete(key);
+          return object;
+        },
+      } as unknown as R2Bucket;
+      const response = await generationJobStartResponse(
+        generationRequest(raceFixture),
+        {
+          ASSET_GENERATION: env.ASSET_GENERATION,
+          DB: env.DB,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: disappearingBucket,
+        },
+        requestContextFor(raceFixture),
+        raceFixture.assetId,
+        "request-local-source-race",
+      );
+      expect(response.status).toBe(202);
+      const created = (await response.json()) as { id: string };
+      const instances = await introspector.get();
+      expect(instances).toHaveLength(1);
+      await expect(
+        instances[0]!.waitForStatus("errored"),
+      ).resolves.not.toThrow();
+
+      expect(
+        await env.DB.prepare(
+          `SELECT j.status, j.failure_code, e.status AS entitlement_status,
+                  a.available_units, a.reserved_units, a.released_units,
+                  (SELECT COUNT(*) FROM generation_provider_attempts AS pa
+                   WHERE pa.workspace_id = j.workspace_id AND pa.job_id = j.id)
+                    AS provider_attempts,
+                  (SELECT COUNT(*) FROM generation_credit_events AS ce
+                   WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                     AND ce.event_type = 'release') AS release_events
+           FROM generation_jobs AS j
+           INNER JOIN generation_job_entitlements AS e
+             ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+           INNER JOIN generation_credit_accounts AS a
+             ON a.workspace_id = j.workspace_id
+           WHERE j.workspace_id = ?1 AND j.id = ?2`,
+        )
+          .bind(raceFixture.workspaceId, created.id)
+          .first(),
+      ).toEqual({
+        status: "failed",
+        failure_code: "GENERATION_INPUT_MISSING",
+        entitlement_status: "released",
+        available_units: 2,
+        reserved_units: 0,
+        released_units: 1,
+        provider_attempts: 0,
+        release_events: 1,
+      });
+
+      const replay = await generationJobStartResponse(
+        generationRequest(raceFixture),
+        env,
+        requestContextFor(raceFixture),
+        raceFixture.assetId,
+        "request-local-source-race-replay",
+      );
+      expect(replay.status).toBe(200);
+      await expect(replay.json()).resolves.toMatchObject({
+        id: created.id,
+        status: "failed",
+        failureCode: "GENERATION_INPUT_MISSING",
+        entitlementStatus: "released",
+      });
+      expect(await introspector.get()).toHaveLength(1);
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
   it("releases once and replays safely when Workflow creation fails", async () => {
     const startFailureFixture: GenerationFixture = {
       workspaceId: "workspace-local-start-failure",
@@ -461,6 +711,7 @@ describe("local generation Workflow", () => {
       DB: env.DB,
       GENERATION_MODE: "simulation",
       GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: env.PRIVATE_ASSETS,
     };
     const startFailureContext = requestContextFor(startFailureFixture);
 

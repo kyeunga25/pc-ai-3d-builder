@@ -99,6 +99,33 @@ function workflowStub(instanceStatus = "unknown") {
   return { creates, workflow };
 }
 
+function sourceBucketStub(
+  options: {
+    contentType?: string;
+    error?: Error;
+    missing?: boolean;
+    size?: number;
+  } = {},
+) {
+  const heads: string[] = [];
+  const bucket = {
+    async head(key: string) {
+      heads.push(key);
+      if (options.error) {
+        throw options.error;
+      }
+      if (options.missing) {
+        return null;
+      }
+      return {
+        size: options.size ?? 8,
+        httpMetadata: { contentType: options.contentType ?? "image/png" },
+      };
+    },
+  } as unknown as R2Bucket;
+  return { bucket, heads };
+}
+
 function request() {
   return new Request(
     "https://app.example/api/assets/asset-fixture/generation-jobs",
@@ -144,6 +171,7 @@ describe("generation job routes", () => {
         DB: db,
         GENERATION_MODE: "disabled",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context("viewer"),
       "asset-fixture",
@@ -193,6 +221,7 @@ describe("generation job routes", () => {
         DB: db,
         GENERATION_MODE: "simulation",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context(),
       "asset-fixture",
@@ -231,6 +260,7 @@ describe("generation job routes", () => {
           DB: db,
           GENERATION_MODE: "simulation",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
         "asset-other",
@@ -253,6 +283,7 @@ describe("generation job routes", () => {
         DB: db,
         GENERATION_MODE: "simulation",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context(),
       "asset-fixture",
@@ -283,6 +314,7 @@ describe("generation job routes", () => {
         DB: db,
         GENERATION_MODE: "simulation",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context(),
       "asset-fixture",
@@ -320,6 +352,7 @@ describe("generation job routes", () => {
           DB: db,
           GENERATION_MODE: "simulation",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
         "asset-fixture",
@@ -346,6 +379,7 @@ describe("generation job routes", () => {
           DB: db,
           GENERATION_MODE: "simulation",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
         "asset-fixture",
@@ -358,6 +392,76 @@ describe("generation job routes", () => {
     );
   });
 
+  it.each([
+    { label: "missing object", options: { missing: true } },
+    { label: "size drift", options: { size: 7 } },
+    { label: "content-type drift", options: { contentType: "image/jpeg" } },
+  ])(
+    "rejects generation for a $label before reserving credit",
+    async ({ options }) => {
+      const { calls, db } = createD1Stub({
+        firstResults: [null, null, assetRow()],
+      });
+      const { creates, workflow } = workflowStub();
+      const { bucket, heads } = sourceBucketStub(options);
+
+      await expect(
+        generationJobStartResponse(
+          request(),
+          {
+            ASSET_GENERATION: workflow,
+            DB: db,
+            GENERATION_MODE: "simulation",
+            GENERATION_MAX_COST_MINOR: "0",
+            PRIVATE_ASSETS: bucket,
+          },
+          context(),
+          "asset-fixture",
+          "request-source-unavailable",
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        code: "GENERATION_SOURCE_REQUIRED",
+      });
+      expect(heads).toEqual(["private/source-fixture"]);
+      expect(creates).toHaveLength(0);
+      expect(
+        calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+      ).toBe(false);
+    },
+  );
+
+  it("keeps a source R2 lookup failure as an operational error", async () => {
+    const storageError = new Error(
+      "synthetic generation source lookup failure",
+    );
+    const { calls, db } = createD1Stub({
+      firstResults: [null, null, assetRow()],
+    });
+    const { creates, workflow } = workflowStub();
+    const { bucket } = sourceBucketStub({ error: storageError });
+
+    await expect(
+      generationJobStartResponse(
+        request(),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: bucket,
+        },
+        context(),
+        "asset-fixture",
+        "request-source-r2-failure",
+      ),
+    ).rejects.toBe(storageError);
+    expect(creates).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
   it("rejects malformed and oversized input before database access", async () => {
     const { calls, db } = createD1Stub();
     const { creates, workflow } = workflowStub();
@@ -366,6 +470,7 @@ describe("generation job routes", () => {
       DB: db,
       GENERATION_MODE: "simulation",
       GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: sourceBucketStub().bucket,
     };
     const malformed = new Request(
       "https://app.example/api/assets/asset-fixture/generation-jobs",
@@ -423,6 +528,7 @@ describe("generation job routes", () => {
       DB: db,
       GENERATION_MODE: "simulation",
       GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: sourceBucketStub().bucket,
     };
 
     await expect(
@@ -461,6 +567,7 @@ describe("generation job routes", () => {
           DB: db,
           GENERATION_MODE: "disabled",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
         "asset-fixture",

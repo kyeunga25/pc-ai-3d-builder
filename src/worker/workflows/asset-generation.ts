@@ -38,6 +38,7 @@ import { pseudonymousGenerationRef, sha256Hex } from "../lib/digest";
 import {
   assetObjectKey,
   deletePrivateObjectQuietly,
+  privateObjectMetadataMatches,
   putPrivateObject,
 } from "../lib/private-assets";
 
@@ -72,6 +73,7 @@ type ClaimedGeneration =
       requestedBy: string | null;
       source: {
         contentType: AssetSourceContentType;
+        objectKey: string;
         sha256: string;
         sizeBytes: number;
       };
@@ -273,6 +275,7 @@ export async function claimGenerationJob(
     current.source_size_bytes === null ||
     current.source_size_bytes <= 0 ||
     current.source_size_bytes > assetFileLimits.source ||
+    !current.source_object_key ||
     !current.source_sha256
   ) {
     await markGenerationFailed(db, params, "GENERATION_INPUT_INVALID");
@@ -286,6 +289,7 @@ export async function claimGenerationJob(
     requestedBy: current.requested_by,
     source: {
       contentType: sourceContentType.data,
+      objectKey: current.source_object_key,
       sha256: current.source_sha256,
       sizeBytes: current.source_size_bytes,
     },
@@ -550,6 +554,21 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
         return { jobId: params.jobId, status: "awaiting_review" };
       }
 
+      const sourceReady = await step.do(
+        "verify source object",
+        stepConfig,
+        () =>
+          privateObjectMetadataMatches(
+            this.env.PRIVATE_ASSETS,
+            claim.source.objectKey,
+            claim.source.contentType,
+            claim.source.sizeBytes,
+          ),
+      );
+      if (!sourceReady) {
+        throw new GenerationWorkflowStateError("GENERATION_INPUT_MISSING");
+      }
+
       await step.do("begin provider attempt", stepConfig, async () => {
         await beginProviderAttempt(this.env.DB, {
           workspaceId: params.workspaceId,
@@ -579,7 +598,11 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
           attemptRef,
           jobRef,
           workspaceRef,
-          source: claim.source,
+          source: {
+            contentType: claim.source.contentType,
+            sha256: claim.source.sha256,
+            sizeBytes: claim.source.sizeBytes,
+          },
           requirements: generationOutputRequirements,
         });
         const durationMs = Math.max(0, Date.now() - startedAt);

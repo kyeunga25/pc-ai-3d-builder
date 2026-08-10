@@ -5,13 +5,13 @@ RigStage v1.1 includes a provider-neutral generation-job foundation. The current
 ## Active boundary
 
 - An owner or admin may request a job only for an unapproved asset in the verified workspace.
-- The private source image must exist and its usage-rights check must already be saved at the current review version.
+- The private source image must exist with R2 byte-size and content-type metadata matching D1, and its usage-rights check must already be saved at the current review version.
 - The workspace must have one available generation credit. Migration `0009` creates the schema only and grants no production credit.
 - `Idempotency-Key` prevents duplicate job creation. A new request is blocked while the same asset has an active job or an `awaiting_review` job with a reserved entitlement.
 - One D1 batch reserves one unit and commits the queued job, job entitlement, credit event, append-only job event and minimal audit event before the Workflow is triggered.
 - The current adapter creates a small synthetic GLB at runtime. It does not read the source-image bytes, contact an external service or incur provider cost.
 - The adapter receives only pseudonymous workspace/job/attempt references, source MIME/size/checksum metadata and a fixed output policy. Raw internal IDs, R2 keys, source bytes and permanent URLs do not cross the provider boundary.
-- Workflow steps claim the current input and reserved entitlement, create one stable provider attempt, enforce the zero monetary and provider cost-unit caps, validate before storage, store the draft under a deterministic private R2 key, read it back, repeat validation and compare its checksum.
+- Workflow steps claim the current input and reserved entitlement, recheck source existence/size/content type before any provider attempt, create one stable attempt, enforce the zero monetary and provider cost-unit caps, validate before storage, store the draft under a deterministic private R2 key, read it back, repeat validation and compare its checksum.
 - D1 stages valid output as a new asset-review version and resets all prior checklist and dimension evidence in the same batch that marks the job `awaiting_review`.
 - The reserved customer credit settles only after human approval. It releases once after rejection, terminal failure, Workflow-start failure or replacement of the generated draft.
 - A generated GLB remains a draft. It is unavailable to the Builder until an owner or admin completes the full human checklist and approves it.
@@ -60,7 +60,7 @@ Stable validation codes are stored; raw parser/provider errors are not returned 
 
 - Any unrecognized mode or non-zero monetary simulation cap resolves to `disabled`.
 - Production starts with the kill switch disabled in tracked configuration.
-- A missing/resolved entitlement, source replacement, review-version change, loss of rights confirmation or asset approval invalidates an in-flight job.
+- A missing/resolved entitlement, missing or drifted R2 source, source replacement, review-version change, loss of rights confirmation or asset approval invalidates an in-flight job. A source failure after reservation records `GENERATION_INPUT_MISSING`, creates no provider attempt and releases the credit once.
 - Dimension, triangle, texture, byte-range, self-containment, length or checksum failure rejects the output before approval.
 - Workflow and API responses expose no R2 key, checksum, provider reference, user identity or deployment coordinate.
 - Failure records use stable codes. Raw provider and platform errors are not returned or added to audit metadata.
@@ -70,7 +70,7 @@ Stable validation codes are stored; raw parser/provider errors are not returned 
 
 The browser-only flow is available through `npm run local:ai:start`: create the built-in synthetic PNG in asset review, save explicit rights confirmation, generate the runtime GLB, complete human review and continue to Builder. This keeps all files in the current browser session.
 
-`npm run test:worker` runs the real migrations and Workflow locally under workerd/Miniflare with isolated D1 and R2 bindings. It forces one transient validation-step retry, proves a single provider attempt/reservation, reads and validates the private object, checks idempotent request replay, settles on approval, releases terminal failure once and runs `PRAGMA foreign_key_check`.
+`npm run test:worker` runs the real migrations and Workflow locally under workerd/Miniflare with isolated D1 and R2 bindings. It rejects missing or drifted source storage before reservation, forces a post-preflight source race and exact-once release without a provider attempt, forces one transient output-validation retry, proves a single successful provider attempt/reservation, reads and validates the private output, checks idempotent request replay, settles on approval, releases terminal failure once and runs `PRAGMA foreign_key_check`.
 
 `npm run local:ai:debug` applies migrations to Wrangler's local D1 and starts `wrangler dev --local` with simulation variables. It does not bypass Access authentication and never selects remote bindings.
 
