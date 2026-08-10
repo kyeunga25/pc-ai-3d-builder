@@ -14,6 +14,7 @@ RigStage v1.1 includes a provider-neutral generation-job foundation. The current
 - Workflow steps claim the current input, active catalogue state and reserved entitlement, recheck source existence/size/content type before any provider attempt, create one stable attempt, enforce the zero monetary and provider cost-unit caps, validate before storage, store the draft under a deterministic private R2 key, read it back, repeat validation and compare its checksum.
 - D1 stages valid output only while the catalogue part is still active, as a new asset-review version, and resets all prior checklist and dimension evidence in the same batch that marks the job `awaiting_review`. A losing stage race removes the private draft and releases the reservation once.
 - The reserved customer credit settles only after human approval. It releases once after rejection, terminal failure, Workflow-start failure or replacement of the generated draft.
+- A catalogue part cannot be archived through the application while its job entitlement remains reserved. The generated review therefore stays reachable until approval, rejection or terminal failure resolves the reservation.
 - A generated GLB remains a draft. It is unavailable to the Builder until an owner or admin completes the full human checklist and approves it.
 
 Generation credit, provider cost units and money are different concepts:

@@ -50,9 +50,9 @@ Every catalogue insert and its minimal audit event are submitted in one transact
 
 ## `PATCH /api/catalogue/:partId`
 
-Updates or archives one active catalogue part in the resolved workspace. Viewer roles cannot mutate. Both actions require `expectedVersion`; a stale value fails without overwriting the newer record. Updates accept the same bounded catalogue fields as creation. A category cannot change while the part is referenced by an existing build; this returns bilingual `CATALOGUE_CATEGORY_LOCKED` without changing the part, selection or audit history. Archive is a logical state transition and returns no body.
+Updates or archives one active catalogue part in the resolved workspace. Viewer roles cannot mutate. Both actions require `expectedVersion`; a stale value fails without overwriting the newer record. Updates accept the same bounded catalogue fields as creation. A category cannot change while the part is referenced by an existing build; this returns bilingual `CATALOGUE_CATEGORY_LOCKED` without changing the part, selection or audit history. Archive is a logical state transition and returns no body. A part with any reserved generation entitlement returns bilingual `CATALOGUE_GENERATION_LOCKED`, remains active and writes no archive audit. The user can retry with the same catalogue version after the Workflow fails or after an owner/admin approves or rejects the generated draft and settles or releases the reservation.
 
-The conditional catalogue update and minimal audit event are submitted in one D1 batch.
+The conditional catalogue update and minimal audit event are submitted in one D1 batch. The update rechecks the reserved-entitlement condition at its D1 write boundary. A database trigger independently prevents an `awaiting_review` generated draft with reserved credit from being hidden by another catalogue status update.
 
 ## `GET /api/builds`
 
@@ -160,6 +160,6 @@ Successful creation returns `202`. The Workflow rechecks the active catalogue st
 }
 ```
 
-Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `CATALOGUE_CATEGORY_LOCKED`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_CREDITS_REQUIRED`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
+Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `CATALOGUE_CATEGORY_LOCKED`, `CATALOGUE_GENERATION_LOCKED`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_CREDITS_REQUIRED`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 
 A 429 response includes `Retry-After: 60`. Unexpected internal errors never expose raw exception messages.

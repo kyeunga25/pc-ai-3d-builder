@@ -26,7 +26,7 @@ Reserved for meaningful state transitions. Read-only session resolution does not
 
 ## `catalog_parts`
 
-Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. A non-negative record version protects concurrent edits, while `status` supports logical archive without deleting records. No production catalogue rows are included in migrations.
+Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. A non-negative record version protects concurrent edits, while `status` supports logical archive without deleting records. A status-update trigger prevents an active part from becoming archived while its generated asset has an `awaiting_review` job with a reserved entitlement; this keeps the review path visible until human approval or rejection resolves the credit. No production catalogue rows are included in migrations.
 
 ## `product_assets`
 
@@ -83,6 +83,7 @@ Stores one internal attempt row per `(workspace, job, attempt_key)`. A row moves
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
 - Build selection updates must use an expected version and server-only mutation token in one D1 batch.
+- Catalogue archive must remain blocked while any linked generation entitlement is reserved; a denied archive must not increment the catalogue version or append an audit event.
 - Generation requests must validate matching private source metadata before reserving an available entitlement, then persist the job, entitlement, credit event, initial job event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
 - Generated output may update an asset only while its catalogue part remains active and its source checksum, saved rights confirmation and review version still match the requested input.
 - Staging a generated draft must update the asset review version, job state, job event and minimal audit record in one guarded batch; output remains private and unapproved.

@@ -62,6 +62,14 @@ function categoryLocked(): ApiError {
   );
 }
 
+function generationLocked(): ApiError {
+  return new ApiError(
+    409,
+    "CATALOGUE_GENERATION_LOCKED",
+    "此產品有保留 credit 的生成工作；請等待工作完成，並由 owner 或 admin 核准或拒絕草稿後再封存。 / This part has a generation job with reserved credit. Wait for it to finish, then ask an owner or admin to approve or reject the draft before archiving.",
+  );
+}
+
 function notFound(): ApiError {
   return new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
 }
@@ -170,6 +178,28 @@ async function findSku(
     .first<{ id: string }>();
 }
 
+async function hasReservedGeneration(
+  db: D1Database,
+  workspaceId: string,
+  partId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS reserved
+       FROM product_assets AS a
+       INNER JOIN generation_jobs AS j
+         ON j.workspace_id = a.workspace_id AND j.asset_id = a.id
+       INNER JOIN generation_job_entitlements AS e
+         ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+       WHERE a.workspace_id = ?1 AND a.catalog_part_id = ?2
+         AND e.status = 'reserved'
+       LIMIT 1`,
+    )
+    .bind(workspaceId, partId)
+    .first<{ reserved: number }>();
+  return row !== null;
+}
+
 export async function catalogueCreateResponse(
   request: Request,
   db: D1Database,
@@ -249,35 +279,59 @@ export async function catalogueMutationResponse(
   const nextVersion = input.expectedVersion + 1;
 
   if (input.action === "archive") {
-    const [archiveResult] = await db.batch([
-      db
-        .prepare(
-          `UPDATE catalog_parts
-           SET status = 'archived',
-               record_version = record_version + 1,
-               updated_by = ?1,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?2
-             AND workspace_id = ?3
-             AND record_version = ?4
-             AND status = 'active'`,
-        )
-        .bind(
-          context.user.id,
+    let archiveResult: D1Result<unknown> | undefined;
+    try {
+      [archiveResult] = await db.batch([
+        db
+          .prepare(
+            `UPDATE catalog_parts
+             SET status = 'archived',
+                 record_version = record_version + 1,
+                 updated_by = ?1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?2
+               AND workspace_id = ?3
+               AND record_version = ?4
+               AND status = 'active'
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM product_assets AS a
+                 INNER JOIN generation_jobs AS j
+                   ON j.workspace_id = a.workspace_id
+                  AND j.asset_id = a.id
+                 INNER JOIN generation_job_entitlements AS e
+                   ON e.workspace_id = j.workspace_id
+                  AND e.job_id = j.id
+                 WHERE a.workspace_id = catalog_parts.workspace_id
+                   AND a.catalog_part_id = catalog_parts.id
+                   AND e.status = 'reserved'
+               )`,
+          )
+          .bind(
+            context.user.id,
+            partId,
+            context.currentWorkspace.id,
+            input.expectedVersion,
+          ),
+        auditInsertStatement(
+          db,
+          context,
+          requestId,
           partId,
-          context.currentWorkspace.id,
-          input.expectedVersion,
+          "catalogue.part.archive",
+          JSON.stringify({ recordVersion: nextVersion }),
+          nextVersion,
         ),
-      auditInsertStatement(
-        db,
-        context,
-        requestId,
-        partId,
-        "catalogue.part.archive",
-        JSON.stringify({ recordVersion: nextVersion }),
-        nextVersion,
-      ),
-    ]);
+      ]);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("CATALOGUE_GENERATION_RESERVED")
+      ) {
+        throw generationLocked();
+      }
+      throw error;
+    }
 
     if (archiveResult?.meta.changes !== 1) {
       const existing = await findCataloguePart(
@@ -287,6 +341,14 @@ export async function catalogueMutationResponse(
       );
       if (!existing) {
         throw notFound();
+      }
+      if (existing.record_version !== input.expectedVersion) {
+        throw versionConflict();
+      }
+      if (
+        await hasReservedGeneration(db, context.currentWorkspace.id, partId)
+      ) {
+        throw generationLocked();
       }
       throw versionConflict();
     }
