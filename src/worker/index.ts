@@ -121,7 +121,7 @@ async function routeRequest(
 
     if (url.pathname === "/api/catalogue") {
       if (request.method === "GET") {
-        return catalogueResponse(env.DB, context, url);
+        return catalogueResponse(env.DB, context, request);
       }
 
       if (request.method === "POST") {

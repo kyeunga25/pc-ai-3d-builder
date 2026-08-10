@@ -11,6 +11,7 @@ import {
   type CatalogPart,
 } from "../../shared/domain/schemas";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { catalogueCursorHeader } from "../../shared/lib/catalogue-pagination";
 
 export class CatalogueRequestError extends Error {
   readonly code: string;
@@ -56,13 +57,14 @@ export async function fetchCataloguePage(
   cursor: string | null = null,
 ): Promise<CatalogueResponse> {
   const query = new URLSearchParams({ limit: "100" });
-  if (cursor) {
-    query.set("cursor", cursor);
+  const headers = workspaceHeaders(workspaceId);
+  if (cursor !== null) {
+    headers.set(catalogueCursorHeader, cursor);
   }
 
   const response = await apiFetch(`/api/catalogue?${query.toString()}`, {
     credentials: "same-origin",
-    headers: workspaceHeaders(workspaceId),
+    headers,
     signal,
   });
 

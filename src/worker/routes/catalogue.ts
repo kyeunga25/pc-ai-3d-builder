@@ -6,6 +6,7 @@ import {
   type CatalogPart,
   type ComponentCategory,
 } from "../../shared/domain/schemas";
+import { catalogueCursorHeader } from "../../shared/lib/catalogue-pagination";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 
@@ -36,10 +37,17 @@ type CatalogueOptions = {
 export const catalogueRecordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 
 function validationError(): ApiError {
-  return new ApiError(400, "VALIDATION_ERROR", "產品目錄篩選條件無效。");
+  return new ApiError(
+    400,
+    "VALIDATION_ERROR",
+    "產品目錄篩選條件無效。Invalid catalogue filters.",
+  );
 }
 
-export function parseCatalogueOptions(url: URL): CatalogueOptions {
+export function parseCatalogueOptions(
+  url: URL,
+  rawCursor: string | null = null,
+): CatalogueOptions {
   const rawLimit = url.searchParams.get("limit");
   const limit = rawLimit === null ? 50 : Number(rawLimit);
 
@@ -52,7 +60,10 @@ export function parseCatalogueOptions(url: URL): CatalogueOptions {
     throw validationError();
   }
 
-  const rawCursor = url.searchParams.get("cursor");
+  if (url.searchParams.has("cursor")) {
+    throw validationError();
+  }
+
   if (rawCursor !== null && !catalogueRecordIdPattern.test(rawCursor)) {
     throw validationError();
   }
@@ -147,9 +158,12 @@ export async function findCataloguePart(
 export async function catalogueResponse(
   db: D1Database,
   context: RequestContext,
-  url: URL,
+  request: Request,
 ): Promise<Response> {
-  const options = parseCatalogueOptions(url);
+  const options = parseCatalogueOptions(
+    new URL(request.url),
+    request.headers.get(catalogueCursorHeader),
+  );
   const clauses = ["p.workspace_id = ?", "p.status = 'active'"];
   const values: Array<number | string> = [context.currentWorkspace.id];
 

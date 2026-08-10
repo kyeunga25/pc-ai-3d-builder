@@ -26,7 +26,7 @@ Current unit tests cover:
 - audit helper serialization;
 - health response and public security headers;
 - exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;
-- bounded, workspace-scoped catalogue pagination and filters;
+- bounded, workspace-scoped catalogue pagination and filters, including transient header-only cursor transport, rejection of URL or malformed cursors and unchanged workspace-first D1 binding;
 - catalogue writer role checks, SKU conflicts, optimistic versions and logical archive;
 - catalogue archive rejection while a linked generation credit remains reserved, followed by safe recovery after human rejection;
 - strict CSV parsing and transactional imports of at most 50 catalogue records;

@@ -36,7 +36,7 @@ Returns read-only counts for the resolved workspace: active and verified catalog
 
 ## `GET /api/catalogue`
 
-Returns active catalogue parts from the resolved workspace. `limit` defaults to 50 and is bounded to 100. `cursor` is the last returned record ID; `category` accepts only a known component category. Each record includes structured specifications, their verification status and a non-negative record version. The response contains `items` and a nullable `nextCursor`.
+Returns active catalogue parts from the resolved workspace. `limit` defaults to 50 and is bounded to 100; `category` accepts only a known component category. A subsequent page sends the previous protected response's `nextCursor` in `X-RigStage-Catalogue-Cursor`. The Worker rejects every `cursor` query parameter and validates the header as one bounded record ID, keeping the private cursor out of browser URLs and request logs. The cursor never selects the workspace: the verified request context remains the first D1 predicate. Each record includes structured specifications, its verification status and a non-negative record version. The response contains `items` and a nullable `nextCursor`, remains protected and uses `Cache-Control: no-store`.
 
 ## `POST /api/catalogue`
 
