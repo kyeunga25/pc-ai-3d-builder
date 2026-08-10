@@ -45,6 +45,17 @@ import {
   mutateCataloguePart,
 } from "./catalogue-api";
 import { CatalogueEditorDialog } from "./CatalogueEditorDialog";
+import {
+  catalogueArchivedStatus,
+  catalogueCountStatus,
+  catalogueCreatedStatus,
+  catalogueFailureStatus,
+  catalogueImportedStatus,
+  catalogueStatusCopy,
+  catalogueUpdatedStatus,
+  type CatalogueOperationStatus,
+} from "./catalogue-status";
+import { CatalogueStatusView } from "./CatalogueStatusView";
 import { categoryLabels } from "./catalogue-options";
 import "./catalogue.css";
 
@@ -122,10 +133,10 @@ export function CataloguePage() {
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(
     isLocalPreview ? currentWorkspace.id : null,
   );
-  const [notice, setNotice] = useState(() =>
+  const [notice, setNotice] = useState<CatalogueOperationStatus>(() =>
     isLocalPreview
-      ? `${catalogParts.length} 件產品 · 合成示範資料`
-      : "正在讀取工作空間目錄",
+      ? catalogueCountStatus(catalogParts.length, true)
+      : catalogueStatusCopy.loading,
   );
 
   useEffect(() => {
@@ -155,7 +166,7 @@ export function CataloguePage() {
         }
         setParts(page.items);
         setNextCursor(page.nextCursor);
-        setNotice(`${page.items.length} 件工作空間產品`);
+        setNotice(catalogueCountStatus(page.items.length, false));
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
       })
@@ -192,6 +203,7 @@ export function CataloguePage() {
     loadingMoreRef.current = true;
     loadMoreControllerRef.current = controller;
     setLoadingMore(true);
+    setNotice(catalogueStatusCopy.loadingMore);
 
     try {
       const page = await fetchCataloguePage(
@@ -204,10 +216,13 @@ export function CataloguePage() {
       }
       setParts((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
-      setNotice(`${parts.length + page.items.length} 件工作空間產品`);
+      setNotice(catalogueCountStatus(parts.length + page.items.length, false));
     } catch {
-      if (requestGeneration === requestGenerationRef.current) {
-        setNotice("未能載入更多產品；現有資料未有變更");
+      if (
+        !controller.signal.aborted &&
+        requestGeneration === requestGenerationRef.current
+      ) {
+        setNotice(catalogueStatusCopy.loadMoreFailed);
       }
     } finally {
       loadingMoreRef.current = false;
@@ -242,7 +257,7 @@ export function CataloguePage() {
       setParts((current) =>
         current.map((part) => (part.id === updated.id ? updated : part)),
       );
-      setNotice(`已更新 ${updated.sku}`);
+      setNotice(catalogueUpdatedStatus(updated.sku));
     } else {
       const created = isLocalPreview
         ? {
@@ -257,7 +272,7 @@ export function CataloguePage() {
           }
         : await createCataloguePart(currentWorkspace.id, input);
       setParts((current) => [...current, created]);
-      setNotice(`已新增 ${created.sku}`);
+      setNotice(catalogueCreatedStatus(created.sku));
     }
     setEditorState(undefined);
   };
@@ -273,7 +288,7 @@ export function CataloguePage() {
       });
     }
     setParts((current) => current.filter((part) => part.id !== editorPart.id));
-    setNotice(`已封存 ${editorPart.sku}`);
+    setNotice(catalogueArchivedStatus(editorPart.sku));
     setEditorState(undefined);
   };
 
@@ -388,16 +403,12 @@ export function CataloguePage() {
     }
 
     setImporting(true);
-    setNotice("正在驗證 CSV 及工作空間資料");
+    setNotice(catalogueStatusCopy.validatingImport);
     try {
       const createdCount = await importCsvFile(file);
-      setNotice(`已匯入 ${createdCount} 件產品`);
+      setNotice(catalogueImportedStatus(createdCount));
     } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "無法匯入 CSV 檔案。 / Unable to import the CSV file.",
-      );
+      setNotice(catalogueFailureStatus(error, "import"));
     } finally {
       inputElement.value = "";
       setImporting(false);
@@ -414,7 +425,7 @@ export function CataloguePage() {
     link.download = "rigstage-catalogue-template.csv";
     link.click();
     URL.revokeObjectURL(url);
-    setNotice("已下載不含真實資料的 CSV 範本");
+    setNotice(catalogueStatusCopy.templateDownloadStarted);
   };
 
   const filteredParts = useMemo(() => {
@@ -457,23 +468,39 @@ export function CataloguePage() {
             onClick={downloadCsvTemplate}
           >
             <FileDown aria-hidden="true" />
-            CSV 範本
+            CSV 範本 <span lang="en">Template</span>
           </button>
           <button
             className="button button--secondary"
             type="button"
             disabled={!canWrite || importing}
-            title={canWrite ? "匯入最多 50 項產品" : "目前角色只可查看產品目錄"}
+            title={
+              canWrite
+                ? "匯入最多 50 項產品 / Import up to 50 products"
+                : "目前角色只可查看產品目錄 / The current role can only view the catalogue"
+            }
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload aria-hidden="true" />
-            {importing ? "正在匯入…" : "匯入 CSV"}
+            {importing ? (
+              <>
+                正在匯入… <span lang="en">Importing…</span>
+              </>
+            ) : (
+              <>
+                匯入 CSV <span lang="en">Import CSV</span>
+              </>
+            )}
           </button>
           <button
             className="button button--primary"
             type="button"
             disabled={!canWrite}
-            title={canWrite ? "新增工作空間產品" : "目前角色只可查看產品目錄"}
+            title={
+              canWrite
+                ? "新增工作空間產品 / Add a workspace product"
+                : "目前角色只可查看產品目錄 / The current role can only view the catalogue"
+            }
             onClick={() =>
               setEditorState({
                 workspaceId: currentWorkspace.id,
@@ -482,7 +509,7 @@ export function CataloguePage() {
             }
           >
             <Plus aria-hidden="true" />
-            新增產品
+            新增產品 <span lang="en">Add product</span>
           </button>
         </div>
       </header>
@@ -540,9 +567,10 @@ export function CataloguePage() {
               <Filter aria-hidden="true" />
               {verifiedOnly ? "顯示全部規格" : "只顯示已核實"}
             </button>
-            <span className="catalogue-toolbar__notice" aria-live="polite">
-              {notice}
-            </span>
+            <CatalogueStatusView
+              className="catalogue-toolbar__notice"
+              status={notice}
+            />
           </section>
 
           {filteredParts.length === 0 ? (

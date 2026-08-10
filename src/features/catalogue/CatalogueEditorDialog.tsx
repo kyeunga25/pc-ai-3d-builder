@@ -16,6 +16,11 @@ import {
   type CatalogPart,
 } from "../../shared/domain/schemas";
 import { categoryLabels, stockStatusLabels } from "./catalogue-options";
+import {
+  catalogueFailureStatus,
+  catalogueStatusCopy,
+  type CatalogueOperationStatus,
+} from "./catalogue-status";
 
 type CatalogueEditorDialogProps = {
   part: CatalogPart | null;
@@ -38,6 +43,8 @@ type EditorDraft = {
   stockCount: string;
   stockStatus: string;
 };
+
+type CatalogueEditorOperation = "archive" | "asset-draft" | "save";
 
 function editorDraft(part: CatalogPart | null): EditorDraft {
   if (!part) {
@@ -116,9 +123,11 @@ export function CatalogueEditorDialog({
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => editorDraft(part));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<CatalogueOperationStatus | null>(null);
+  const [busyOperation, setBusyOperation] =
+    useState<CatalogueEditorOperation | null>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const busy = busyOperation !== null;
 
   useEffect(() => {
     const previousFocus =
@@ -144,7 +153,7 @@ export function CatalogueEditorDialog({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) {
+      if (event.key === "Escape" && !busy) {
         event.preventDefault();
         onClose();
       }
@@ -173,14 +182,14 @@ export function CatalogueEditorDialog({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, saving]);
+  }, [busy, onClose]);
 
   const update = <Key extends keyof EditorDraft>(
     key: Key,
     value: EditorDraft[Key],
   ) => {
     setDraft((current) => ({ ...current, [key]: value }));
-    setError(null);
+    setMessage(null);
     setConfirmArchive(false);
   };
 
@@ -191,24 +200,18 @@ export function CatalogueEditorDialog({
     }
     const input = parseDraft(draft);
     if (!input) {
-      setError(
-        "請檢查必填欄位、港幣售價、庫存數量及規格 JSON。 / Check the required fields, HKD price, stock quantity and specification JSON.",
-      );
+      setMessage(catalogueStatusCopy.invalidFields);
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("save");
+    setMessage(catalogueStatusCopy.saving);
     try {
       await onSave(input);
     } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "無法儲存產品，請重新載入後再試。 / Unable to save the product. Reload and retry.",
-      );
+      setMessage(catalogueFailureStatus(saveError, "save"));
     } finally {
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
 
@@ -218,22 +221,18 @@ export function CatalogueEditorDialog({
     }
     if (!confirmArchive) {
       setConfirmArchive(true);
-      setError("再次按下「確認封存」即可從目前目錄隱藏此產品。");
+      setMessage(catalogueStatusCopy.confirmArchive);
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("archive");
+    setMessage(catalogueStatusCopy.archiving);
     try {
       await onArchive();
     } catch (archiveError) {
-      setError(
-        archiveError instanceof Error
-          ? archiveError.message
-          : "無法封存產品，請重新載入後再試。 / Unable to archive the product. Reload and retry.",
-      );
+      setMessage(catalogueFailureStatus(archiveError, "archive"));
     } finally {
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
 
@@ -247,29 +246,31 @@ export function CatalogueEditorDialog({
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("asset-draft");
+    setMessage(catalogueStatusCopy.creatingAssetDraft);
     try {
       await onCreateAssetFromSource(file);
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "無法建立私人素材草稿。 / Unable to create the private asset draft.",
-      );
+      setMessage(catalogueFailureStatus(uploadError, "asset-draft"));
     } finally {
       inputElement.value = "";
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
+
+  const currentMessage =
+    message ??
+    (readOnly
+      ? catalogueStatusCopy.readOnly
+      : catalogueStatusCopy.writeBoundary);
 
   return (
     <div className="catalogue-dialog-layer">
       <button
         className="catalogue-dialog-backdrop"
         type="button"
-        aria-label="關閉產品編輯器"
-        disabled={saving}
+        aria-label="關閉產品編輯器 / Close product editor"
+        disabled={busy}
         onClick={onClose}
       />
       <section
@@ -292,8 +293,8 @@ export function CatalogueEditorDialog({
           <button
             className="icon-button"
             type="button"
-            aria-label="關閉產品編輯器"
-            disabled={saving}
+            aria-label="關閉產品編輯器 / Close product editor"
+            disabled={busy}
             onClick={onClose}
           >
             <X aria-hidden="true" />
@@ -306,12 +307,12 @@ export function CatalogueEditorDialog({
             hidden
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            disabled={saving || readOnly}
+            disabled={busy || readOnly}
             onChange={(event) => void createAssetFromSource(event)}
           />
           <fieldset
             className="catalogue-editor-fields"
-            disabled={saving || readOnly}
+            disabled={busy || readOnly}
           >
             <div className="catalogue-editor-grid">
               <label>
@@ -433,13 +434,10 @@ export function CatalogueEditorDialog({
 
           <p
             id={messageId}
-            className="catalogue-editor-message"
-            role={error ? "alert" : "status"}
+            className={`catalogue-editor-message is-${currentMessage.tone}`}
+            role={currentMessage.tone === "error" ? "alert" : "status"}
           >
-            {error ??
-              (readOnly
-                ? "目前角色是唯讀；資料不會被修改。"
-                : "儲存後只會更新目前已驗證的工作空間，並留下精簡操作紀錄。")}
+            {currentMessage.message}
           </p>
 
           <footer className="catalogue-dialog__actions">
@@ -448,33 +446,53 @@ export function CatalogueEditorDialog({
                 <button
                   className="button button--danger"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => void archive()}
                 >
                   <Archive aria-hidden="true" />
-                  {confirmArchive ? "確認封存" : "封存產品"}
+                  {busyOperation === "archive" ? (
+                    <>
+                      正在封存… <span lang="en">Archiving…</span>
+                    </>
+                  ) : confirmArchive ? (
+                    <>
+                      確認封存 <span lang="en">Confirm archive</span>
+                    </>
+                  ) : (
+                    <>
+                      封存產品 <span lang="en">Archive product</span>
+                    </>
+                  )}
                 </button>
               ) : null}
               {!readOnly && part && onCreateAssetFromSource ? (
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => sourceInputRef.current?.click()}
                 >
                   <Upload aria-hidden="true" />
-                  建立素材草稿
+                  {busyOperation === "asset-draft" ? (
+                    <>
+                      正在建立… <span lang="en">Creating…</span>
+                    </>
+                  ) : (
+                    <>
+                      建立素材草稿 <span lang="en">Create asset draft</span>
+                    </>
+                  )}
                 </button>
               ) : null}
               {part && onOpenAssetReview ? (
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={onOpenAssetReview}
                 >
                   <Cuboid aria-hidden="true" />
-                  前往素材審核
+                  前往素材審核 <span lang="en">Review asset</span>
                 </button>
               ) : null}
             </div>
@@ -482,19 +500,27 @@ export function CatalogueEditorDialog({
               <button
                 className="button button--secondary"
                 type="button"
-                disabled={saving}
+                disabled={busy}
                 onClick={onClose}
               >
-                取消
+                取消 <span lang="en">Cancel</span>
               </button>
               {!readOnly ? (
                 <button
                   className="button button--primary"
                   type="submit"
-                  disabled={saving}
+                  disabled={busy}
                 >
                   <Save aria-hidden="true" />
-                  {saving ? "正在儲存…" : "儲存產品"}
+                  {busyOperation === "save" ? (
+                    <>
+                      正在儲存… <span lang="en">Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      儲存產品 <span lang="en">Save product</span>
+                    </>
+                  )}
                 </button>
               ) : null}
             </div>

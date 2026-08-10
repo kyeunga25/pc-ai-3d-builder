@@ -11,6 +11,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Bounded catalogue pagination and review-queue reads from the resolved workspace.
 - Role-protected catalogue creation, optimistic updates and logical archive.
 - Validated CSV template download and transactional import of at most 50 catalogue records.
+- Traditional-Chinese-first bilingual Catalogue status and recovery copy for product writes, two-step archive, private asset-draft creation and CSV import, including semantic info/success/warning/error announcements and reload guidance after an ambiguous write result.
 - Draft saves for staff, with approval and rejection reserved for owner or admin roles.
 - Optimistic asset versions and append-only review and audit events.
 - Private source-image and GLB upload with signature, MIME and size validation.

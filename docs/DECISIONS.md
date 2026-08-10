@@ -28,6 +28,8 @@ Build archive is a logical state transition with the same optimistic version bou
 
 Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV imports validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch.
 
+Catalogue operation feedback is centrally enumerated in Traditional Chinese and English with explicit info, success, warning and error tones. A valid bilingual public error can remain visible, but a raw monolingual exception is replaced with operation-specific recovery copy. Network or response failures after a write are treated as ambiguous: the interface asks the user to reload before retrying and does not claim that the server made no change.
+
 ## Private object storage
 
 Original images, uploaded GLB models and future render outputs use a private object binding. The browser receives file bytes only after Access and workspace verification, then uses a short-lived blob URL for the current page. Each remote-file URL is bound to that request's abort signal and is revoked idempotently on workspace/asset change or unmount; a response arriving after cancellation does not materialize a URL. The browser does not receive object keys, checksums, provider keys or permanent public object URLs.

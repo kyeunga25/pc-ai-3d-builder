@@ -24,7 +24,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 公開 API 錯誤保留穩定代碼及 request ID，並以「繁體中文 / English」回傳可操作但不洩漏內部解析細節的訊息；雙欄介面會拆分顯示兩種語言。
 - Worker 以精確路徑及方法表執行 API preflight；受保護的未知路徑或錯誤方法會在 Access 驗證與 subject 限流後、workspace membership D1 查詢前，以通用雙語 `404` 或帶精確 `Allow` 的雙語 `405` 拒絕。
 - 受 workspace 限制的分頁產品目錄 API；私人分頁游標只經受保護請求標頭傳送，不寫入瀏覽器 URL，production 介面亦具備載入、空白與錯誤狀態。
-- Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。
+- Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。新增、編輯、封存、素材草稿及 CSV 匯入均使用繁中／英文的提示、成功、警告或錯誤狀態；單語技術例外會換成安全文案，無法確認的寫入結果會要求重新載入才重試。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
 - 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。
 - 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；可上載最多 10 MiB 的 JPEG／PNG／WebP 來源圖片，上載前會核對 MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF frame 結構，以及每邊最多 32,768 px、總像素最多 100 MP 的安全上限。
