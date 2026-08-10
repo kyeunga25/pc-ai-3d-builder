@@ -54,6 +54,14 @@ function assetNotFound(): ApiError {
   return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
 }
 
+function cataloguePartNotFound(): ApiError {
+  return new ApiError(
+    404,
+    "CATALOGUE_PART_NOT_FOUND",
+    "找不到可建立素材的有效產品。 / No active product was found for this asset.",
+  );
+}
+
 function assetFileNotFound(): ApiError {
   return new ApiError(
     404,
@@ -122,7 +130,7 @@ export async function createAssetSourceResponse(
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
   if (!catalogueRecordIdPattern.test(partId)) {
-    throw new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
+    throw cataloguePartNotFound();
   }
 
   const part = await db
@@ -135,7 +143,7 @@ export async function createAssetSourceResponse(
     .bind(partId, context.currentWorkspace.id)
     .first<CataloguePartIdentity>();
   if (!part) {
-    throw new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
+    throw cataloguePartNotFound();
   }
 
   const existing = await db
@@ -210,6 +218,12 @@ export async function createAssetSourceResponse(
     ]);
   } catch (error) {
     await deletePrivateObjectQuietly(bucket, objectKey);
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw cataloguePartNotFound();
+    }
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new ApiError(
         409,

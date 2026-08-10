@@ -86,7 +86,7 @@ Returns one active catalogue asset from the resolved workspace, including approv
 
 Creates a new draft asset for an active catalogue part and uploads its first private source image. Viewer roles cannot mutate. The binary body must be JPEG, PNG or WebP, match its declared MIME type and be at most 10 MiB. A file signature mismatch rejects the request before D1 metadata is committed.
 
-The validated object is stored under an opaque private R2 key. The workspace-scoped asset row and minimal audit event are committed in one D1 batch. The response never contains the object key or checksum.
+The validated object is stored under an opaque private R2 key. The workspace-scoped asset row and minimal audit event are committed in one D1 batch. A D1 trigger rechecks that the catalogue part is still active at insert time; if it was archived after the initial lookup, the whole batch rolls back, the new R2 object is removed and bilingual `CATALOGUE_PART_NOT_FOUND` is returned. A retry is safe after an authorized user restores the part, while the one-asset-per-part constraint rejects a successful replay. The response never contains the object key or checksum.
 
 ## `PUT /api/assets/:assetId/files/:kind`
 
