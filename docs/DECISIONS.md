@@ -42,6 +42,8 @@ The builder may decode only the selected component's approved GLB. It uses the p
 
 Every public API failure keeps a stable machine code and request ID while presenting Traditional Chinese first and English second. A shared construction guard rejects single-language public copy. Validation layers may keep detailed internal diagnostics for control flow, but CSV parser state, GLB structure labels, raw exceptions and private identifiers are reduced to bounded corrective categories before serialization. This preserves actionable error handling without turning parser details into a public debugging channel.
 
+The Asset Review client preserves a valid bilingual API or file-validation message but never presents a raw monolingual exception. Its typed operation channel uses alert semantics for failures and distinct status semantics for progress, success and unsaved-warning states. A lost response after save, approve, reject, upload or generation start is described as unconfirmed and requires a reload before retry, because the browser cannot prove that the server-side transition did not commit.
+
 ## Bounded asynchronous work
 
 Long-running jobs use a swappable provider boundary and an idempotent Workflow. A generation request is accepted only after its workspace-scoped job, initial event and audit record commit. The Workflow uses unique instance IDs, bounded retry/timeout settings and guarded D1 transitions.

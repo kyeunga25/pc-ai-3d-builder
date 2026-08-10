@@ -95,5 +95,8 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("合成資料變更只保留在本機");
     expect(markup).toContain("Synthetic changes stay in this local session");
     expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('class="asset-review-status is-info"');
+    expect(markup).toContain('role="status"');
+    expect(markup).toContain("lucide-info");
   });
 });

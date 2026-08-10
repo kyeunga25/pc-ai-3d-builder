@@ -44,9 +44,43 @@
 .asset-review-status {
   display: grid;
   max-width: 460px;
-  gap: 2px;
+  align-items: start;
+  gap: 8px;
+  grid-template-columns: 16px minmax(0, 1fr);
   text-align: right;
   line-height: 1.4;
+}
+
+.asset-review-status > svg {
+  width: 16px;
+  margin-top: 1px;
+}
+
+.asset-review-status__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.asset-review-status.is-success > svg,
+.asset-review-status.is-success .asset-review-status__copy > span {
+  color: var(--success);
+}
+
+.asset-review-status.is-info > svg,
+.asset-review-status.is-info .asset-review-status__copy > span {
+  color: var(--info);
+}
+
+.asset-review-status.is-warning > svg,
+.asset-review-status.is-warning .asset-review-status__copy > span {
+  color: var(--warning);
+}
+
+.asset-review-status.is-error > svg,
+.asset-review-status.is-error .asset-review-status__copy > span {
+  color: var(--danger);
 }
 
 .asset-review-status small {

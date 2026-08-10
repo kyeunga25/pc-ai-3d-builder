@@ -13,6 +13,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Validated CSV template download and transactional import of at most 50 catalogue records.
 - Traditional-Chinese-first bilingual Catalogue status and recovery copy for product writes, two-step archive, private asset-draft creation and CSV import, including semantic info/success/warning/error announcements and reload guidance after an ambiguous write result.
 - Draft saves for staff, with approval and rejection reserved for owner or admin roles.
+- Traditional-Chinese-first bilingual Asset Review progress, success, unsaved-warning and failure announcements for draft save, approval, rejection, private-file upload and simulated generation, including reload guidance when a response is lost after a possible write.
 - Optimistic asset versions and append-only review and audit events.
 - Private source-image and GLB upload with signature, MIME and size validation.
 - Authorized private-file reads and manual Three.js GLB inspection without permanent object URLs.

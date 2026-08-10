@@ -37,6 +37,7 @@ Current unit tests cover:
 - fixed-URL header-only private-file targets with viewer and malformed-target rejection before body/D1/R2, generic legacy-path logging, workspace-scoped R2 creation with upload checksum enforcement, replacement, exact-key rollback cleanup, one bounded transient delete retry, persistent-failure suppression after two attempts and reads that fail closed on missing or drifted size, content type or SHA-256;
 - abort-bound browser object URLs for remote private files, including no materialization after cancellation, immediate cleanup when cancellation wins during creation and exact-once revocation after abort or explicit release;
 - review and private-file replacement rollback when catalogue archive wins at the asset-update boundary, followed by same-version recovery after reactivation;
+- typed bilingual Asset Review progress/success/warning/error notices, status-versus-alert semantics, operation-specific ambiguous-result fallbacks, preservation of bounded bilingual API/file-validation messages and action-specific progress copy;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement;
 - bounded JSON mutation bodies;
 - fixed-URL header-only asset detail/review targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, viewer rejection, complete-approval requirements and stale-version rejection;
