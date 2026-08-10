@@ -13,9 +13,16 @@ export type SessionState =
   | { status: "denied"; session: null; error: SessionError }
   | { status: "error"; session: null; error: SessionError };
 
+export type WorkspaceSelectionState =
+  | { status: "idle"; targetWorkspaceId: null; error: null }
+  | { status: "switching"; targetWorkspaceId: string; error: null }
+  | { status: "error"; targetWorkspaceId: string; error: SessionError };
+
 export type SessionContextValue = SessionState & {
+  workspaceSelection: WorkspaceSelectionState;
   reload: () => void;
   selectWorkspace: (workspaceId: string) => void;
+  dismissWorkspaceSelectionError: () => void;
 };
 
 export const SessionContext = createContext<SessionContextValue | null>(null);

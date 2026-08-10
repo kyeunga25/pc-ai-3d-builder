@@ -18,7 +18,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 香港繁體中文介面及港幣格式。
 - 讀取真實 D1 聚合資料的 Dashboard，以及產品目錄、素材審核及 PC Builder 路由。
 - Cloudflare Access JWT 驗證、受限 assertion／身份欄位、邀請制用戶及 server-side workspace scope；畸形或超限身份會在 Rate Limiting 與 D1 前 fail closed。
-- 已綁定身份的一般讀取只解析 active workspace membership，不更新使用者列；只有使用者明確切換時，前端才以固定 `PUT` 端點及受保護 workspace 標頭持久化偏好。
+- 已綁定身份的一般讀取只解析 active workspace membership，不更新使用者列；只有使用者明確切換時，前端才以固定 `PUT` 端點及受保護 workspace 標頭持久化偏好。切換成功前保留目前資料範圍，局部或暫時失敗提供雙語重試／留在目前操作，全域身份失效則仍 fail closed。
 - Dashboard、產品目錄、素材審核及 Builder 的 parent／deep route 都以 Worker-first 驗證 Access JWT 與 active D1 membership，Static Assets 不可繞過私人 shell 授權。
 - 公開 health endpoint，以及受保護的 session／workspace endpoint。
 - 公開 API 錯誤保留穩定代碼及 request ID，並以「繁體中文 / English」回傳可操作但不洩漏內部解析細節的訊息；雙欄介面會拆分顯示兩種語言。

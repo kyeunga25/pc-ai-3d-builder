@@ -23,7 +23,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
 - Protected API requests are rate-limited by a versioned, domain-separated SHA-256 key derived from the verified Access subject; the raw subject is not sent to the Rate Limiting binding or request logs.
-- Session and workspace reads for an already-bound identity do not update user metadata or append audit events; first identity binding is one bounded exception, while an explicit fixed-URL workspace-selection PUT conditionally updates only the selected preference.
+- Session and workspace reads for an already-bound identity do not update user metadata or append audit events; first identity binding is one bounded exception, while an explicit fixed-URL workspace-selection PUT conditionally updates only the selected preference. The client adopts only a matching successful session response, retains the previous verified scope after a target-only or transient failure, and still clears stale state on Access expiry, invite removal or identity-binding conflict.
 - Catalogue and asset queries include the resolved workspace in every database predicate; selected asset detail and review targets use a bounded protected header with fixed URLs.
 - Catalogue mutations and source-asset creation use fixed URLs plus a bounded protected part-ID header; role and target checks precede request-body, D1 and R2 work, while updates retain bounded bodies, optimistic versions and logical archive.
 - Catalogue CSV imports validate the complete document before one transactional D1 batch.

@@ -73,4 +73,16 @@ describe("session API", () => {
     expect(init.body).toBeUndefined();
     expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-beta");
   });
+
+  it("rejects a successful response that does not match the requested target", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(session));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      selectWorkspaceSession(new AbortController().signal, "workspace-alpha"),
+    ).rejects.toEqual({
+      status: 0,
+      code: "WORKSPACE_SELECTION_MISMATCH",
+    });
+  });
 });

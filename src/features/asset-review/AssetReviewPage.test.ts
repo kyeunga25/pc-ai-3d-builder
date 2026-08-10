@@ -29,6 +29,12 @@ const sessionValue = {
     workspaces: [currentWorkspace],
   },
   error: null,
+  workspaceSelection: {
+    status: "idle" as const,
+    targetWorkspaceId: null,
+    error: null,
+  },
+  dismissWorkspaceSelectionError() {},
   reload() {},
   selectWorkspace() {},
 };

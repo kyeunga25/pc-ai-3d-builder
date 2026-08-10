@@ -35,11 +35,11 @@ export function fetchSession(signal: AbortSignal): Promise<SessionResponse> {
   });
 }
 
-export function selectWorkspaceSession(
+export async function selectWorkspaceSession(
   signal: AbortSignal,
   workspaceId: string,
 ): Promise<SessionResponse> {
-  return requestSession("/api/session/workspace", {
+  const session = await requestSession("/api/session/workspace", {
     method: "PUT",
     headers: {
       accept: "application/json",
@@ -47,4 +47,11 @@ export function selectWorkspaceSession(
     },
     signal,
   });
+  if (session.currentWorkspace.id !== workspaceId) {
+    throw {
+      status: 0,
+      code: "WORKSPACE_SELECTION_MISMATCH",
+    } satisfies SessionError;
+  }
+  return session;
 }

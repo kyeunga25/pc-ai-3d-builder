@@ -4,6 +4,7 @@ import {
   Cuboid,
   Gauge,
   LogOut,
+  TriangleAlert,
   Wrench,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
@@ -37,20 +38,33 @@ const roleLabels: Record<WorkspaceRole, string> = {
 
 export function MerchantShell() {
   const { currentWorkspace, user, workspaces } = useAuthenticatedSession();
-  const { selectWorkspace } = useSessionState();
+  const {
+    dismissWorkspaceSelectionError,
+    selectWorkspace,
+    workspaceSelection,
+  } = useSessionState();
   const demoMode = isPublicDemoPath();
+  const switching = workspaceSelection.status === "switching";
+  const targetWorkspace =
+    workspaceSelection.status === "idle"
+      ? null
+      : (workspaces.find(
+          (workspace) => workspace.id === workspaceSelection.targetWorkspaceId,
+        ) ?? null);
+  const targetNameZhHant = targetWorkspace?.name ?? "所選工作空間";
+  const targetNameEnglish = targetWorkspace?.name ?? "the selected workspace";
 
   return (
     <div className="merchant-shell">
       <header className="merchant-header">
         <BrandMark />
-        <label className="workspace-switcher">
+        <label className="workspace-switcher" aria-busy={switching}>
           <span>
-            <small>工作空間</small>
+            <small>{switching ? "正在切換 / Switching" : "工作空間"}</small>
             <select
               value={currentWorkspace.id}
               aria-label="選擇工作空間"
-              disabled={workspaces.length === 1}
+              disabled={workspaces.length === 1 || switching}
               onChange={(event) => selectWorkspace(event.target.value)}
             >
               {workspaces.map((workspace) => (
@@ -62,11 +76,18 @@ export function MerchantShell() {
           </span>
           <ChevronDown aria-hidden="true" />
         </label>
-        <div className="merchant-header__status">
+        <div
+          className="merchant-header__status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <span className="status-dot" aria-hidden="true" />
-          {demoMode
-            ? "合成 Demo · 不連接正式資料"
-            : `已驗證 · ${roleLabels[currentWorkspace.role]}`}
+          {switching
+            ? `正在切換至 ${targetNameZhHant} / Switching to ${targetNameEnglish}`
+            : demoMode
+              ? "合成 Demo · 不連接正式資料"
+              : `已驗證 · ${roleLabels[currentWorkspace.role]}`}
         </div>
         <span
           className="account-button"
@@ -113,7 +134,45 @@ export function MerchantShell() {
       </aside>
 
       <main className="merchant-content">
-        <Outlet />
+        {workspaceSelection.status === "error" ? (
+          <section
+            className="workspace-switch-alert"
+            role="alert"
+            aria-atomic="true"
+          >
+            <TriangleAlert aria-hidden="true" />
+            <div className="workspace-switch-alert__copy">
+              <strong>未能切換至 {targetNameZhHant}</strong>
+              <strong lang="en">Unable to switch to {targetNameEnglish}</strong>
+              <p>
+                目前仍顯示 {currentWorkspace.name}；未有混合目標工作空間的資料。
+              </p>
+              <p lang="en">
+                The current workspace remains {currentWorkspace.name}. No data
+                from the target workspace was mixed into this view.
+              </p>
+            </div>
+            <div className="workspace-switch-alert__actions">
+              <button
+                className="button button--primary"
+                type="button"
+                onClick={() =>
+                  selectWorkspace(workspaceSelection.targetWorkspaceId)
+                }
+              >
+                重試 / Retry
+              </button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={dismissWorkspaceSelectionError}
+              >
+                留在目前工作空間 / Stay here
+              </button>
+            </div>
+          </section>
+        ) : null}
+        <Outlet key={currentWorkspace.id} />
       </main>
     </div>
   );

@@ -22,7 +22,7 @@ Current unit tests cover:
 - workspace membership selection and tampering rejection;
 - concurrent first-login subject binding, active-membership revocation at the binding boundary, zero preference writes during bound-identity reads and guarded explicit workspace-switch persistence;
 - versioned subject-digest API rate limiting, including raw-identifier exclusion, deterministic replay/concurrency and distinct actor keys;
-- read-only session responses plus fixed-URL, header-only workspace-selection requests;
+- read-only session responses plus fixed-URL, header-only workspace-selection requests, matching-target response enforcement and a client state machine that retains the previous scope on recoverable failures while invalidating it on global identity denial;
 - audit helper serialization;
 - health response and public security headers;
 - construction-time rejection of single-language public API errors, bilingual 404/429/500 serialization and safe client fallback when an upstream message is absent;
@@ -70,6 +70,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - 首頁的 Dashboard、產品目錄、素材審核及 Builder 合成工作區畫面均可載入、放大查看，且不包含真實商戶或私人素材；
 - 首頁的正文、案例、圖說及輔助文字在桌面和 390 px 均維持適合繁體中文閱讀的字級、行距及對比；
 - the authentication loading and failure states are readable;
+- workspace switching keeps the previous scope visible until a matching success, disables repeated selection while pending, and shows readable bilingual retry/stay actions after a recoverable failure at desktop and 390 px;
 - logout clears the Access application session, re-login uses a top-level navigation, and an expired AJAX session returns a bounded authorization failure;
 - every navigation item is keyboard reachable;
 - the builder route loads lazily;
