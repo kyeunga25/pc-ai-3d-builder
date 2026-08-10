@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchCataloguePage } from "./catalogue-api";
+import { fetchCataloguePage, mutateCataloguePart } from "./catalogue-api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -64,5 +64,32 @@ describe("catalogue pagination API", () => {
     expect(new Headers(init.headers).has("x-rigstage-catalogue-cursor")).toBe(
       false,
     );
+  });
+});
+
+describe("catalogue part target API", () => {
+  it("keeps the private part ID out of the mutation URL and body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      mutateCataloguePart("workspace-fixture", "part-private-fixture", {
+        action: "archive",
+        expectedVersion: 3,
+      }),
+    ).resolves.toBeNull();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/catalogue/part");
+    expect(url).not.toContain("part-private-fixture");
+    expect(String(init.body)).not.toContain("part-private-fixture");
+    expect(headers.get("x-rigstage-catalogue-part-id")).toBe(
+      "part-private-fixture",
+    );
+    expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
+    expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
   });
 });

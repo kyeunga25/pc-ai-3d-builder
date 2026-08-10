@@ -11,11 +11,10 @@ describe("request log route templates", () => {
     ["/api/build/export", "/api/build/export"],
     ["/api/build", "/api/build"],
     ["/api/builds/build_private_123", "/api/*"],
-    [
-      "/api/catalogue/part_private_123/assets/source",
-      "/api/catalogue/:partId/assets/source",
-    ],
-    ["/api/catalogue/part_private_123", "/api/catalogue/:partId"],
+    ["/api/catalogue/part/source", "/api/catalogue/part/source"],
+    ["/api/catalogue/part", "/api/catalogue/part"],
+    ["/api/catalogue/part_private_123/assets/source", "/api/*"],
+    ["/api/catalogue/part_private_123", "/api/*"],
     [
       "/api/assets/asset_private_123/files/source-private-key",
       "/api/assets/:assetId/files/:fileKind",

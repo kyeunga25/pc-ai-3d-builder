@@ -181,10 +181,7 @@ async function routeRequest(
       });
     }
 
-    const cataloguePartMatch = /^\/api\/catalogue\/([^/]+)$/u.exec(
-      url.pathname,
-    );
-    if (cataloguePartMatch) {
+    if (url.pathname === "/api/catalogue/part") {
       if (request.method !== "PATCH") {
         return new Response(null, {
           status: 405,
@@ -192,18 +189,10 @@ async function routeRequest(
         });
       }
 
-      return catalogueMutationResponse(
-        request,
-        env.DB,
-        context,
-        cataloguePartMatch[1]!,
-        requestId,
-      );
+      return catalogueMutationResponse(request, env.DB, context, requestId);
     }
 
-    const catalogueAssetSourceMatch =
-      /^\/api\/catalogue\/([^/]+)\/assets\/source$/u.exec(url.pathname);
-    if (catalogueAssetSourceMatch) {
+    if (url.pathname === "/api/catalogue/part/source") {
       if (request.method !== "POST") {
         return new Response(null, {
           status: 405,
@@ -216,7 +205,6 @@ async function routeRequest(
         env.DB,
         env.PRIVATE_ASSETS,
         context,
-        catalogueAssetSourceMatch[1]!,
         requestId,
       );
     }

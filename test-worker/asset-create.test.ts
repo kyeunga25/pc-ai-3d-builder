@@ -50,14 +50,14 @@ function context(fixture: WorkspaceFixture): RequestContext {
 }
 
 function sourceRequest(): Request {
-  return new Request(
-    `https://local.invalid/api/catalogue/${partId}/assets/source`,
-    {
-      method: "POST",
-      headers: { "content-type": "image/png" },
-      body: sourceBytes.buffer as ArrayBuffer,
+  return new Request("https://local.invalid/api/catalogue/part/source", {
+    method: "POST",
+    headers: {
+      "content-type": "image/png",
+      "x-rigstage-catalogue-part-id": partId,
     },
-  );
+    body: sourceBytes.buffer as ArrayBuffer,
+  });
 }
 
 function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
@@ -119,7 +119,6 @@ describe("asset creation runtime constraints", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(foreignFixture),
-        partId,
         "request-asset-create-foreign",
       ),
     ).rejects.toMatchObject({
@@ -141,7 +140,6 @@ describe("asset creation runtime constraints", () => {
         racingDb,
         env.PRIVATE_ASSETS,
         context(targetFixture),
-        partId,
         "request-asset-create-race",
       ),
     ).rejects.toMatchObject({
@@ -183,7 +181,6 @@ describe("asset creation runtime constraints", () => {
       env.DB,
       env.PRIVATE_ASSETS,
       context(targetFixture),
-      partId,
       "request-asset-create-recovery",
     );
     expect(recovered.status).toBe(201);
@@ -201,7 +198,6 @@ describe("asset creation runtime constraints", () => {
         env.DB,
         env.PRIVATE_ASSETS,
         context(targetFixture),
-        partId,
         "request-asset-create-replay",
       ),
     ).rejects.toMatchObject({ status: 409, code: "ASSET_ALREADY_EXISTS" });

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { reviewAsset } from "../../shared/domain/mockData";
 import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
+  createAssetFromSource,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
 } from "./asset-review-api";
@@ -111,5 +113,35 @@ describe("generation request API", () => {
     expect(headers.get("idempotency-key")).toBe("request-stable-001");
     expect(url).not.toContain("request-stable-001");
     expect(String(init.body)).not.toContain("request-stable-001");
+  });
+});
+
+describe("catalogue source target API", () => {
+  it("keeps the private part ID out of the source upload URL and body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
+    vi.stubGlobal("fetch", fetchMock);
+    const source = new File([new Uint8Array([0x89])], "fixture.png", {
+      type: "image/png",
+    });
+
+    await expect(
+      createAssetFromSource(
+        "workspace-fixture",
+        "part-private-fixture",
+        source,
+      ),
+    ).resolves.toEqual(reviewAsset);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/catalogue/part/source");
+    expect(url).not.toContain("part-private-fixture");
+    expect(String(init.body)).not.toContain("part-private-fixture");
+    expect(init.body).toBe(source);
+    expect(headers.get("x-rigstage-catalogue-part-id")).toBe(
+      "part-private-fixture",
+    );
+    expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
+    expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
   });
 });

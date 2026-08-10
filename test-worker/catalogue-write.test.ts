@@ -55,9 +55,12 @@ function updateRequest(
   category: ComponentCategory,
   model: string,
 ): Request {
-  return new Request(`https://local.invalid/api/catalogue/${partId}`, {
+  return new Request("https://local.invalid/api/catalogue/part", {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-rigstage-catalogue-part-id": partId,
+    },
     body: JSON.stringify({
       action: "update",
       expectedVersion,
@@ -75,9 +78,12 @@ function updateRequest(
 }
 
 function archiveRequest(targetPartId: string, expectedVersion = 0): Request {
-  return new Request(`https://local.invalid/api/catalogue/${targetPartId}`, {
+  return new Request("https://local.invalid/api/catalogue/part", {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-rigstage-catalogue-part-id": targetPartId,
+    },
     body: JSON.stringify({ action: "archive", expectedVersion }),
   });
 }
@@ -267,7 +273,6 @@ describe("catalogue write runtime constraints", () => {
         updateRequest(0, "cpu", "Invalid Category Change"),
         env.DB,
         context(protectedFixture),
-        partId,
         "request-catalogue-category-locked",
       ),
     ).rejects.toMatchObject({
@@ -305,7 +310,6 @@ describe("catalogue write runtime constraints", () => {
       updateRequest(0, "case", "Updated Referenced Case"),
       env.DB,
       context(protectedFixture),
-      partId,
       "request-catalogue-same-category",
     );
     expect(updated.status).toBe(200);
@@ -321,7 +325,6 @@ describe("catalogue write runtime constraints", () => {
         updateRequest(0, "case", "Stale Replay"),
         env.DB,
         context(protectedFixture),
-        partId,
         "request-catalogue-stale-replay",
       ),
     ).rejects.toMatchObject({
@@ -333,7 +336,6 @@ describe("catalogue write runtime constraints", () => {
         updateRequest(1, "case", "Foreign Update"),
         env.DB,
         context(foreignFixture),
-        partId,
         "request-catalogue-foreign-update",
       ),
     ).rejects.toMatchObject({
@@ -408,7 +410,6 @@ describe("catalogue write runtime constraints", () => {
         archiveRequest(fixture.partId),
         env.DB,
         context(foreignFixture),
-        fixture.partId,
         "request-catalogue-generation-foreign",
       ),
     ).rejects.toMatchObject({
@@ -420,7 +421,6 @@ describe("catalogue write runtime constraints", () => {
         archiveRequest(fixture.partId),
         env.DB,
         context(fixture.actor),
-        fixture.partId,
         "request-catalogue-generation-locked",
       ),
     ).rejects.toMatchObject({
@@ -481,7 +481,6 @@ describe("catalogue write runtime constraints", () => {
       archiveRequest(fixture.partId),
       env.DB,
       context(fixture.actor),
-      fixture.partId,
       "request-catalogue-generation-archive",
     );
     expect(archived.status).toBe(204);

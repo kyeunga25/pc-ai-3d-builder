@@ -9,6 +9,7 @@ import {
   parseCatalogueCsvFile,
 } from "../../shared/domain/catalogue-csv";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 import { readBoundedCsv, readBoundedJson } from "../lib/request-body";
@@ -71,7 +72,11 @@ function generationLocked(): ApiError {
 }
 
 function notFound(): ApiError {
-  return new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
+  return new ApiError(
+    404,
+    "CATALOGUE_PART_NOT_FOUND",
+    "找不到所要求的產品。 / The requested catalogue part was not found.",
+  );
 }
 
 function cataloguePartId(): string {
@@ -260,11 +265,11 @@ export async function catalogueMutationResponse(
   request: Request,
   db: D1Database,
   context: RequestContext,
-  partId: string,
   requestId: string,
 ): Promise<Response> {
   assertCatalogueWriteRole(context.currentWorkspace.role);
-  if (!catalogueRecordIdPattern.test(partId)) {
+  const partId = request.headers.get(cataloguePartTargetHeader);
+  if (!partId || !catalogueRecordIdPattern.test(partId)) {
     throw notFound();
   }
 

@@ -161,37 +161,68 @@ describe("catalogue writes", () => {
       batchChanges: 0,
       firstResults: [null, { ...catalogueRow, record_version: 2 }],
     });
-    const request = new Request(
-      "https://app.example/api/catalogue/part-fixture",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          expectedVersion: 0,
-          sku: "CASE-001",
-          category: "case",
-          manufacturer: "Fixture",
-          model: "Compact Case",
-          priceMinor: 84_900,
-          stockStatus: "in_stock",
-          stockCount: 6,
-          specificationStatus: "verified",
-          specifications: { formFactor: "ATX" },
-        }),
+    const request = new Request("https://app.example/api/catalogue/part", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-catalogue-part-id": "part-fixture",
       },
-    );
+      body: JSON.stringify({
+        action: "update",
+        expectedVersion: 0,
+        sku: "CASE-001",
+        category: "case",
+        manufacturer: "Fixture",
+        model: "Compact Case",
+        priceMinor: 84_900,
+        stockStatus: "in_stock",
+        stockCount: 6,
+        specificationStatus: "verified",
+        specifications: { formFactor: "ATX" },
+      }),
+    });
 
     await expect(
       catalogueMutationResponse(
         request,
         db,
         context("owner"),
-        "part-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "CATALOGUE_VERSION_CONFLICT" });
   });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed part target before body or database work: %s",
+    async (partId) => {
+      const { calls, db } = createD1Stub();
+      const headers = new Headers({ "content-type": "application/json" });
+      if (partId !== null) {
+        headers.set("x-rigstage-catalogue-part-id", partId);
+      }
+      const request = new Request("https://app.example/api/catalogue/part", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ action: "archive", expectedVersion: 0 }),
+      });
+
+      await expect(
+        catalogueMutationResponse(
+          request,
+          db,
+          context("staff"),
+          "request-target-fixture",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "CATALOGUE_PART_NOT_FOUND",
+        message:
+          "找不到所要求的產品。 / The requested catalogue part was not found.",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+    },
+  );
 
   it("submits an imported row and its audit event in the same batch", async () => {
     const { calls, db } = createD1Stub({

@@ -17,6 +17,7 @@ import {
   type GenerationJobStartInput,
 } from "../../shared/domain/generation-jobs";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
 const apiErrorSchema = z.object({
   error: z.object({
@@ -159,15 +160,13 @@ export async function createAssetFromSource(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", uploadContentType("source", file));
-  const response = await apiFetch(
-    `/api/catalogue/${encodeURIComponent(partId)}/assets/source`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers,
-      body: file,
-    },
-  );
+  headers.set(cataloguePartTargetHeader, partId);
+  const response = await apiFetch("/api/catalogue/part/source", {
+    method: "POST",
+    credentials: "same-origin",
+    headers,
+    body: file,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }

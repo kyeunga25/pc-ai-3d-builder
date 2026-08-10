@@ -6,6 +6,7 @@ import {
   type AssetFileKind,
 } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   findReservedGenerationForAsset,
@@ -126,11 +127,11 @@ export async function createAssetSourceResponse(
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  partId: string,
   requestId: string,
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
-  if (!catalogueRecordIdPattern.test(partId)) {
+  const partId = request.headers.get(cataloguePartTargetHeader);
+  if (!partId || !catalogueRecordIdPattern.test(partId)) {
     throw cataloguePartNotFound();
   }
 

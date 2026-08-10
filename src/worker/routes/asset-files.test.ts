@@ -150,10 +150,13 @@ describe("private asset routes", () => {
     const { bucket, putChecksums, puts } = createR2Stub();
     const source = minimalSource;
     const request = new Request(
-      "https://app.example/api/catalogue/part-fixture/assets/source",
+      "https://app.example/api/catalogue/part/source",
       {
         method: "POST",
-        headers: { "content-type": "image/png" },
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
         body: source.buffer as ArrayBuffer,
       },
     );
@@ -163,7 +166,6 @@ describe("private asset routes", () => {
       db,
       bucket,
       context("staff"),
-      "part-fixture",
       "request-fixture",
     );
 
@@ -191,10 +193,13 @@ describe("private asset routes", () => {
     const { calls, db } = createD1Stub();
     const { bucket, puts } = createR2Stub();
     const request = new Request(
-      "https://app.example/api/catalogue/part-fixture/assets/source",
+      "https://app.example/api/catalogue/part/source",
       {
         method: "POST",
-        headers: { "content-type": "image/png" },
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
         body: new Uint8Array([0x89]).buffer as ArrayBuffer,
       },
     );
@@ -205,7 +210,6 @@ describe("private asset routes", () => {
         db,
         bucket,
         context("viewer"),
-        "part-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
@@ -213,16 +217,55 @@ describe("private asset routes", () => {
     expect(puts).toHaveLength(0);
   });
 
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed catalogue target before body, D1 or R2 work: %s",
+    async (partId) => {
+      const { calls, db } = createD1Stub();
+      const { bucket, puts } = createR2Stub();
+      const headers = new Headers({ "content-type": "image/png" });
+      if (partId !== null) {
+        headers.set("x-rigstage-catalogue-part-id", partId);
+      }
+      const request = new Request(
+        "https://app.example/api/catalogue/part/source",
+        {
+          method: "POST",
+          headers,
+          body: minimalSource.buffer as ArrayBuffer,
+        },
+      );
+
+      await expect(
+        createAssetSourceResponse(
+          request,
+          db,
+          bucket,
+          context("staff"),
+          "request-target-fixture",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "CATALOGUE_PART_NOT_FOUND",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(puts).toHaveLength(0);
+    },
+  );
+
   it("rejects a signature-only source before private storage or mutation", async () => {
     const { calls, db } = createD1Stub({
       firstResults: [{ id: "part-fixture" }, null],
     });
     const { bucket, puts } = createR2Stub();
     const request = new Request(
-      "https://app.example/api/catalogue/part-fixture/assets/source",
+      "https://app.example/api/catalogue/part/source",
       {
         method: "POST",
-        headers: { "content-type": "image/png" },
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
         body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
           .buffer as ArrayBuffer,
       },
@@ -234,7 +277,6 @@ describe("private asset routes", () => {
         db,
         bucket,
         context("staff"),
-        "part-fixture",
         "request-invalid-source",
       ),
     ).rejects.toMatchObject({
