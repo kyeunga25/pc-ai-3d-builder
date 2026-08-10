@@ -8,6 +8,7 @@ import type { RequestContext } from "../src/worker/auth/workspace";
 import {
   buildDetailResponse,
   buildExportResponse,
+  buildMutationResponse,
 } from "../src/worker/routes/builds";
 
 type WorkspaceFixture = {
@@ -84,6 +85,23 @@ function catalogueInsert(
     part.version,
     fixture.userId,
   );
+}
+
+function updateRequest(
+  expectedVersion: number,
+  name: string,
+  selectedPartIds: string[],
+): Request {
+  return new Request(`https://local.invalid/api/builds/${buildId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      action: "update",
+      expectedVersion,
+      name,
+      selectedPartIds,
+    }),
+  });
 }
 
 async function seedWorkspace(fixture: WorkspaceFixture): Promise<void> {
@@ -273,5 +291,86 @@ describe("persistent build runtime boundaries", () => {
     await expect(
       buildExportResponse(env.DB, context(protectedFixture), buildId),
     ).rejects.toMatchObject({ status: 409, code: "BUILD_EXPORT_BLOCKED" });
+  });
+
+  it("applies one guarded replacement and rejects stale or foreign updates", async () => {
+    const selectedPartIds = selectedParts.map((part) => part.id);
+    const updated = await buildMutationResponse(
+      updateRequest(0, "已核實版本更新", selectedPartIds),
+      env.DB,
+      context(protectedFixture),
+      buildId,
+      "request-build-runtime-update",
+    );
+    const updatedText = await updated.text();
+
+    expect(updated.status).toBe(200);
+    expect(JSON.parse(updatedText)).toMatchObject({
+      id: buildId,
+      name: "已核實版本更新",
+      selectedParts: expect.arrayContaining(
+        selectedPartIds.map((id) => expect.objectContaining({ id })),
+      ),
+      version: 1,
+    });
+    expect(updatedText).not.toContain("runtime-build-mutation-fixture");
+
+    await expect(
+      buildMutationResponse(
+        updateRequest(0, "不可覆寫版本", []),
+        env.DB,
+        context(protectedFixture),
+        buildId,
+        "request-build-runtime-stale",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "BUILD_VERSION_CONFLICT",
+    });
+    await expect(
+      buildMutationResponse(
+        updateRequest(1, "外部工作空間更新", []),
+        env.DB,
+        context(requesterFixture),
+        buildId,
+        "request-build-runtime-foreign",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "BUILD_NOT_FOUND" });
+
+    expect(
+      await env.DB.prepare(
+        `SELECT name, record_version,
+                (SELECT COUNT(*) FROM build_items AS bi
+                 WHERE bi.workspace_id = b.workspace_id
+                   AND bi.build_id = b.id) AS selected_count
+         FROM builds AS b
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, buildId)
+        .first(),
+    ).toEqual({
+      name: "已核實版本更新",
+      record_version: 1,
+      selected_count: 9,
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count
+         FROM audit_events
+         WHERE workspace_id = ?1 AND target_id = ?2
+           AND action = 'build.update'`,
+      )
+        .bind(protectedFixture.workspaceId, buildId)
+        .first(),
+    ).toEqual({ count: 1 });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count
+         FROM audit_events
+         WHERE workspace_id = ?1 AND request_id = ?2`,
+      )
+        .bind(requesterFixture.workspaceId, "request-build-runtime-foreign")
+        .first(),
+    ).toEqual({ count: 0 });
   });
 });
