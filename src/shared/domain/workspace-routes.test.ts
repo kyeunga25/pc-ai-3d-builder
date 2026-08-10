@@ -5,6 +5,7 @@ import {
   isProtectedWorkspacePath,
   safeWorkspaceLoginReturnPath,
   safeWorkspaceReturnPath,
+  workspaceDestinationCopy,
   workspaceDestinationLabel,
 } from "./workspace-routes";
 
@@ -46,6 +47,22 @@ describe("workspace routes", () => {
       "電腦組裝工作台",
     );
     expect(workspaceDestinationLabel("/unknown")).toBe("商戶儀表板");
+    expect(workspaceDestinationCopy("/catalogue")).toEqual({
+      english: "Product catalogue",
+      zhHant: "產品目錄",
+    });
+    expect(workspaceDestinationCopy("/asset-review")).toEqual({
+      english: "3D asset review",
+      zhHant: "3D 素材審核",
+    });
+    expect(workspaceDestinationCopy("/BUILDER#inspector")).toEqual({
+      english: "PC builder",
+      zhHant: "電腦組裝工作台",
+    });
+    expect(workspaceDestinationCopy("/unknown")).toEqual({
+      english: "Merchant dashboard",
+      zhHant: "商戶儀表板",
+    });
   });
 
   it.each([

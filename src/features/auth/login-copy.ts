@@ -1,5 +1,72 @@
 import type { LoginReason } from "./access-navigation";
 
+export type BilingualLoginCopy = {
+  readonly english: string;
+  readonly zhHant: string;
+};
+
+function loginCopy(zhHant: string, english: string): BilingualLoginCopy {
+  return { english, zhHant };
+}
+
+export function bilingualLoginTitle(copy: BilingualLoginCopy): string {
+  return `${copy.zhHant} / ${copy.english}`;
+}
+
+export const loginInterfaceCopy = {
+  betaNote: loginCopy(
+    "只接受獲邀的 Beta Access 用戶。商業使用或獨立部署，請聯絡工作空間管理員。",
+    "Only invited Beta Access users are accepted. For commercial use or an independent deployment, contact the workspace administrator.",
+  ),
+  checkingSession: loginCopy(
+    "正在檢查現有登入狀態",
+    "Checking existing sign-in status",
+  ),
+  continueWithAccess: loginCopy(
+    "使用 Cloudflare Access 繼續",
+    "Continue with Cloudflare Access",
+  ),
+  destinationLabel: loginCopy("登入成功後前往", "After sign-in, go to"),
+  failClosedBoundary: loginCopy(
+    "失敗時不載入任何私人工作區資料",
+    "No private workspace data loads when verification fails",
+  ),
+  footerAccess: loginCopy(
+    "RigStage · Access 保護工作空間",
+    "RigStage · Access-protected workspace",
+  ),
+  footerLocked: loginCopy(
+    "驗證失敗時，私人資料保持鎖定",
+    "Private data stays locked when verification fails",
+  ),
+  introDescription: loginCopy(
+    "一次驗證後繼續管理產品目錄、私人 3D 素材與電腦組裝。這裡沒有公開註冊，也不會在登入前讀取商戶資料。",
+    "Continue managing your product catalogue, private 3D assets and PC builds after one verification. There is no public registration, and no merchant data is read before sign-in.",
+  ),
+  introTitle: loginCopy(
+    "登入你的 RigStage 工作空間。",
+    "Sign in to your RigStage workspace.",
+  ),
+  inviteOnly: loginCopy("只限獲邀工作空間", "Invite-only workspace"),
+  logoutCurrentIdentity: loginCopy(
+    "先登出目前的 Access 身份",
+    "Sign out of the current Access identity first",
+  ),
+  membershipBoundary: loginCopy(
+    "伺服器再核對邀請與有效成員資格",
+    "The server then checks the invitation and active membership",
+  ),
+  returnToPublicHome: loginCopy(
+    "返回 RigStage 公開主頁",
+    "Return to the RigStage public home page",
+  ),
+  securityBoundaryLabel: loginCopy("登入安全邊界", "Login security boundaries"),
+  verifyIdentityBoundary: loginCopy(
+    "Cloudflare Access 先驗證身份",
+    "Cloudflare Access verifies identity first",
+  ),
+} as const satisfies Record<string, BilingualLoginCopy>;
+
 export const loginReasonCopy = {
   "sign-in": {
     title: "準備安全登入",

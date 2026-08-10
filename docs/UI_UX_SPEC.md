@@ -9,6 +9,8 @@
 - Status must not depend on colour alone.
 - Non-essential motion must respect `prefers-reduced-motion`.
 
+The login page presents Traditional Chinese above supporting English for its introduction, identity and active-membership boundaries, all five status reasons, fixed workspace destination, Access continuation, unauthorized-identity logout, public-home recovery and fail-closed footer. Accessible names contain both languages. It shows only a generic route destination, never a dynamic record identifier. At 390 px, supporting English, destination labels and full-width actions wrap without horizontal overflow; this guidance never implies that the client has granted workspace access.
+
 ## Layout
 
 The application shell uses a top command bar and merchant navigation. The builder keeps its central viewport as the primary area, with component selection, inspection and build status surrounding it.

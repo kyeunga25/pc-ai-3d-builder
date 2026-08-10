@@ -7,7 +7,35 @@ export const workspaceRouteRoots = [
   "/builder",
 ] as const;
 
-function matchingWorkspaceRouteRoot(pathname: string): string | undefined {
+export type WorkspaceDestinationCopy = {
+  readonly english: string;
+  readonly zhHant: string;
+};
+
+type WorkspaceRouteRoot = (typeof workspaceRouteRoots)[number];
+
+const workspaceDestinationCopyByRoot = {
+  "/dashboard": {
+    english: "Merchant dashboard",
+    zhHant: "商戶儀表板",
+  },
+  "/catalogue": {
+    english: "Product catalogue",
+    zhHant: "產品目錄",
+  },
+  "/asset-review": {
+    english: "3D asset review",
+    zhHant: "3D 素材審核",
+  },
+  "/builder": {
+    english: "PC builder",
+    zhHant: "電腦組裝工作台",
+  },
+} as const satisfies Record<WorkspaceRouteRoot, WorkspaceDestinationCopy>;
+
+function matchingWorkspaceRouteRoot(
+  pathname: string,
+): WorkspaceRouteRoot | undefined {
   const normalizedPathname = pathname.split(/[?#]/u, 1)[0]!.toLowerCase();
 
   return workspaceRouteRoots.find(
@@ -48,16 +76,13 @@ export function safeWorkspaceLoginReturnPath(candidate: string | null): string {
 }
 
 export function workspaceDestinationLabel(pathname: string): string {
-  const routeRoot = matchingWorkspaceRouteRoot(pathname);
+  return workspaceDestinationCopy(pathname).zhHant;
+}
 
-  if (routeRoot === "/catalogue") {
-    return "產品目錄";
-  }
-  if (routeRoot === "/asset-review") {
-    return "3D 素材審核";
-  }
-  if (routeRoot === "/builder") {
-    return "電腦組裝工作台";
-  }
-  return "商戶儀表板";
+export function workspaceDestinationCopy(
+  pathname: string,
+): WorkspaceDestinationCopy {
+  const routeRoot =
+    matchingWorkspaceRouteRoot(pathname) ?? defaultWorkspacePath;
+  return workspaceDestinationCopyByRoot[routeRoot];
 }

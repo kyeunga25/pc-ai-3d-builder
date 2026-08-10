@@ -19,6 +19,7 @@ Current unit tests cover:
 - one configured Access audience and a bounded multi-application audience allowlist, including fail-closed empty, duplicate, oversized and over-count values;
 - exact protected SPA parent/deep-route matching and Static Assets Worker-first configuration;
 - AJAX expiry signaling and top-level re-login/logout paths;
+- exhaustive typed bilingual login copy for the introduction, identity/membership/fail-closed boundaries, five login reasons, fixed destination labels, Access continuation, unauthorized logout, public-home recovery and footer; bilingual ARIA labels; root-only return targets with dynamic identifier/query/fragment absence; and phone-width wrapping;
 - workspace membership selection and tampering rejection;
 - concurrent first-login subject binding, active-membership revocation at the binding boundary, zero preference writes during bound-identity reads and guarded explicit workspace-switch persistence;
 - versioned subject-digest API rate limiting, including raw-identifier exclusion, deterministic replay/concurrency and distinct actor keys;
