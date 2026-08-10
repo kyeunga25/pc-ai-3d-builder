@@ -161,7 +161,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - 組裝讀寫必須同時限制 workspace；讀取空清單不會建立資料，更新使用版本及一次性 mutation token。
 - 匯出在有嚴重錯誤或未知相容性結果時會停止，並排除身份、營運及私人素材欄位。
 - Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。
-- 限流鍵使用已驗證 Access subject，不記錄 JWT 或電郵。
+- 限流在任何 protected D1 工作前，把已驗證 Access subject 轉成版本化、domain-separated SHA-256 opaque key；raw subject、JWT 及電郵均不會傳入 Rate Limiting binding 或 request log。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
 - Builder 只讀取已核准素材的私人 GLB，並在選擇切換或頁面卸載時撤銷瀏覽器 object URL。
 - 生成工作先原子保留一個非貨幣 credit，提交 D1 job／entitlement／event／audit，再啟動 Workflow；輸入版本、使用權、成本上限、輸出格式及 checksum 任一失敗都不會建立可核准素材，保留 credit 只會釋放一次。

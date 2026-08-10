@@ -75,7 +75,7 @@ npm run owner:onboard
 - 無邀請、無 active membership 或跨 workspace 要求會被拒絕。
 - 相同邀請的衝突 subject 綁定會被拒絕。
 - `users.status`、membership 或 workspace 被停用時會被拒絕。
-- 超出每 subject 限額時回傳 429 及 `Retry-After`。
+- 超出每個版本化 subject 摘要鍵的限額時回傳 429 及 `Retry-After`；raw subject 不傳入 Rate Limiting binding。
 - Session 讀取不寫入 D1 audit table。
 - 回應及 log 不含 Cloudflare identifier、電郵或原始 exception。
 - `/cdn-cgi/access/logout` 清除 Access session；expired AJAX request 回傳 `401`，重新登入使用 top-level navigation。

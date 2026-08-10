@@ -21,7 +21,7 @@ Current unit tests cover:
 - AJAX expiry signaling and top-level re-login/logout paths;
 - workspace membership selection and tampering rejection;
 - concurrent first-login subject binding, active-membership revocation at the binding boundary and guarded workspace-switch persistence;
-- subject-keyed API rate limiting;
+- versioned subject-digest API rate limiting, including raw-identifier exclusion, deterministic replay/concurrency and distinct actor keys;
 - read-only session responses;
 - audit helper serialization;
 - health response and public security headers;

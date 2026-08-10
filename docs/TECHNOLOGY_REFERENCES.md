@@ -15,7 +15,7 @@
 | D1 | 儲存 workspace-scoped relational metadata；repository 只帶 schema migrations，不帶 production rows | [D1](https://developers.cloudflare.com/d1/) |
 | R2 | 儲存 private source image 及 GLB；不使用 public bucket URL | [R2](https://developers.cloudflare.com/r2/) |
 | Workflows | 執行 bounded、idempotent generation validation steps | [Workflows](https://developers.cloudflare.com/workflows/) |
-| Rate Limiting binding | 在 protected database work 前按已驗證 subject 限流 | [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
+| Rate Limiting binding | 在 protected database work 前按已驗證 subject 的版本化 SHA-256 opaque key 限流 | [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 | Workers Builds | 可選的 Git-based build、migration 及 Worker deployment | [Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) |
 
 Tracked `wrangler.jsonc` 是 identifier-free template。實際 Worker、D1、R2、Workflow、rate namespace、hostname、Access audience 及 account details 不屬於公開技術清單。

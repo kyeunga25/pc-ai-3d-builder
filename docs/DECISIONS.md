@@ -54,7 +54,7 @@ No payment route, UI, binding or ledger is active. The public source contains on
 
 ## Read-only requests remain read-only
 
-Session, workspace and dashboard reads do not append audit rows. Dashboard compatibility work is bounded to the latest 50 active drafts, and its recent-work response is capped at six items. Rate limiting is applied before protected database work, keyed by the verified Access subject.
+Session, workspace and dashboard reads do not append audit rows. Dashboard compatibility work is bounded to the latest 50 active drafts, and its recent-work response is capped at six items. Rate limiting is applied before protected database work, keyed by a versioned domain-separated SHA-256 digest of the verified Access subject rather than the raw identifier.
 
 ## Public configuration is non-operational
 

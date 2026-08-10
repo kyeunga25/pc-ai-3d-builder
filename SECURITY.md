@@ -22,7 +22,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - The public landing page performs no protected API request; workspace parent and deep routes run through Worker authentication before Static Assets, and every non-health API route remains behind Access.
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
-- Protected API requests are rate-limited by verified Access subject.
+- Protected API requests are rate-limited by a versioned, domain-separated SHA-256 key derived from the verified Access subject; the raw subject is not sent to the Rate Limiting binding or request logs.
 - Session and workspace reads do not append audit events; first identity binding and an explicit workspace switch may update bounded user metadata.
 - Catalogue and asset queries include the resolved workspace in every database predicate.
 - Catalogue mutations use bounded bodies, role checks, optimistic versions and logical archive.
