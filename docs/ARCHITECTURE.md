@@ -11,12 +11,13 @@ Browser
         -> protected API request
         -> verified Access identity
         -> opaque subject-digest rate limit
+        -> exact route and method preflight
         -> D1 invited user and active memberships
         -> workspace-scoped API response
   -> Static Assets binding for the React application
 ```
 
-The Worker handles `/api/*` and each protected workspace parent/deep route before falling back to the built Vite application. Static Assets use single-page-application fallback. The `/` route is a static product introduction and makes no session request. Navigation to `/dashboard` is a full-page request so the configured Access application can perform its browser login flow before the Worker independently validates the JWT and active D1 membership, then serves the private React shell with `private, no-store` caching.
+The Worker handles `/api/*` and each protected workspace parent/deep route before falling back to the built Vite application. Static Assets use single-page-application fallback. The `/` route is a static product introduction and makes no session request. Navigation to `/dashboard` is a full-page request so the configured Access application can perform its browser login flow before the Worker independently validates the JWT and active D1 membership, then serves the private React shell with `private, no-store` caching. An exact route-policy table keeps the public health endpoint separate from protected APIs. For every other API request, Access verification and subject-keyed rate limiting occur before route preflight; an unknown path or disallowed method then fails without a membership query, request-body read, R2 operation or Workflow call. This order preserves the protected boundary without spending workspace database work on a request that cannot be dispatched.
 
 ## Authentication and tenancy
 

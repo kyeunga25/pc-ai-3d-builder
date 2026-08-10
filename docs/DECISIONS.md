@@ -60,6 +60,10 @@ No payment route, UI, binding or ledger is active. The public source contains on
 
 After the one-time invited-identity binding, session, workspace, dashboard and product reads do not update user preference metadata or append audit rows. A requested workspace header scopes only that request; persistence requires the explicit fixed-URL workspace-selection PUT, whose conditional update rechecks the verified subject and active membership. This prevents two tabs reading different workspaces from repeatedly rewriting `last_workspace_id`. The browser keeps the previous verified session until a matching target response succeeds; recoverable selection failure is an inline retry state rather than a reason to discard unrelated active membership, while global identity denial still clears the session. Dashboard compatibility work is bounded to the latest 50 active drafts, and its recent-work response is capped at six items. Rate limiting is applied before protected database work, keyed by a versioned domain-separated SHA-256 digest of the verified Access subject rather than the raw identifier.
 
+## Invalid API requests stop before tenancy lookup
+
+One exact route-and-method policy defines every API endpoint. The public health endpoint is handled separately. All other API paths retain Access verification and subject-keyed rate limiting so unknown paths cannot bypass the protected boundary, but a generic unknown-path response or a method-specific bilingual `405` is returned before active workspace membership resolution. This avoids request-body, D1, R2 and Workflow work for a request that cannot be dispatched, while exact `Allow` headers keep the supported method contract reviewable.
+
 ## Public configuration is non-operational
 
 Tracked Cloudflare configuration contains bindings and placeholders only. Deployment-specific values remain in Git-ignored local configuration or platform secrets.

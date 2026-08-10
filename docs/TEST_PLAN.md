@@ -25,7 +25,8 @@ Current unit tests cover:
 - read-only session responses plus fixed-URL, header-only workspace-selection requests, matching-target response enforcement and a client state machine that retains the previous scope on recoverable failures while invalidating it on global identity denial;
 - audit helper serialization;
 - health response and public security headers;
-- construction-time rejection of single-language public API errors, bilingual 404/429/500 serialization and safe client fallback when an upstream message is absent;
+- exact API route/method policy, generic unknown-path handling, protected Access-plus-rate-limit preflight before membership D1, public health isolation, exact `Allow` headers and bilingual `METHOD_NOT_ALLOWED` responses;
+- construction-time rejection of single-language public API errors, bilingual 404/405/429/500 serialization and safe client fallback when an upstream message is absent;
 - exact JSON/CSV media-type token matching, parameter acceptance and prefix-spoof rejection before body reads or database work;
 - bounded, workspace-scoped catalogue pagination and filters, including transient header-only cursor transport, rejection of URL or malformed cursors and unchanged workspace-first D1 binding;
 - catalogue writer fixed-URL header targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, role checks, SKU conflicts, optimistic versions and logical archive;

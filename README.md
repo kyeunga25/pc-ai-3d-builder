@@ -22,6 +22,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - Dashboard、產品目錄、素材審核及 Builder 的 parent／deep route 都以 Worker-first 驗證 Access JWT 與 active D1 membership，Static Assets 不可繞過私人 shell 授權。
 - 公開 health endpoint，以及受保護的 session／workspace endpoint。
 - 公開 API 錯誤保留穩定代碼及 request ID，並以「繁體中文 / English」回傳可操作但不洩漏內部解析細節的訊息；雙欄介面會拆分顯示兩種語言。
+- Worker 以精確路徑及方法表執行 API preflight；受保護的未知路徑或錯誤方法會在 Access 驗證與 subject 限流後、workspace membership D1 查詢前，以通用雙語 `404` 或帶精確 `Allow` 的雙語 `405` 拒絕。
 - 受 workspace 限制的分頁產品目錄 API；私人分頁游標只經受保護請求標頭傳送，不寫入瀏覽器 URL，production 介面亦具備載入、空白與錯誤狀態。
 - Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
