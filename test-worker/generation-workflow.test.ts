@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { assetReviewChecks } from "../src/shared/domain/assets";
+import type { AssetGenerationParams } from "../src/shared/domain/generation-jobs";
 import { validateGeneratedGlb } from "../src/shared/domain/glb-validation";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { generationOutputRequirements } from "../src/worker/generation/provider";
@@ -414,6 +415,136 @@ describe("local generation Workflow", () => {
     } finally {
       await introspector.dispose();
     }
+  });
+
+  it("releases once and replays safely when Workflow creation fails", async () => {
+    const startFailureFixture: GenerationFixture = {
+      workspaceId: "workspace-local-start-failure",
+      userId: "user-local-start-failure",
+      partId: "part-local-start-failure",
+      assetId: "asset-local-start-failure",
+      sourceSha256: "9".repeat(64),
+      slug: "local-start-failure",
+      idempotencyKey: "local-start-failure-request-001",
+    };
+    await seedGenerationFixture(startFailureFixture);
+    const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
+      [];
+    const failingWorkflow = {
+      async create(
+        options?: WorkflowInstanceCreateOptions<AssetGenerationParams>,
+      ) {
+        if (options) {
+          creates.push(options);
+        }
+        throw new Error("Synthetic Workflow start failure.");
+      },
+      async createBatch(
+        options: WorkflowInstanceCreateOptions<AssetGenerationParams>[],
+      ) {
+        creates.push(...options);
+        throw new Error("Synthetic Workflow batch start failure.");
+      },
+      async get(id: string) {
+        return {
+          id,
+          async status() {
+            return { status: "unknown" as const };
+          },
+        } as WorkflowInstance;
+      },
+    } as Workflow<AssetGenerationParams>;
+    const routeEnv = {
+      ASSET_GENERATION: failingWorkflow,
+      DB: env.DB,
+      GENERATION_MODE: "simulation",
+      GENERATION_MAX_COST_MINOR: "0",
+    };
+    const startFailureContext = requestContextFor(startFailureFixture);
+
+    await expect(
+      generationJobStartResponse(
+        generationRequest(startFailureFixture),
+        routeEnv,
+        startFailureContext,
+        startFailureFixture.assetId,
+        "request-local-start-failure",
+      ),
+    ).rejects.toMatchObject({
+      status: 503,
+      code: "GENERATION_START_FAILED",
+    });
+    expect(creates).toHaveLength(1);
+
+    const failed = await env.DB.prepare(
+      `SELECT j.id, j.status, j.failure_code,
+              e.status AS entitlement_status, e.release_reason_code,
+              a.available_units, a.reserved_units, a.settled_units,
+              a.released_units,
+              (SELECT COUNT(*) FROM generation_credit_events AS ce
+               WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                 AND ce.event_type = 'release') AS release_events,
+              (SELECT COUNT(*) FROM generation_job_events AS je
+               WHERE je.workspace_id = j.workspace_id AND je.job_id = j.id
+                 AND je.event_type = 'start_failed') AS start_failed_events,
+              (SELECT COUNT(*) FROM generation_provider_attempts AS pa
+               WHERE pa.workspace_id = j.workspace_id AND pa.job_id = j.id)
+                AS provider_attempts
+       FROM generation_jobs AS j
+       INNER JOIN generation_job_entitlements AS e
+         ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+       INNER JOIN generation_credit_accounts AS a
+         ON a.workspace_id = j.workspace_id
+       WHERE j.workspace_id = ?1 AND j.idempotency_key = ?2`,
+    )
+      .bind(startFailureFixture.workspaceId, startFailureFixture.idempotencyKey)
+      .first<Record<string, unknown>>();
+    expect(failed).toMatchObject({
+      status: "failed",
+      failure_code: "GENERATION_START_FAILED",
+      entitlement_status: "released",
+      release_reason_code: "start_failed",
+      available_units: 2,
+      reserved_units: 0,
+      settled_units: 0,
+      released_units: 1,
+      release_events: 1,
+      start_failed_events: 1,
+      provider_attempts: 0,
+    });
+
+    const repeated = await generationJobStartResponse(
+      generationRequest(startFailureFixture),
+      routeEnv,
+      startFailureContext,
+      startFailureFixture.assetId,
+      "request-local-start-failure-repeat",
+    );
+    expect(repeated.status).toBe(200);
+    await expect(repeated.json()).resolves.toMatchObject({
+      id: failed?.id,
+      status: "failed",
+      failureCode: "GENERATION_START_FAILED",
+      entitlementStatus: "released",
+    });
+    expect(creates).toHaveLength(1);
+
+    const afterReplay = await env.DB.prepare(
+      `SELECT a.available_units, a.reserved_units, a.released_units,
+              (SELECT COUNT(*) FROM generation_credit_events AS ce
+               WHERE ce.workspace_id = ?1 AND ce.job_id = ?2
+                 AND ce.event_type = 'release') AS release_events
+       FROM generation_credit_accounts AS a
+       WHERE a.workspace_id = ?1`,
+    )
+      .bind(startFailureFixture.workspaceId, failed?.id)
+      .first();
+    expect(afterReplay).toEqual({
+      available_units: 2,
+      reserved_units: 0,
+      released_units: 1,
+      release_events: 1,
+    });
   });
 
   it("releases a reserved credit exactly once after a terminal failure", async () => {
