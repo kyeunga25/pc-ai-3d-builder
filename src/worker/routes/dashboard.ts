@@ -202,7 +202,8 @@ export async function dashboardResponse(
           : "3D 素材草稿等待處理",
       statusZhHant: asset.status === "in_review" ? "審核中" : "需要審核",
       tone: "warning",
-      href: `/asset-review?asset=${encodeURIComponent(asset.id)}`,
+      href: "/asset-review",
+      targetAssetId: asset.id,
       updatedAt: asset.updated_at,
     })),
     ...builds.map((build): DashboardWorkItem => {
@@ -217,6 +218,7 @@ export async function dashboardResponse(
         statusZhHant: ready ? "可匯出" : hasError ? "需要修正" : "資料未齊",
         tone: ready ? "success" : hasError ? "danger" : "warning",
         href: "/builder",
+        targetAssetId: null,
         updatedAt: build.updatedAt,
       };
     }),

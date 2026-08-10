@@ -12,6 +12,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { createAssetFromSource } from "../asset-review/asset-review-api";
+import { useAssetReviewNavigation } from "../asset-review/asset-review-navigation";
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
@@ -88,6 +89,7 @@ function assetQualityLabel(quality: CatalogPart["assetQuality"]) {
 
 export function CataloguePage() {
   const { currentWorkspace } = useAuthenticatedSession();
+  const { selectAssetReviewTarget } = useAssetReviewNavigation();
   const navigate = useNavigate();
   const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const canWrite = currentWorkspace.role !== "viewer";
@@ -101,6 +103,7 @@ export function CataloguePage() {
     editorState?.workspaceId === currentWorkspace.id
       ? editorState.part
       : undefined;
+  const editorAssetId = editorPart?.assetId ?? null;
   const [importing, setImporting] = useState(false);
   const [parts, setParts] = useState<CatalogPart[]>(() =>
     isLocalPreview ? catalogParts : [],
@@ -330,7 +333,8 @@ export function CataloguePage() {
       ),
     );
     setEditorState(undefined);
-    void navigate(`/asset-review?asset=${encodeURIComponent(asset.id)}`, {
+    selectAssetReviewTarget(currentWorkspace.id, asset.id);
+    void navigate("/asset-review", {
       state: isLocalPreview ? { localAsset: asset, sourceUrl } : undefined,
     });
   };
@@ -636,12 +640,11 @@ export function CataloguePage() {
               : undefined
           }
           onOpenAssetReview={
-            editorPart?.assetId
+            editorAssetId
               ? () => {
                   setEditorState(undefined);
-                  void navigate(
-                    `/asset-review?asset=${encodeURIComponent(editorPart.assetId!)}`,
-                  );
+                  selectAssetReviewTarget(currentWorkspace.id, editorAssetId);
+                  void navigate("/asset-review");
                 }
               : undefined
           }

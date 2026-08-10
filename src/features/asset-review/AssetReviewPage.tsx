@@ -23,7 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
@@ -66,6 +66,10 @@ import {
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
+import {
+  targetAssetIdForWorkspace,
+  useAssetReviewNavigation,
+} from "./asset-review-navigation";
 import "./asset-review.css";
 
 const AssetModelPreview = lazy(async () => {
@@ -231,9 +235,13 @@ export function AssetReviewPage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { target, clearAssetReviewTarget } = useAssetReviewNavigation();
+  const [initialNavigationTarget] = useState(() => target);
   const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
-  const targetAssetId = searchParams.get("asset");
+  const targetAssetId = targetAssetIdForWorkspace(
+    initialNavigationTarget,
+    currentWorkspace.id,
+  );
   const localNavigationState =
     (location.state as LocalAssetNavigationState | null) ?? null;
   const initialAsset = isLocalPreview
@@ -304,6 +312,21 @@ export function AssetReviewPage() {
   const [generationSubmitting, setGenerationSubmitting] = useState(false);
   const appliedGenerationJobRef = useRef<string | null>(null);
   const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
+
+  useEffect(() => {
+    if (initialNavigationTarget) {
+      clearAssetReviewTarget(initialNavigationTarget);
+    }
+  }, [clearAssetReviewTarget, initialNavigationTarget]);
+
+  useEffect(() => {
+    if (location.search || location.hash) {
+      void navigate("/asset-review", {
+        replace: true,
+        state: location.state,
+      });
+    }
+  }, [location.hash, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -1225,9 +1248,7 @@ export function AssetReviewPage() {
       />
       <header className="asset-review-header">
         <div>
-          <span className="eyebrow">
-            素材 {asset.id} · 版本 {asset.version}
-          </span>
+          <span className="eyebrow">私人素材 · 版本 {asset.version}</span>
           <h1>
             {asset.part.manufacturer} {asset.part.model}
           </h1>
@@ -1423,8 +1444,8 @@ export function AssetReviewPage() {
                 <dd>{qualityLabels[asset.quality]}</dd>
               </div>
               <div>
-                <dt>素材 ID</dt>
-                <dd className="mono">{asset.id}</dd>
+                <dt>審核版本</dt>
+                <dd className="mono">v{asset.version}</dd>
               </div>
             </dl>
           </div>

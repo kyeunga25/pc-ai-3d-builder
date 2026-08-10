@@ -40,7 +40,7 @@ Current unit tests cover:
 - deterministic build compatibility pass, warning, error and unknown outcomes;
 - workspace-scoped build list, role checks, guarded optimistic mutations and portable export;
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
-- read-only workspace dashboard aggregates, empty state and identity exclusion;
+- read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links and schema rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft.
 - generation capability fail-closed parsing and disabled-provider behavior;
 - runtime synthetic GLB structure and strict container, chunk, buffer-view, accessor, node-graph, dimension, triangle, texture and external-URI validation;

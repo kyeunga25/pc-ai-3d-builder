@@ -12,6 +12,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
+import { useAssetReviewNavigation } from "../asset-review/asset-review-navigation";
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
@@ -74,7 +75,8 @@ function localDashboardFixture(): DashboardResponse {
         detailZhHant: "3D 素材正在審核 · 合成示範資料",
         statusZhHant: "審核中",
         tone: "warning",
-        href: `/asset-review?asset=${encodeURIComponent(reviewAsset.id)}`,
+        href: "/asset-review",
+        targetAssetId: reviewAsset.id,
         updatedAt: "2026-07-26T05:00:00Z",
       },
       {
@@ -84,6 +86,7 @@ function localDashboardFixture(): DashboardResponse {
         statusZhHant: "可匯出",
         tone: "success",
         href: "/builder",
+        targetAssetId: null,
         updatedAt: build.updatedAt,
       },
     ],
@@ -127,6 +130,7 @@ const localFixture = localDashboardFixture();
 
 export function DashboardPage() {
   const { currentWorkspace } = useAuthenticatedSession();
+  const { selectAssetReviewTarget } = useAssetReviewNavigation();
   const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<
@@ -300,6 +304,21 @@ export function DashboardPage() {
                   className="queue-row"
                   key={`${item.kind}-${item.title}-${item.updatedAt}`}
                   to={item.href}
+                  onClick={(event) => {
+                    if (
+                      item.targetAssetId &&
+                      event.button === 0 &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey
+                    ) {
+                      selectAssetReviewTarget(
+                        currentWorkspace.id,
+                        item.targetAssetId,
+                      );
+                    }
+                  }}
                 >
                   <span className="queue-row__icon">{workIcon(item)}</span>
                   <div>

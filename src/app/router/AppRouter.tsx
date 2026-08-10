@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes } from "react-router";
 
 import { MerchantShell } from "../shell/MerchantShell";
 import { AssetReviewPage } from "../../features/asset-review/AssetReviewPage";
+import { AssetReviewNavigationProvider } from "../../features/asset-review/AssetReviewNavigationProvider";
 import { SessionGate } from "../../features/auth/SessionGate";
 import { SessionProvider } from "../../features/auth/SessionProvider";
 import { LoginPage } from "../../features/auth/LoginPage";
@@ -20,7 +21,9 @@ function ProtectedWorkspace() {
   return (
     <SessionProvider>
       <SessionGate>
-        <Outlet />
+        <AssetReviewNavigationProvider>
+          <Outlet />
+        </AssetReviewNavigationProvider>
       </SessionGate>
     </SessionProvider>
   );

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { reviewAsset } from "../../shared/domain/mockData";
 import { SessionContext } from "../auth/session-context";
 import { AssetReviewPage } from "./AssetReviewPage";
+import { AssetReviewNavigationProvider } from "./AssetReviewNavigationProvider";
 
 const currentWorkspace = {
   id: "workspace-review-fixture",
@@ -50,7 +51,11 @@ function renderPage(
             },
           ],
         },
-        createElement(AssetReviewPage),
+        createElement(
+          AssetReviewNavigationProvider,
+          null,
+          createElement(AssetReviewPage),
+        ),
       ),
     ),
   );
@@ -69,6 +74,7 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("核准素材");
     expect(markup).toContain("Approve asset");
     expect(markup).toContain('lang="en"');
+    expect(markup).not.toContain(reviewAsset.id);
   });
 
   it("renders the approved demo recovery action and live status bilingually", () => {

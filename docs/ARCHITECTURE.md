@@ -36,7 +36,7 @@ The R2 binding stores validated source images and self-contained GLB models unde
 
 ## Dashboard
 
-The dashboard performs workspace-scoped aggregate reads only. Catalogue and asset counts are derived by bounded SQL queries. Compatibility readiness is evaluated from at most the latest 50 active build drafts and their selected catalogue records; the response returns at most six recent work items. It never creates a draft, appends an audit row or returns user identity.
+The dashboard performs workspace-scoped aggregate reads only. Catalogue and asset counts are derived by bounded SQL queries. Compatibility readiness is evaluated from at most the latest 50 active build drafts and their selected catalogue records; the response returns at most six recent work items. Asset-review work uses the fixed `/asset-review` path and passes its protected target only through a workspace-bound, in-memory React context that is cleared after the review page captures it. The target is not written to the URL, history state or persistent browser storage, and modified-link navigation safely opens the generic queue. Legacy query strings and fragments are ignored as targets and replaced with the clean route. The dashboard never creates a draft, appends an audit row or returns user identity.
 
 ## Catalogue and asset review
 
