@@ -974,6 +974,30 @@
     var(--bg-1);
 }
 
+.builder-inspector-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.builder-inspector-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.82em;
+  opacity: 0.78;
+}
+
+.build-inspector .status-badge {
+  min-height: 42px;
+  white-space: normal;
+}
+
+.build-inspector .status-badge .builder-inspector-copy {
+  gap: 2px;
+  text-align: left;
+}
+
 .build-inspector--empty {
   display: grid;
   align-content: center;
@@ -1044,10 +1068,15 @@
 .build-inspector__header p {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
   margin: 0;
   font-size: 13px;
+}
+
+.build-inspector__header .stock-inline {
+  white-space: normal;
 }
 
 .build-inspector__header p > strong {
@@ -1082,11 +1111,17 @@
   min-height: 48px;
   border: 0;
   border-bottom: 2px solid transparent;
+  padding: 6px 3px;
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
+  white-space: normal;
+}
+
+.inspector-tabs .builder-inspector-copy {
+  justify-items: center;
 }
 
 .inspector-tabs button:hover,
@@ -1121,12 +1156,15 @@
 }
 
 .inspector-specs dt {
+  min-width: 0;
   color: var(--text-muted);
   font-size: 13px;
 }
 
 .inspector-specs dd {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 13px;
@@ -1175,6 +1213,13 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.inspector-empty-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .finding-row--success > svg:first-child {

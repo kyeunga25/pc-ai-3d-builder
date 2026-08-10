@@ -31,7 +31,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 透過固定檔案 API 與受保護的 asset／file-kind 標頭，上載最多 25 MiB 的自包含 glTF 2.0 GLB；經授權讀取後在審核室及 Builder 以 Three.js 人手預覽，私人 asset ID 不進檔案 URL 或 body。GLB 要求及操作狀態同樣提供雙語文案；審核 viewport 的四個鏡頭預設、合適視野／線框工具、鏡頭讀數、模型有無／載入／解碼失敗狀態及「視覺素材不構成相容性證明」亦以繁中優先、英文輔助顯示。取代所選檔案會重設核准清單及已核實尺寸，另一個私人檔案不受取代影響並繼續保持私人。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。瀏覽器的短期 Blob URL 綁定目前檔案要求的 abort signal，切換 workspace／素材或卸載畫面便冪等撤銷，遲到的已取消回應不會建立新 URL。回滾及取代只清理單一明確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交狀態。
 - 素材審核導向固定使用 `/asset-review`；指定素材只以 workspace 綁定的頁面記憶體交接，載入後即清除，不寫入 URL、history state 或持久儲存，畫面亦不顯示內部素材 ID。
-- 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；私人 build ID 只經固定 API 的受保護標頭傳送，不寫入 URL 或請求 body；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。建立、切換、儲存、封存及私隱安全匯出的即時狀態均提供繁中／英文及相符的成功、提示、警告或錯誤語意；單語技術錯誤不會直接顯示。
+- 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；私人 build ID 只經固定 API 的受保護標頭傳送，不寫入 URL 或請求 body；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。建立、切換、儲存、封存及私隱安全匯出的即時狀態均提供繁中／英文及相符的成功、提示、警告或錯誤語意；單語技術錯誤不會直接顯示。Builder 檢查器的三個分頁、空白狀態、已知規格欄位、規格核實狀態、相容性嚴重程度、證據標籤及 3D 素材狀態／品質／使用條件亦完整雙語化；未知自訂欄位會保留原鍵並標示為自訂，不猜測含義或顯示私人素材 ID。
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。

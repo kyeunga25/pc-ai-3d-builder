@@ -51,6 +51,7 @@ Current unit tests cover:
 - deterministic build compatibility pass, warning, error and unknown outcomes;
 - workspace-scoped build list, fixed-URL header-only build targets, malformed-target rejection before D1, generic logging of legacy dynamic paths, role checks, guarded optimistic mutations and portable export;
 - enumerated bilingual Builder create/switch/save/archive/export states, safe replacement of monolingual technical errors, versioned success messages, semantic status/alert tones and bilingual Save/Export controls;
+- exact bilingual Builder-inspector coverage for all three tabs, four compatibility severities, four asset states, four asset-quality states and both specification-verification states; known and custom specification labels; evidence labels; stock singular/plural; empty guidance; approved-only manual-preview wording; private-ID absence; and wrapping inspector badges and copy;
 - schema-2 export revision evidence, viewer read access, changed catalogue-version visibility without a build write, and exclusion of build/workspace identity, price, stock and private-asset fields;
 - read-only workspace dashboard aggregates, empty state, identity exclusion, exact generic review links, schema-required bounded Traditional Chinese/English work detail and status, bilingual relative-time boundaries, exhaustive static interface copy, singular/plural metric summaries, empty/complete/incomplete readiness guidance, and rejection of asset IDs embedded in URLs;
 - guarded logical archive for a build draft;

@@ -15,6 +15,8 @@ The application shell uses a top command bar and merchant navigation. The builde
 
 At narrower widths, the inspector becomes an overlay and the component rail becomes a compact step bar. Primary actions must remain visible without horizontal scrolling.
 
+The Builder inspector shows its tabs, selected-component summary, structured specifications, rule findings and 3D asset state in Traditional Chinese and English. Pass, warning, error and unknown states use text and icons in addition to colour; an approved visual asset remains explicitly separate from compatibility evidence. Bilingual tab labels, stock counts, values and pill badges wrap inside the narrow overlay instead of clipping or creating page-level horizontal overflow.
+
 ## States
 
 Every data-dependent screen must represent loading, empty and error states. Synthetic demo values must be visibly distinguishable from verified merchant data.
