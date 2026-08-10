@@ -19,7 +19,10 @@ export function SessionGate({ children }: { children: ReactNode }) {
     return (
       <main className="auth-gate">
         <BrandMark />
-        <LoadingState label="正在驗證商戶身份" />
+        <LoadingState
+          label="正在驗證商戶身份"
+          labelEnglish="Verifying merchant identity"
+        />
       </main>
     );
   }

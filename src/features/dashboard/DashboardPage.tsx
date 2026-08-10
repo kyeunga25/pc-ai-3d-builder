@@ -191,6 +191,7 @@ export function DashboardPage() {
         <div className="page dashboard-page dashboard-page--state">
           <ErrorState
             title="無法載入商戶儀表板"
+            titleEnglish="Unable to load the merchant dashboard"
             onRetry={() => {
               setState({
                 status: "loading",
@@ -205,7 +206,10 @@ export function DashboardPage() {
     }
     return (
       <div className="page dashboard-page dashboard-page--state">
-        <LoadingState label="正在載入工作空間指標" />
+        <LoadingState
+          label="正在載入工作空間指標"
+          labelEnglish="Loading workspace metrics"
+        />
       </div>
     );
   }

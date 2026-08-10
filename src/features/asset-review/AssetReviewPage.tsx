@@ -469,7 +469,10 @@ export function AssetReviewPage() {
   if (visibleLoadState === "loading") {
     return (
       <div className="page asset-review-page">
-        <LoadingState label="正在載入素材審核佇列" />
+        <LoadingState
+          label="正在載入素材審核佇列"
+          labelEnglish="Loading asset review queue"
+        />
       </div>
     );
   }
@@ -477,7 +480,11 @@ export function AssetReviewPage() {
   if (visibleLoadState === "error") {
     return (
       <div className="page asset-review-page">
-        <ErrorState title="無法載入素材審核佇列" onRetry={retryQueue} />
+        <ErrorState
+          title="無法載入素材審核佇列"
+          titleEnglish="Unable to load the asset review queue"
+          onRetry={retryQueue}
+        />
       </div>
     );
   }

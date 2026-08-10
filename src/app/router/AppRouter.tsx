@@ -51,7 +51,12 @@ export function AppRouter({ demoMode = false }: { demoMode?: boolean }) {
           path="/builder"
           element={
             <Suspense
-              fallback={<LoadingState label="正在載入電腦組裝工作空間" />}
+              fallback={
+                <LoadingState
+                  label="正在載入電腦組裝工作空間"
+                  labelEnglish="Loading PC builder workspace"
+                />
+              }
             >
               <BuilderPage />
             </Suspense>

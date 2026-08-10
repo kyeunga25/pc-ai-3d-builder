@@ -481,7 +481,10 @@ export function BuilderPage() {
   if (visibleLoadState === "loading") {
     return (
       <div className="page builder-page builder-page--state">
-        <LoadingState label="正在載入組裝及產品目錄" />
+        <LoadingState
+          label="正在載入組裝及產品目錄"
+          labelEnglish="Loading builds and catalogue"
+        />
       </div>
     );
   }
@@ -491,6 +494,7 @@ export function BuilderPage() {
       <div className="page builder-page builder-page--state">
         <ErrorState
           title="無法載入組裝工具"
+          titleEnglish="Unable to load the PC builder"
           onRetry={() => {
             setLoadState("loading");
             setLoadedWorkspaceId(null);

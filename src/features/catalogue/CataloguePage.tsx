@@ -470,9 +470,16 @@ export function CataloguePage() {
       </header>
 
       {visibleLoadState === "loading" ? (
-        <LoadingState label="正在載入工作空間產品目錄" />
+        <LoadingState
+          label="正在載入工作空間產品目錄"
+          labelEnglish="Loading workspace catalogue"
+        />
       ) : visibleLoadState === "error" ? (
-        <ErrorState title="無法載入工作空間產品目錄" onRetry={retryCatalogue} />
+        <ErrorState
+          title="無法載入工作空間產品目錄"
+          titleEnglish="Unable to load the workspace catalogue"
+          onRetry={retryCatalogue}
+        />
       ) : (
         <>
           <section className="catalogue-toolbar" aria-label="產品目錄篩選器">

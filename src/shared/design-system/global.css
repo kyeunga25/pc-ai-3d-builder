@@ -409,9 +409,28 @@ svg {
 }
 
 .async-state strong {
+  display: grid;
+  max-width: 100%;
+  gap: 2px;
   color: var(--text-primary);
   font-family: var(--font-display);
   font-size: 19px;
+  line-height: 1.4;
+}
+
+.async-state strong small,
+.async-state__secondary {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.async-state__message,
+.async-state__secondary {
+  max-width: 560px;
+  overflow-wrap: anywhere;
 }
 
 .async-state__spinner {
