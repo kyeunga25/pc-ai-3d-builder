@@ -1,7 +1,10 @@
 import {
+  AlertCircle,
+  AlertTriangle,
   Archive,
   ChevronDown,
   CircleCheck,
+  Info,
   PanelRightOpen,
   Plus,
 } from "lucide-react";
@@ -11,6 +14,32 @@ import { useAuthenticatedSession } from "../auth/session-context";
 import { BrandMark } from "../../shared/components/BrandMark";
 import type { BuildListItem } from "../../shared/domain/builds";
 import { accountInitials } from "../../shared/domain/session";
+import type { BuilderOperationStatus } from "./builder-status";
+
+export function BuilderOperationStatusView({
+  status,
+}: {
+  status: BuilderOperationStatus;
+}) {
+  const StatusIcon =
+    status.tone === "error"
+      ? AlertCircle
+      : status.tone === "warning"
+        ? AlertTriangle
+        : status.tone === "info"
+          ? Info
+          : CircleCheck;
+
+  return (
+    <span
+      className={`command-save-state is-${status.tone}`}
+      role={status.tone === "error" ? "alert" : "status"}
+    >
+      <StatusIcon aria-hidden="true" />
+      <span title={status.message}>{status.message}</span>
+    </span>
+  );
+}
 
 export function BuilderCommandBar({
   saveState,
@@ -25,7 +54,7 @@ export function BuilderCommandBar({
   onArchiveBuild,
   onOpenInspector,
 }: {
-  saveState: string;
+  saveState: BuilderOperationStatus;
   buildName: string;
   buildId: string;
   builds: BuildListItem[];
@@ -56,7 +85,7 @@ export function BuilderCommandBar({
         <label>
           <small>目前組裝</small>
           <select
-            aria-label="切換組裝"
+            aria-label="切換組裝 / Switch build"
             value={buildId}
             onChange={(event) => onBuildSelect(event.target.value)}
           >
@@ -69,7 +98,7 @@ export function BuilderCommandBar({
           <ChevronDown aria-hidden="true" />
         </label>
         <input
-          aria-label="組裝名稱"
+          aria-label="組裝名稱 / Build name"
           value={buildName}
           maxLength={120}
           disabled={!canWrite}
@@ -80,7 +109,7 @@ export function BuilderCommandBar({
             <button
               className="icon-button command-new-build"
               type="button"
-              aria-label="建立新組裝"
+              aria-label="建立新組裝 / Create new build"
               onClick={onCreateBuild}
             >
               <Plus aria-hidden="true" />
@@ -90,8 +119,16 @@ export function BuilderCommandBar({
                 archiveArmed ? " is-armed" : ""
               }`}
               type="button"
-              aria-label={archiveArmed ? "確認封存目前組裝" : "封存目前組裝"}
-              title={archiveArmed ? "再次按下以確認封存" : "封存目前組裝"}
+              aria-label={
+                archiveArmed
+                  ? "確認封存目前組裝 / Confirm archiving the current build"
+                  : "封存目前組裝 / Archive the current build"
+              }
+              title={
+                archiveArmed
+                  ? "再次按下以確認封存 / Press again to confirm archive"
+                  : "封存目前組裝 / Archive the current build"
+              }
               onClick={onArchiveBuild}
             >
               <Archive aria-hidden="true" />
@@ -100,10 +137,7 @@ export function BuilderCommandBar({
         ) : null}
       </div>
 
-      <span className="command-save-state" aria-live="polite">
-        <CircleCheck aria-hidden="true" />
-        {saveState}
-      </span>
+      <BuilderOperationStatusView status={saveState} />
 
       <button
         className="button command-inspector-button"

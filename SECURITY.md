@@ -34,7 +34,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 - File replacement rejects viewers before target/body/D1/R2 work, requires the current review version plus an active catalogue part at the D1 write boundary, and resets prior approval evidence.
 - Asset review mutations reject viewers before target/body/D1/R2 work, validate a bounded protected target before the JSON body, and retain optimistic version conditions plus an active-catalogue database trigger.
 - Asset state, review history and the minimal audit event are committed in one D1 batch.
-- Build reads and writes are workspace-scoped; selected build IDs use a bounded protected header with fixed API URLs, and explicit writes use bounded selections, optimistic versions and guarded D1 batches.
+- Build reads and writes are workspace-scoped; selected build IDs use a bounded protected header with fixed API URLs, and explicit writes use bounded selections, optimistic versions and guarded D1 batches. Create, switch, save, two-step archive and export states are bilingual and use typed info/success/warning/error announcements; malformed or monolingual client exceptions are replaced with operation-specific safe copy that states whether data or a download changed.
 - Build export fails closed on hard errors or unknown compatibility results and excludes identities, workspace identifiers, prices, stock, private assets and deployment data.
 - Dashboard aggregates are bounded, workspace-scoped and read-only; they do not append audit records or expose user identity data.
 - Builder model previews request only an approved asset through the protected Worker route and revoke the short-lived object URL when the selected part changes.

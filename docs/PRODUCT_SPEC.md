@@ -17,6 +17,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Authorized private-file reads and manual Three.js GLB inspection without permanent object URLs.
 - Explicit build creation, switching and optimistic persistence for one selected part per category.
 - Two-step logical archive for build drafts.
+- Traditional-Chinese-first bilingual status and recovery copy for build creation, switching, saving, archiving and privacy-safe export, with semantic info/success/warning/error announcements and safe fallbacks for monolingual technical failures.
 - Deterministic compatibility findings from six verified structured-specification rules.
 - Protected preview of the selected component's approved GLB in the builder.
 - Portable JSON export that fails closed and excludes identity, operational and private-asset fields.

@@ -22,7 +22,7 @@ A build selects at most one active catalogue part per component category. Reads 
 
 Portable schema-2 JSON includes the build record version, each component's current catalogue record version, component identity, verified specifications and bilingual compatibility evidence. It deliberately omits build and workspace identifiers, users, price, stock, private files, checksums and deployment values. The revision fields improve traceability but do not claim an immutable snapshot or content digest.
 
-Build archive is a logical state transition with the same optimistic version boundary. The interface requires a separate second action before submitting it.
+Build archive is a logical state transition with the same optimistic version boundary. The interface requires a separate second action before submitting it. Every create, switch, save, archive and export state uses centrally enumerated Traditional Chinese and English copy plus an explicit info, success, warning or error tone. Failures use alert semantics instead of the success indicator. Raw monolingual client exceptions are not treated as user-facing instructions; an operation-specific fallback explicitly reports no data, current-build or download change.
 
 ## Catalogue onboarding is bounded and transactional
 

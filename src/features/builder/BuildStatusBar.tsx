@@ -74,7 +74,7 @@ export function BuildStatusBar({
           onClick={onSave}
         >
           <Save aria-hidden="true" />
-          儲存
+          儲存 <span lang="en">Save</span>
         </button>
         <button
           className="button button--primary"
@@ -82,13 +82,13 @@ export function BuildStatusBar({
           disabled={!canExport || busy}
           title={
             canExport
-              ? "匯出不含身份、價格、庫存及私人素材的 JSON"
-              : "先儲存變更，並解決嚴重錯誤及未知相容性結果"
+              ? "匯出不含身份、價格、庫存及私人素材的 JSON / Export JSON without identity, pricing, stock or private assets"
+              : "先儲存變更，並解決嚴重錯誤及未知相容性結果 / Save changes and resolve errors and unknown compatibility results first"
           }
           onClick={onExport}
         >
           <Download aria-hidden="true" />
-          匯出
+          匯出 <span lang="en">Export</span>
         </button>
       </div>
     </footer>
