@@ -14,6 +14,7 @@ import {
   generationReviewAccountingStatements,
 } from "../generation/accounting";
 import { ApiError } from "../lib/api-error";
+import { privateModelObjectMatches } from "../lib/private-assets";
 import { readBoundedJson } from "../lib/request-body";
 
 export type AssetReviewRow = {
@@ -259,15 +260,19 @@ export async function assetReviewMutationResponse(
       if (
         !current.model_object_key ||
         !current.model_content_type ||
-        !current.model_size_bytes
+        !current.model_size_bytes ||
+        !current.model_sha256
       ) {
         throw assetModelRequired();
       }
-      const storedModel = await bucket.head(current.model_object_key);
       if (
-        !storedModel ||
-        storedModel.size !== current.model_size_bytes ||
-        storedModel.httpMetadata?.contentType !== current.model_content_type
+        !(await privateModelObjectMatches(
+          bucket,
+          current.model_object_key,
+          current.model_content_type,
+          current.model_size_bytes,
+          current.model_sha256,
+        ))
       ) {
         throw assetModelRequired();
       }

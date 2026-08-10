@@ -5,8 +5,10 @@ import {
   assetReviewChecks,
   type AssetReviewCheck,
 } from "../src/shared/domain/assets";
+import { createSyntheticDraftGlb } from "../src/shared/domain/synthetic-glb";
 import type { WorkspaceRole } from "../src/shared/domain/session";
 import type { RequestContext } from "../src/worker/auth/workspace";
+import { sha256Hex } from "../src/worker/lib/digest";
 import { assetReviewMutationResponse } from "../src/worker/routes/assets";
 
 type ActorFixture = {
@@ -46,6 +48,7 @@ const sourceObjectKey =
   "workspaces/workspace-asset-review-protected/assets/asset-review-runtime/source/synthetic";
 const modelObjectKey =
   "workspaces/workspace-asset-review-protected/assets/asset-review-runtime/model/synthetic";
+const modelBytes = createSyntheticDraftGlb();
 
 function context(fixture: ActorFixture): RequestContext {
   return {
@@ -88,7 +91,8 @@ function reviewRequest(
   });
 }
 
-async function seedFixtures(): Promise<void> {
+async function seedFixtures(): Promise<string> {
+  const modelSha256 = await sha256Hex(modelBytes);
   await env.DB.batch([
     env.DB.prepare(
       "INSERT INTO workspaces (id, slug, name) VALUES (?1, ?2, ?3)",
@@ -133,7 +137,7 @@ async function seedFixtures(): Promise<void> {
          model_size_bytes, model_sha256, created_by, updated_by
        ) VALUES (
          ?1, ?2, ?3, 'draft', 'draft', 'uploaded', '[]', 0, 0,
-         ?4, 'image/png', 128, ?5, ?6, 'model/gltf-binary', 256, ?7, ?8, ?8
+         ?4, 'image/png', 128, ?5, ?6, 'model/gltf-binary', ?7, ?8, ?9, ?9
        )`,
     ).bind(
       assetId,
@@ -142,15 +146,17 @@ async function seedFixtures(): Promise<void> {
       sourceObjectKey,
       "a".repeat(64),
       modelObjectKey,
-      "b".repeat(64),
+      modelBytes.byteLength,
+      modelSha256,
       staffFixture.userId,
     ),
   ]);
+  return modelSha256;
 }
 
 describe("asset review runtime boundaries", () => {
   it("allows a staff draft and applies one workspace-scoped admin approval", async () => {
-    await seedFixtures();
+    const modelSha256 = await seedFixtures();
 
     const draft = await assetReviewMutationResponse(
       reviewRequest("save_draft", 0, ["model_identity", "source_rights"], {
@@ -179,7 +185,7 @@ describe("asset review runtime boundaries", () => {
     expect(draftText).not.toContain(sourceObjectKey);
     expect(draftText).not.toContain(modelObjectKey);
     expect(draftText).not.toContain("a".repeat(64));
-    expect(draftText).not.toContain("b".repeat(64));
+    expect(draftText).not.toContain(modelSha256);
 
     const approvalRequest = () =>
       reviewRequest("approve", 1, [...assetReviewChecks], {
@@ -223,12 +229,16 @@ describe("asset review runtime boundaries", () => {
       status: 409,
       code: "ASSET_MODEL_REQUIRED",
     });
-    await env.PRIVATE_ASSETS.put(modelObjectKey, new Uint8Array(255), {
-      httpMetadata: {
-        contentType: "application/octet-stream",
-        cacheControl: "no-store",
+    await env.PRIVATE_ASSETS.put(
+      modelObjectKey,
+      new Uint8Array(modelBytes.byteLength - 1),
+      {
+        httpMetadata: {
+          contentType: "application/octet-stream",
+          cacheControl: "no-store",
+        },
       },
-    });
+    );
     await expect(
       assetReviewMutationResponse(
         approvalRequest(),
@@ -242,7 +252,54 @@ describe("asset review runtime boundaries", () => {
       status: 409,
       code: "ASSET_MODEL_REQUIRED",
     });
-    await env.PRIVATE_ASSETS.put(modelObjectKey, new Uint8Array(256), {
+    await env.PRIVATE_ASSETS.put(
+      modelObjectKey,
+      new Uint8Array(modelBytes.byteLength),
+      {
+        httpMetadata: {
+          contentType: "model/gltf-binary",
+          cacheControl: "no-store",
+        },
+      },
+    );
+    await expect(
+      assetReviewMutationResponse(
+        approvalRequest(),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(adminFixture),
+        assetId,
+        "request-asset-review-model-invalid-bytes",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_MODEL_REQUIRED",
+    });
+
+    const checksumDriftBytes = modelBytes.slice();
+    const finalByteIndex = checksumDriftBytes.byteLength - 1;
+    checksumDriftBytes[finalByteIndex] =
+      checksumDriftBytes[finalByteIndex]! ^ 1;
+    await env.PRIVATE_ASSETS.put(modelObjectKey, checksumDriftBytes, {
+      httpMetadata: {
+        contentType: "model/gltf-binary",
+        cacheControl: "no-store",
+      },
+    });
+    await expect(
+      assetReviewMutationResponse(
+        approvalRequest(),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(adminFixture),
+        assetId,
+        "request-asset-review-model-checksum-drift",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_MODEL_REQUIRED",
+    });
+    await env.PRIVATE_ASSETS.put(modelObjectKey, modelBytes, {
       httpMetadata: {
         contentType: "model/gltf-binary",
         cacheControl: "no-store",

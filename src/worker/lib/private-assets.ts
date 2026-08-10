@@ -1,3 +1,10 @@
+import {
+  AssetFileValidationError,
+  assetFileLimits,
+  validateAssetFileBytes,
+} from "../../shared/domain/asset-files";
+import { sha256Hex } from "./digest";
+
 export function assetObjectKey(
   workspaceId: string,
   assetId: string,
@@ -19,6 +26,44 @@ export async function privateObjectMetadataMatches(
     stored.size === sizeBytes &&
     stored.httpMetadata?.contentType === contentType
   );
+}
+
+export async function privateModelObjectMatches(
+  bucket: R2Bucket,
+  objectKey: string,
+  contentType: string,
+  sizeBytes: number,
+  sha256: string,
+): Promise<boolean> {
+  if (
+    !Number.isSafeInteger(sizeBytes) ||
+    sizeBytes <= 0 ||
+    sizeBytes > assetFileLimits.model ||
+    !/^[a-f0-9]{64}$/u.test(sha256)
+  ) {
+    return false;
+  }
+  const stored = await bucket.get(objectKey);
+  if (
+    !stored ||
+    stored.size !== sizeBytes ||
+    stored.httpMetadata?.contentType !== contentType
+  ) {
+    return false;
+  }
+  const bytes = new Uint8Array(await stored.arrayBuffer());
+  if (bytes.byteLength !== sizeBytes) {
+    return false;
+  }
+  try {
+    validateAssetFileBytes("model", contentType, bytes);
+  } catch (error) {
+    if (error instanceof AssetFileValidationError) {
+      return false;
+    }
+    throw error;
+  }
+  return (await sha256Hex(bytes)) === sha256;
 }
 
 export async function deletePrivateObjectQuietly(

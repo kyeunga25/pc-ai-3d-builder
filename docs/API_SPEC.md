@@ -100,7 +100,7 @@ Streams a private `source` or `model` file only after Access verification and ac
 
 ## `PATCH /api/assets/:assetId/review`
 
-Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles cannot mutate. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item, three positive dimensions of at most 10,000 mm and a private GLB whose R2 object still exists with the recorded byte size and `model/gltf-binary` metadata. Missing or mismatched storage returns bilingual `ASSET_MODEL_REQUIRED` without a D1 write; an R2 operational failure remains an internal failure and can be retried.
+Accepts a JSON body of at most 32 KiB with `action`, `expectedVersion`, `completedChecks` and `dimensionsMm`. Viewer roles cannot mutate. Staff may save drafts; owner or admin roles may also approve or reject. Approval requires every fixed checklist item, three positive dimensions of at most 10,000 mm and a private GLB whose R2 object still exists with the recorded byte size and `model/gltf-binary` metadata. Before committing approval, the Worker bounds the object to 25 MiB, reads it back, repeats the GLB structure and self-containment validation, and compares its SHA-256 with D1. Missing, invalid or same-metadata checksum-drifted storage returns bilingual `ASSET_MODEL_REQUIRED` without a review or audit write; restoring the exact validated object permits a retry at the same asset version. An R2 read or cryptographic operational failure remains an internal failure and can be retried.
 
 The conditional asset update, review event and audit event are submitted in one D1 batch. A stale `expectedVersion` fails without overwriting the newer record.
 

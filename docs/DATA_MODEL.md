@@ -32,7 +32,7 @@ Stores workspace-scoped product identity, pricing, stock state and structured-sp
 
 Stores one current visual-asset review record per workspace catalogue part. A `BEFORE INSERT` trigger requires the workspace-scoped catalogue part to remain active at the D1 commit boundary, closing the gap between initial route validation and the asset batch. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from private source-image and GLB metadata.
 
-Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. Both private-file reads and asset approval recheck R2 existence, byte size and content type against these D1 values before streaming bytes or committing a review transition. Missing or drifted objects fail closed until an authorized replacement restores matching metadata. Private file metadata never appears in browser API records, audit metadata, logs or checked-in fixtures.
+Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. Private-file reads recheck R2 existence, byte size and content type before streaming. Asset approval additionally performs a bounded read-back, repeats the GLB structure and self-containment validation, and compares the object SHA-256 with D1 before committing a review transition. Missing, invalid or drifted objects fail closed until an authorized replacement restores the exact validated bytes. Private file metadata never appears in browser API records, audit metadata, logs or checked-in fixtures.
 
 ## `asset_review_events`
 
