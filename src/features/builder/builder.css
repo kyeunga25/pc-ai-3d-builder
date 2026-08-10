@@ -41,10 +41,33 @@
   text-align: left;
 }
 
-.command-workspace span,
+.command-workspace > span,
 .command-build {
   display: grid;
   min-width: 0;
+}
+
+.command-bar-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.command-bar-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.78em;
+  opacity: 0.78;
+}
+
+.command-workspace small .command-bar-copy,
+.command-build small .command-bar-copy {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 5px;
+  line-height: 1.1;
 }
 
 .command-workspace small,
@@ -56,7 +79,11 @@
   text-transform: uppercase;
 }
 
-.command-workspace span {
+.command-workspace > span {
+  overflow: hidden;
+}
+
+.command-workspace strong {
   overflow: hidden;
   color: var(--text-primary);
   font-size: 15px;
@@ -183,6 +210,10 @@
 
 .command-inspector-button {
   display: none;
+}
+
+.command-inspector-button .command-bar-copy {
+  justify-items: center;
 }
 
 .builder-main {
