@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
 import { createD1Stub } from "../test/d1-stub";
@@ -226,6 +227,41 @@ describe("private asset routes", () => {
       calls.find((call) => call.values.includes("asset.file.model.upload"))
         ?.sql,
     ).toContain("changes() = 1");
+  });
+
+  it("rejects an oversized replacement before private storage or mutation", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [assetRow()] });
+    const { bucket, deletes, puts } = createR2Stub();
+    const request = new Request(
+      "https://app.example/api/assets/asset-fixture/files/source",
+      {
+        method: "PUT",
+        headers: {
+          "content-length": String(assetFileLimits.source + 1),
+          "content-type": "image/png",
+          "x-rigstage-expected-version": "0",
+        },
+        body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+          .buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context("staff"),
+        "asset-fixture",
+        "source",
+        "request-oversized",
+      ),
+    ).rejects.toMatchObject({ status: 413, code: "PAYLOAD_TOO_LARGE" });
+    expect(puts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
   });
 
   it("streams a private file only after a workspace-scoped asset lookup", async () => {

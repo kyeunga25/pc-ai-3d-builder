@@ -29,16 +29,37 @@ describe("bounded JSON request bodies", () => {
   });
 
   it("stops reading when a streamed body exceeds the limit", async () => {
+    const encoder = new TextEncoder();
+    const chunks = [encoder.encode('{"a":'), encoder.encode('"value"}')];
+    let pullCount = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks[pullCount];
+        pullCount += 1;
+        if (chunk) {
+          controller.enqueue(chunk);
+        } else {
+          controller.close();
+        }
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
     const request = new Request("https://app.example/api/review", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: "larger than limit" }),
-    });
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
 
     await expect(readBoundedJson(request, 8)).rejects.toMatchObject({
       status: 413,
       code: "PAYLOAD_TOO_LARGE",
     });
+    expect(cancelled).toBe(true);
+    expect(pullCount).toBeLessThanOrEqual(chunks.length + 1);
   });
 
   it("accepts bounded UTF-8 CSV bodies", async () => {
