@@ -80,7 +80,7 @@ export function AssetModelPreview({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.domElement.setAttribute("aria-label", "可旋轉的私人 GLB 模型");
     renderer.domElement.setAttribute("role", "img");
-    container.append(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     scene.add(new THREE.HemisphereLight(0xdce9ff, 0x111827, 2.1));
     const keyLight = new THREE.DirectionalLight(0xffffff, 3.4);

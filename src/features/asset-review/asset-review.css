@@ -41,6 +41,20 @@
   font-size: 13px;
 }
 
+.asset-review-status {
+  display: grid;
+  max-width: 460px;
+  gap: 2px;
+  text-align: right;
+  line-height: 1.4;
+}
+
+.asset-review-status small {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+
 .review-workspace {
   display: grid;
   min-width: 0;
@@ -544,7 +558,28 @@
 
 .review-actions > div {
   display: flex;
+  min-width: 0;
   gap: 9px;
+}
+
+.review-actions .button {
+  min-width: 0;
+  min-height: 54px;
+}
+
+.review-action-label {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.review-action-label small {
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0;
+  opacity: 0.78;
 }
 
 @media (max-width: 1100px) {
@@ -573,6 +608,10 @@
 }
 
 @media (max-width: 720px) {
+  .asset-review-page {
+    grid-template-rows: auto auto auto;
+  }
+
   .asset-review-header {
     align-items: flex-start;
     flex-direction: column;
@@ -581,7 +620,12 @@
 
   .asset-review-header__meta {
     width: 100%;
+    align-items: flex-start;
     justify-content: space-between;
+  }
+
+  .asset-review-status {
+    max-width: min(72%, 290px);
   }
 
   .review-workspace {
@@ -629,5 +673,10 @@
   .review-actions > div,
   .review-actions .button {
     flex: 1;
+  }
+
+  .review-actions .button {
+    height: auto;
+    padding: 8px 10px;
   }
 }
