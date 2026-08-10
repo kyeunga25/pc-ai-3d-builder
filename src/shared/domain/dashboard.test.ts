@@ -6,7 +6,9 @@ const assetReviewItem = {
   kind: "asset_review",
   title: "Fixture Asset",
   detailZhHant: "等待審核",
+  detailEnglish: "Awaiting review",
   statusZhHant: "需要審核",
+  statusEnglish: "Review required",
   tone: "warning",
   href: "/asset-review",
   targetAssetId: "asset-fixture",
@@ -27,6 +29,30 @@ describe("dashboard work item schema", () => {
         href: "/asset-review?asset=asset-fixture",
       }),
     ).toThrow();
+  });
+
+  it("requires bounded Traditional Chinese and English work copy", () => {
+    const withoutDetailEnglish: Record<string, unknown> = {
+      ...assetReviewItem,
+    };
+    const withoutStatusEnglish: Record<string, unknown> = {
+      ...assetReviewItem,
+    };
+    delete withoutDetailEnglish.detailEnglish;
+    delete withoutStatusEnglish.statusEnglish;
+
+    expect(
+      dashboardWorkItemSchema.safeParse(withoutDetailEnglish).success,
+    ).toBe(false);
+    expect(
+      dashboardWorkItemSchema.safeParse(withoutStatusEnglish).success,
+    ).toBe(false);
+    expect(
+      dashboardWorkItemSchema.safeParse({
+        ...assetReviewItem,
+        detailEnglish: "x".repeat(241),
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects missing or cross-kind navigation targets", () => {

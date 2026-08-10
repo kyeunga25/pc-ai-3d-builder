@@ -23,6 +23,10 @@ import {
 import { StatusBadge } from "../../shared/components/StatusBadge";
 import { composeBuildRecord } from "../../shared/domain/builds";
 import {
+  dashboardAssetReviewWorkCopy,
+  dashboardBuildWorkCopy,
+} from "../../shared/domain/dashboard-work-copy";
+import {
   dashboardResponseSchema,
   type DashboardResponse,
   type DashboardWorkItem,
@@ -33,6 +37,7 @@ import {
   reviewAsset,
 } from "../../shared/domain/mockData";
 import { fetchDashboard } from "./dashboard-api";
+import { relativeDashboardUpdateCopy } from "./dashboard-copy";
 import "./dashboard.css";
 
 function localDashboardFixture(): DashboardResponse {
@@ -51,6 +56,12 @@ function localDashboardFixture(): DashboardResponse {
       part.specificationStatus === "verified" &&
       part.assetStatus === "approved",
   ).length;
+  const assetWorkCopy = dashboardAssetReviewWorkCopy("in_review");
+  const buildWorkCopy = dashboardBuildWorkCopy({
+    errorCount: build.summary.errorCount,
+    partCount: build.selectedParts.length,
+    unknownCount: build.summary.unknownCount,
+  });
 
   return dashboardResponseSchema.parse({
     metrics: {
@@ -70,50 +81,25 @@ function localDashboardFixture(): DashboardResponse {
     },
     recentWork: [
       {
-        kind: "asset_review",
+        ...assetWorkCopy,
         title: `${reviewAsset.part.manufacturer} ${reviewAsset.part.model}`,
-        detailZhHant: "3D 素材正在審核 · 合成示範資料",
-        statusZhHant: "審核中",
-        tone: "warning",
+        detailZhHant: `${assetWorkCopy.detailZhHant} · 合成示範資料`,
+        detailEnglish: `${assetWorkCopy.detailEnglish} · Synthetic demo data`,
         href: "/asset-review",
         targetAssetId: reviewAsset.id,
         updatedAt: "2026-07-26T05:00:00Z",
       },
       {
-        kind: "build_ready",
+        ...buildWorkCopy,
         title: build.name,
         detailZhHant: `${build.selectedParts.length} 個組件 · 合成示範組裝`,
-        statusZhHant: "可匯出",
-        tone: "success",
+        detailEnglish: `${build.selectedParts.length} components · Synthetic demo build`,
         href: "/builder",
         targetAssetId: null,
         updatedAt: build.updatedAt,
       },
     ],
   });
-}
-
-function relativeUpdate(value: string): string {
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/u.test(value)
-    ? `${value.replace(" ", "T")}Z`
-    : value;
-  const timestamp = Date.parse(normalized);
-  if (!Number.isFinite(timestamp)) {
-    return "最近更新";
-  }
-  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
-  if (minutes < 1) {
-    return "剛剛";
-  }
-  if (minutes < 60) {
-    return `${minutes} 分鐘前`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} 小時前`;
-  }
-  const days = Math.floor(hours / 24);
-  return days <= 7 ? `${days} 日前` : "較早更新";
 }
 
 function workIcon(item: DashboardWorkItem) {
@@ -299,40 +285,53 @@ export function DashboardPage() {
           </div>
           {data.recentWork.length > 0 ? (
             <div className="queue-list">
-              {data.recentWork.map((item) => (
-                <Link
-                  className="queue-row"
-                  key={`${item.kind}-${item.title}-${item.updatedAt}`}
-                  to={item.href}
-                  onClick={(event) => {
-                    if (
-                      item.targetAssetId &&
-                      event.button === 0 &&
-                      !event.metaKey &&
-                      !event.ctrlKey &&
-                      !event.shiftKey &&
-                      !event.altKey
-                    ) {
-                      selectAssetReviewTarget(
-                        currentWorkspace.id,
-                        item.targetAssetId,
-                      );
-                    }
-                  }}
-                >
-                  <span className="queue-row__icon">{workIcon(item)}</span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>
-                      {item.detailZhHant} · {relativeUpdate(item.updatedAt)}
-                    </span>
-                  </div>
-                  <StatusBadge tone={item.tone}>
-                    {item.statusZhHant}
-                  </StatusBadge>
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              ))}
+              {data.recentWork.map((item) => {
+                const relativeUpdate = relativeDashboardUpdateCopy(
+                  item.updatedAt,
+                );
+                return (
+                  <Link
+                    className="queue-row"
+                    key={`${item.kind}-${item.title}-${item.updatedAt}`}
+                    to={item.href}
+                    onClick={(event) => {
+                      if (
+                        item.targetAssetId &&
+                        event.button === 0 &&
+                        !event.metaKey &&
+                        !event.ctrlKey &&
+                        !event.shiftKey &&
+                        !event.altKey
+                      ) {
+                        selectAssetReviewTarget(
+                          currentWorkspace.id,
+                          item.targetAssetId,
+                        );
+                      }
+                    }}
+                  >
+                    <span className="queue-row__icon">{workIcon(item)}</span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span className="queue-row__details">
+                        <span>
+                          {item.detailZhHant} · {relativeUpdate.zhHant}
+                        </span>
+                        <small lang="en">
+                          {item.detailEnglish} · {relativeUpdate.english}
+                        </small>
+                      </span>
+                    </div>
+                    <StatusBadge tone={item.tone}>
+                      <span className="queue-row__status-copy">
+                        <span>{item.statusZhHant}</span>
+                        <small lang="en">{item.statusEnglish}</small>
+                      </span>
+                    </StatusBadge>
+                    <ArrowRight aria-hidden="true" />
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <EmptyState

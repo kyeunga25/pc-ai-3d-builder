@@ -38,7 +38,7 @@ Uses the same read-only authentication and workspace resolution path and returns
 
 ## `GET /api/dashboard`
 
-Returns read-only counts for the resolved workspace: active and verified catalogue records, approved and pending visual assets, draft builds, and compatibility readiness across the latest 50 drafts. Recent work combines at most six asset-review or build items. Asset-review items use the exact `href` `/asset-review` and include a protected `targetAssetId` for the current workspace; build items use `/builder` and a null target. The client transfers an asset target only through transient workspace-bound memory and never serializes it into the URL or visible interface. The route performs no writes, appends no audit event and returns no user identity.
+Returns read-only counts for the resolved workspace: active and verified catalogue records, approved and pending visual assets, draft builds, and compatibility readiness across the latest 50 drafts. Recent work combines at most six asset-review or build items. Each item requires `detailZhHant` and `detailEnglish` of 1–240 characters plus `statusZhHant` and `statusEnglish` of 1–80 characters. Asset-review items use the exact `href` `/asset-review` and include a protected `targetAssetId` for the current workspace; build items use `/builder` and a null target. The client transfers an asset target only through transient workspace-bound memory and never serializes it into the URL or visible interface. The route performs no writes, appends no audit event and returns no user identity.
 
 ## `GET /api/catalogue`
 

@@ -17,7 +17,9 @@ export const dashboardWorkItemSchema = z
     kind: z.enum(["asset_review", "build_ready", "build_attention"]),
     title: z.string().trim().min(1).max(240),
     detailZhHant: z.string().trim().min(1).max(240),
+    detailEnglish: z.string().trim().min(1).max(240),
     statusZhHant: z.string().trim().min(1).max(80),
+    statusEnglish: z.string().trim().min(1).max(80),
     tone: z.enum(["info", "success", "warning", "danger"]),
     href: z.enum(["/asset-review", "/builder"]),
     targetAssetId: z

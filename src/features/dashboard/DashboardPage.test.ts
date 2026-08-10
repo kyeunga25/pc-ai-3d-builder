@@ -57,6 +57,11 @@ describe("DashboardPage", () => {
     );
 
     expect(markup).toContain('href="/asset-review"');
+    expect(markup).toContain("3D asset is under review · Synthetic demo data");
+    expect(markup).toContain("Under review");
+    expect(markup).toContain("9 components · Synthetic demo build");
+    expect(markup).toContain("Export ready");
+    expect(markup).toContain("Earlier update");
     expect(markup).not.toContain("?asset=");
   });
 });

@@ -131,6 +131,38 @@
   line-height: 1.55;
 }
 
+.queue-row__details,
+.queue-row__status-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+
+.queue-row__details > small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.82;
+}
+
+.queue-row .status-badge {
+  min-height: 38px;
+  white-space: normal;
+}
+
+.queue-row__status-copy {
+  font-size: inherit;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.queue-row__status-copy > small {
+  font-size: 0.82em;
+  line-height: 1.15;
+  opacity: 0.82;
+}
+
 .queue-row > svg {
   width: 16px;
   color: var(--text-muted);
