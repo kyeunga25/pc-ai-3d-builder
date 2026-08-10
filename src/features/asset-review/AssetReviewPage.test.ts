@@ -146,4 +146,31 @@ describe("AssetReviewPage", () => {
       /@media[^]*?\.asset-file-control\s*\{[^}]*flex-direction:\s*column;/u,
     );
   });
+
+  it("renders verified dimensions and every approval check bilingually", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("核實尺寸");
+    expect(markup).toContain("Verified dimensions");
+    expect(markup).toContain("Only enter values checked by a person");
+    expect(markup).toContain("Width");
+    expect(markup).toContain("Height");
+    expect(markup).toContain("Depth");
+    expect(markup).toContain("核准清單");
+    expect(markup).toContain("Approval checklist");
+    expect(markup).toContain("5 of 6 checks complete");
+    expect(markup).toContain("Model and SKU are correct");
+    expect(markup).toContain("Image usage rights are confirmed");
+  });
+
+  it("stacks verified dimension fields at phone width", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toMatch(
+      /@media \(max-width: 480px\)[^]*?\.dimension-grid\s*\{[^}]*grid-template-columns:\s*1fr;/u,
+    );
+  });
 });

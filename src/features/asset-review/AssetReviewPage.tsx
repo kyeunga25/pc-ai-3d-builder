@@ -71,6 +71,13 @@ import {
   updateAssetReview,
 } from "./asset-review-api";
 import {
+  assetReviewChecklistCopy,
+  assetReviewChecklistProgressCopy,
+  assetReviewDimensionItems,
+  assetReviewEvidenceCopy,
+  type AssetReviewDimensionKey,
+} from "./asset-review-evidence-copy";
+import {
   assetReviewFileActionCopy,
   assetReviewFileControlCopy,
 } from "./asset-review-file-copy";
@@ -108,27 +115,13 @@ const AssetModelPreview = lazy(async () => {
   return { default: module.AssetModelPreview };
 });
 
-const checklist: Array<{ id: AssetReviewCheck; label: string }> = [
-  { id: "model_identity", label: "型號及 SKU 正確" },
-  { id: "variant_identity", label: "顏色及版本正確" },
-  { id: "standard_orientation", label: "已設定標準方向" },
-  { id: "verified_dimensions", label: "已輸入核實尺寸" },
-  { id: "installation_pivot", label: "樞軸適合作安裝" },
-  { id: "source_rights", label: "已確認圖片使用權" },
-];
-
 const cameraPresets = ["正面", "左側", "頂部", "等角"];
 const sourceViews = ["正面", "背面", "左側", "三分之四角度"];
-const dimensions = [
-  { key: "width", label: "闊度" },
-  { key: "height", label: "高度" },
-  { key: "depth", label: "深度" },
-] as const;
 
 type ReviewForm = {
   asset: AssetReviewItem;
   checks: Set<AssetReviewCheck>;
-  dimensions: Record<(typeof dimensions)[number]["key"], string>;
+  dimensions: Record<AssetReviewDimensionKey, string>;
 };
 
 type AssetFileUrls = {
@@ -847,10 +840,7 @@ export function AssetReviewPage() {
     setReviewNotice(assetReviewStatusCopy.checklistDirty);
   };
 
-  const updateDimension = (
-    key: (typeof dimensions)[number]["key"],
-    value: string,
-  ) => {
+  const updateDimension = (key: AssetReviewDimensionKey, value: string) => {
     if (!canEdit) {
       return;
     }
@@ -1627,14 +1617,18 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Scan aria-hidden="true" />
               <div>
-                <strong>核實尺寸</strong>
-                <span>只接受經人手核對的數值</span>
+                <BilingualStrongText
+                  copy={assetReviewEvidenceCopy.dimensionsHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewEvidenceCopy.dimensionsGuidance}
+                />
               </div>
             </div>
             <div className="dimension-grid">
-              {dimensions.map(({ key, label }) => (
+              {assetReviewDimensionItems.map(({ key, copy }) => (
                 <label key={key}>
-                  <span>{label}</span>
+                  <BilingualInterfaceText copy={copy} />
                   <span>
                     <input
                       value={form.dimensions[key]}
@@ -1659,21 +1653,28 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Check aria-hidden="true" />
               <div>
-                <strong>核准清單</strong>
-                <span>
-                  已完成 {form.checks.size} / {checklist.length} 項
-                </span>
+                <BilingualStrongText
+                  copy={assetReviewEvidenceCopy.checklistHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewChecklistProgressCopy(
+                    form.checks.size,
+                    assetReviewChecks.length,
+                  )}
+                />
               </div>
             </div>
-            {checklist.map((item) => (
-              <label key={item.id}>
+            {assetReviewChecks.map((check) => (
+              <label key={check}>
                 <input
                   type="checkbox"
-                  checked={form.checks.has(item.id)}
+                  checked={form.checks.has(check)}
                   disabled={!canEdit || submitting}
-                  onChange={() => toggleCheck(item.id)}
+                  onChange={() => toggleCheck(check)}
                 />
-                <span>{item.label}</span>
+                <BilingualInterfaceText
+                  copy={assetReviewChecklistCopy[check]}
+                />
               </label>
             ))}
           </div>

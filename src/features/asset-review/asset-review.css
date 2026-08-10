@@ -560,7 +560,7 @@
   display: grid;
   gap: 8px;
   margin-top: 13px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dimension-grid label {
@@ -780,5 +780,11 @@
   .review-actions .button {
     height: auto;
     padding: 8px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dimension-grid {
+    grid-template-columns: 1fr;
   }
 }
