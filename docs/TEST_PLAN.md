@@ -14,8 +14,8 @@ Current unit tests cover:
 
 - domain schema and locale formatting;
 - synthetic session parsing;
-- Access JWT validation failures and accepted claims;
-- required application-token type and rejection of expired Access assertions;
+- Access JWT validation failures, deterministic concurrent claim normalization and accepted boundary values;
+- required identity-based application-token type plus rejection of expired, oversized or malformed assertions and bounded subject, email and display-name claims before Rate Limiting or D1;
 - one configured Access audience and a bounded multi-application audience allowlist, including fail-closed empty, duplicate, oversized and over-count values;
 - exact protected SPA parent/deep-route matching and Static Assets Worker-first configuration;
 - AJAX expiry signaling and top-level re-login/logout paths;

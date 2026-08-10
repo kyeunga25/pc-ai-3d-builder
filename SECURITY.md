@@ -18,7 +18,7 @@ The browser preview uses synthetic data only. Do not enter real merchant, custom
 
 ## Security controls
 
-- Access JWT signature, issuer, audience, expiry and subject are verified in the Worker.
+- Access JWT signature, issuer, audience, expiry and identity-based application-token type are verified in the Worker. Assertions are capped at 16 KiB; normalized subjects, emails and display names are capped at 256, 254 and 128 characters, reject control characters, and fail before Rate Limiting or D1 when invalid.
 - The public landing page performs no protected API request; workspace parent and deep routes run through Worker authentication before Static Assets, and every non-health API route remains behind Access.
 - Protected records are resolved through active D1 workspace memberships.
 - First-login identity binding rejects conflicting concurrent subjects.
