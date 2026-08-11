@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
+import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import type { RequestContext } from "../auth/workspace";
 import { sha256Hex } from "../lib/digest";
 import { createD1Stub } from "../test/d1-stub";
@@ -37,23 +38,6 @@ const minimalSourceDigest = await crypto.subtle.digest(
   "SHA-256",
   minimalSource,
 );
-
-function minimalGlb(): Uint8Array {
-  const rawJson = new TextEncoder().encode(
-    JSON.stringify({ asset: { version: "2.0" }, scenes: [{}], scene: 0 }),
-  );
-  const paddedLength = Math.ceil(rawJson.byteLength / 4) * 4;
-  const bytes = new Uint8Array(20 + paddedLength);
-  bytes.set([0x67, 0x6c, 0x54, 0x46]);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(4, 2, true);
-  view.setUint32(8, bytes.byteLength, true);
-  view.setUint32(12, paddedLength, true);
-  view.setUint32(16, 0x4e4f534a, true);
-  bytes.fill(0x20, 20);
-  bytes.set(rawJson, 20);
-  return bytes;
-}
 
 function assetRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -282,7 +266,7 @@ describe("private asset routes", () => {
     ).rejects.toMatchObject({
       status: 400,
       code: "VALIDATION_ERROR",
-      message: expect.stringMatching(/容器.*container/iu),
+      message: expect.stringMatching(/完整.*complete/iu),
     });
     expect(puts).toHaveLength(0);
     expect(
@@ -291,7 +275,7 @@ describe("private asset routes", () => {
   });
 
   it("uploads a GLB with an optimistic version and removes the replaced object", async () => {
-    const glb = minimalGlb();
+    const glb = createSyntheticDraftGlb();
     const updated = assetRow({
       review_version: 1,
       model_object_key: "private/new-model",

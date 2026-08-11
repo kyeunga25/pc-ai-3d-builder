@@ -40,7 +40,7 @@ Cloudflare Workers Builds 連接 GitHub `main` 分支：
 - Root directory：`/`
 - Production branch：`main`
 
-儲存 binding 的 ID 及名稱只存入 Cloudflare build secrets。`npm run deploy:ci` 會先套用尚未執行的 D1 migrations，成功後才部署 Worker。更新部署設定後，先推送一個經檢查的 commit，再於 Cloudflare Builds 及 GitHub check run 核對結果。
+儲存 binding 的 ID 及名稱只存入 Cloudflare build secrets。`npm run deploy:ci` 會先套用尚未執行的 D1 migrations，成功後才部署 Worker；兩個遠端 Wrangler 指令都由私密 wrapper 有界擷取 stdout／stderr，正常 build log 只會收到不含資源座標的通用結果。更新部署設定後，先推送一個經檢查的 commit，再於 Cloudflare Builds 及 GitHub check run 核對結果。
 
 ## D1 migration
 

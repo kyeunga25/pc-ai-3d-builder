@@ -28,8 +28,8 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - Staff、admin 及 owner 可新增、編輯和封存產品；私人 part ID 只經固定 API 的受保護標頭傳送，更新以版本條件避免覆寫較新資料。產品編輯器的新建／編輯／查看標題、版本、欄位、分類、庫存、規格核實、JSON 指引及所有操作狀態均以繁中優先、英文輔助顯示，並與目錄主清單共用完整型別映射。Viewer 只取得停用欄位、素材審核入口及關閉操作，不會渲染儲存、封存或建立素材草稿控制；390 px 文案及操作可換行，畫面不顯示私人 part／asset ID。新增、編輯、封存、素材草稿及 CSV 匯入均使用繁中／英文的提示、成功、警告或錯誤狀態；單語技術例外會換成安全文案，無法確認的寫入結果會要求重新載入才重試。
 - CSV 範本下載及每批最多 50 項的原子匯入，匯入前會驗證格式、SKU 和結構化規格。
 - 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。頁首指引、草稿／待審／核准／拒絕狀態、來源種類、品質、版本及佇列數量均由完整型別映射以繁中優先、英文輔助顯示，英文項目數亦正確處理單複數；窄畫面狀態徽章可換行而不顯示內部素材 ID。保存、核准、拒絕、檔案上載及模擬生成狀態均以雙語及相符的提示、成功、警告或錯誤語意顯示；六項核准清單、三個人手核實尺寸、核對提示及完成計數亦使用由 domain 規則約束的雙語文案。網絡中斷後不會假定寫入或工作未發生，而會要求先重新載入。拒絕採用同一素材版本內的兩步確認，先說明可能釋放保留 credit、但不會刪除私人檔案，第二次按下才送出審核 mutation；切換素材或進行其他表單操作會解除確認。
-- 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；可上載最多 10 MiB 的 JPEG／PNG／WebP 來源圖片，上載前會核對 MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF frame 結構，以及每邊最多 32,768 px、總像素最多 100 MP 的安全上限。來源圖片的要求、上載／取代／進行中狀態及 Access 私隱邊界均以繁中優先、英文輔助顯示；審核縮圖列的四個視角、授權 API 載入／缺少狀態、私人預覽替代文字、佔位說明及圖片使用權已確認／未確認狀態亦完整雙語化。
-- 透過固定檔案 API 與受保護的 asset／file-kind 標頭，上載最多 25 MiB 的自包含 glTF 2.0 GLB；經授權讀取後在審核室及 Builder 以 Three.js 人手預覽，私人 asset ID 不進檔案 URL 或 body。GLB 要求及操作狀態同樣提供雙語文案；審核 viewport 的四個鏡頭預設、合適視野／線框工具、鏡頭讀數、模型有無／載入／解碼失敗狀態及「視覺素材不構成相容性證明」亦以繁中優先、英文輔助顯示。取代所選檔案會重設核准清單及已核實尺寸，另一個私人檔案不受取代影響並繼續保持私人。
+- 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；可上載最多 10 MiB 的靜態 JPEG／PNG／WebP 來源圖片，上載前會核對 MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF 結構，以及每邊最多 8,192 px、總像素最多 24 MP 的瀏覽器安全上限。APNG 及 animated WebP 會在私人儲存前拒絕。來源圖片的要求、上載／取代／進行中狀態及 Access 私隱邊界均以繁中優先、英文輔助顯示；審核縮圖列的四個視角、授權 API 載入／缺少狀態、私人預覽替代文字、佔位說明及圖片使用權已確認／未確認狀態亦完整雙語化。
+- 透過固定檔案 API 與受保護的 asset／file-kind 標頭，上載最多 25 MiB 的自包含 glTF 2.0 GLB；手動上載及模擬生成共用 buffer／accessor、三角形、node graph、尺寸、貼圖數量與貼圖 bytes 安全閘，並在核准前讀回重驗。經授權讀取後在審核室及 Builder 以 Three.js 人手預覽，私人 asset ID 不進檔案 URL 或 body。GLB 要求及操作狀態同樣提供雙語文案；審核 viewport 的四個鏡頭預設、合適視野／線框工具、鏡頭讀數、模型有無／載入／解碼失敗狀態及「視覺素材不構成相容性證明」亦以繁中優先、英文輔助顯示。取代所選檔案會重設核准清單及已核實尺寸，另一個私人檔案不受取代影響並繼續保持私人。
 - Builder viewport 的四個鏡頭、三個顯示模式、工具、場景讀數、類別、四種庫存狀態、已選組件摘要及 footer 亦完整雙語化。它明確區分經授權載入的私人 GLB、本機已核准 synthetic GLB、本地不讀取私人檔案的後備及沒有已核准模型的後備；載入失敗只顯示通用私隱安全文案，不顯示 workspace／asset ID 或解析細節。雙語 footer 以內容高度換行，並持續說明視覺素材不構成相容性證據。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。瀏覽器的短期 Blob URL 綁定目前檔案要求的 abort signal，切換 workspace／素材或卸載畫面便冪等撤銷，遲到的已取消回應不會建立新 URL。回滾及取代只清理單一明確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交狀態。
 - 素材審核導向固定使用 `/asset-review`；指定素材只以 workspace 綁定的頁面記憶體交接，載入後即清除，不寫入 URL、history state 或持久儲存，畫面亦不顯示內部素材 ID。
@@ -131,7 +131,7 @@ npx wrangler r2 bucket create <your-private-r2-name>
 
 ## Cloudflare Workers 部署設定
 
-版本庫內的 `wrangler.jsonc` 只記錄 placeholder Worker label 及不含識別資料的 binding 範本。`main` 分支由 Cloudflare Workers Builds 執行 `npm run build` 及 `npm run deploy:ci`；部署指令會以平台提供的 CI override 與 Cloudflare build secrets 產生 Git 忽略的臨時設定，明確關閉 `workers.dev` 與 preview URLs，先套用尚未執行的 D1 migrations，再上傳 Worker。Account ID、D1 ID、實際資源名稱、token、私有物件 URL 及商戶身份資料不會進入 Git。
+版本庫內的 `wrangler.jsonc` 只記錄 placeholder Worker label 及不含識別資料的 binding 範本。`main` 分支由 Cloudflare Workers Builds 執行 `npm run build` 及 `npm run deploy:ci`；部署指令會以平台提供的 CI override 與 Cloudflare build secrets 產生 Git 忽略、mode-`0600` 的臨時設定，明確關閉 `workers.dev` 與 preview URLs，先套用尚未執行的 D1 migrations，再上傳 Worker。遠端 Wrangler stdout／stderr 由私密 wrapper 有界擷取，正常 build log 只輸出不含座標的成功或錯誤碼。Account ID、D1 ID、實際資源名稱、route、version ID、token、私有物件 URL 及商戶身份資料不會進入 Git 或一般建置日誌。
 
 Cloudflare build 環境需要以下 secret 名稱，值只儲存在 Cloudflare：
 

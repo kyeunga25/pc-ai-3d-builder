@@ -8,8 +8,8 @@ export class ImageStructureError extends Error {
   }
 }
 
-const maximumDimension = 32_768;
-const maximumPixels = 100_000_000;
+const maximumDimension = 8_192;
+const maximumPixels = 24_000_000;
 const maximumAnimationFrames = 120;
 
 function invalid(message: string): never {
@@ -110,6 +110,9 @@ function validatePng(bytes: Uint8Array): void {
       !["IHDR", "PLTE", "IDAT", "IEND"].includes(type)
     ) {
       invalid("PNG contains an unsupported critical chunk.");
+    }
+    if (["acTL", "fcTL", "fdAT"].includes(type)) {
+      invalid("Animated PNG is not supported.");
     }
     if (sawImageData && type !== "IDAT") {
       imageDataEnded = true;
@@ -488,6 +491,9 @@ function validateWebp(bytes: Uint8Array): void {
   };
   assertDimensions(canvas.width, canvas.height);
   const animated = (flags & 0x02) !== 0;
+  if (animated) {
+    invalid("Animated WebP is not supported.");
+  }
   let cursor = first.paddedEnd;
   let sawAlpha = false;
   let sawAnimationControl = false;

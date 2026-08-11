@@ -7,6 +7,7 @@ import {
   type GlbSafetyPolicy,
 } from "./glb-validation";
 import { createSyntheticDraftGlb } from "./synthetic-glb";
+import { createSyntheticSourcePng } from "./synthetic-image";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -113,6 +114,29 @@ describe("generated GLB safety policy", () => {
       }));
     });
     expectValidationCode(textured, "GLB_TEXTURE_LIMIT_EXCEEDED");
+
+    expectValidationCode(createSyntheticDraftGlb(), "GLB_STRUCTURE_INVALID", {
+      ...generationOutputRequirements,
+      maxDecodedGeometryBytes: 1,
+    });
+  });
+
+  it("validates embedded texture bytes instead of trusting their MIME", () => {
+    const png = createSyntheticSourcePng();
+    const encodedPng = btoa(String.fromCharCode(...png));
+    const validTexture = rewriteSyntheticGlb((document) => {
+      document.images = [{ uri: `data:image/png;base64,${encodedPng}` }];
+      document.textures = [{ source: 0 }];
+    });
+    expect(
+      validateGeneratedGlb(validTexture, generationOutputRequirements),
+    ).toMatchObject({ textureBytes: png.byteLength, textureCount: 1 });
+
+    const invalidTexture = rewriteSyntheticGlb((document) => {
+      document.images = [{ uri: "data:image/png;base64,AA==" }];
+      document.textures = [{ source: 0 }];
+    });
+    expectValidationCode(invalidTexture, "GLB_STRUCTURE_INVALID");
   });
 
   it("rejects malformed index accessors instead of treating them as unindexed", () => {

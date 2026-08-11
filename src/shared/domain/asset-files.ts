@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { GlbValidationError, validateGlbStructure } from "./glb-validation";
+import {
+  GlbValidationError,
+  rigStageGlbSafetyPolicy,
+  validateGlbSafety,
+} from "./glb-validation";
 import {
   ImageStructureError,
   validateImageStructure,
@@ -16,7 +20,7 @@ export const assetModelContentType = "model/gltf-binary" as const;
 
 export const assetFileLimits = {
   source: 10 * 1024 * 1024,
-  model: 25 * 1024 * 1024,
+  model: rigStageGlbSafetyPolicy.maxBytes,
 } as const;
 
 export type AssetFileKind = z.infer<typeof assetFileKindSchema>;
@@ -49,7 +53,7 @@ function inferImageContentType(
 
 function validateGlb(bytes: Uint8Array): void {
   try {
-    validateGlbStructure(bytes);
+    validateGlbSafety(bytes, rigStageGlbSafetyPolicy);
   } catch (error) {
     if (error instanceof GlbValidationError) {
       const publicMessage: Record<GlbValidationError["code"], string> = {
@@ -109,7 +113,7 @@ export function validateAssetFileBytes(
       declaredContentType.toLowerCase() !== inferredContentType
     ) {
       throw new AssetFileValidationError(
-        "來源圖片容器無效、已截斷或超出安全尺寸；只接受完整 JPEG、PNG 或 WebP。 / The source image container is invalid, truncated, or exceeds safe dimensions. Upload a complete JPEG, PNG, or WebP image.",
+        "來源圖片必須是完整、靜態且符合安全尺寸的 JPEG、PNG 或 WebP。 / The source image must be a complete, static JPEG, PNG, or WebP within the safe dimensions.",
       );
     }
     return inferredContentType;

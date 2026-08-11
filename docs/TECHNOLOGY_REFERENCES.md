@@ -63,6 +63,7 @@ Tracked `wrangler.jsonc` 是 identifier-free template。實際 Worker、D1、R2�
 - Repository 不包含 production catalogue、真實價格／庫存、merchant/customer/user identity、workspace data、private image、render、GLB、prompt、provider response、log 或 database dump。
 - Compatibility result 只來自人手核實的 structured specification 及 deterministic rules；不從 mesh、圖片、品牌名稱或 AI 推斷。
 - Public landing 的 workspace 圖像只可來自 synthetic local UI，不得擷取真實 session 或 production data。
+- 目前四張 public workspace 圖像均由本版本的 `/demo/*` 介面重新擷取；可見廠商名稱統一為 `RigStage Fixture`，不使用第三方品牌、商標、真實 SKU、實際報價或內部 record ID。
 - 第三方官方文件只作 implementation reference，不會把第三方網站內容、sample dataset 或 media 複製到本 repository。
 
 ## 測試、格式及品質工具

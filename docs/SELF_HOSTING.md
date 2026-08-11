@@ -214,7 +214,7 @@ npx wrangler deploy --config .wrangler/deploy.jsonc --secrets-file .env.runtime.
 
 Workers Builds 會提供 `WRANGLER_CI_OVERRIDE_NAME`；其他 CI 才需要另設 private `RIGSTAGE_WORKER_NAME`。`TEAM_DOMAIN` 與 `POLICY_AUD` 是 Worker runtime secrets，應在 **Variables & Secrets** 管理，不是一般 build variables。
 
-`npm run deploy:ci` 會重新產生已固定關閉 `workers.dev` 與 preview URLs 的 private config，並在 Worker upload 前先套用 remote D1 migrations。若 fork 改寫 generator 或 private pre-deploy step，必須保留這兩個 top-level flags；不要依賴一次性的 dashboard toggle。不要讓 preview branch 共用 production build secrets；若需要 preview／staging，建立完全獨立的 Worker、D1、R2、Workflow、rate namespace、hostname、Access application 及 secrets。否則關閉 non-production deployment。
+`npm run deploy:ci` 會重新產生已固定關閉 `workers.dev` 與 preview URLs 的 private config，並在 Worker upload 前先套用 remote D1 migrations。遠端 Wrangler 子程序的 stdout／stderr 會被有界擷取；正常 build log 只輸出通用成功或穩定錯誤碼，不輸出 database、bucket、Worker、Workflow、route 或 version 座標。若 fork 改寫 generator 或 private pre-deploy step，必須保留這個輸出邊界及兩個 top-level flags；不要依賴一次性的 dashboard toggle。不要讓 preview branch 共用 production build secrets；若需要 preview／staging，建立完全獨立的 Worker、D1、R2、Workflow、rate namespace、hostname、Access application 及 secrets。否則關閉 non-production deployment。
 
 ## 11. 回復與 migration 邊界
 

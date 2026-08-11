@@ -8,6 +8,53 @@ import {
   createAlternateSyntheticSourcePng,
   createSyntheticSourcePng,
 } from "./synthetic-image";
+import { createSyntheticDraftGlb } from "./synthetic-glb";
+
+const pngCrcTable = Uint32Array.from({ length: 256 }, (_, value) => {
+  let current = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    current =
+      (current & 1) === 1 ? 0xedb88320 ^ (current >>> 1) : current >>> 1;
+  }
+  return current >>> 0;
+});
+
+function pngCrc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let index = start; index < end; index += 1) {
+    crc = pngCrcTable[(crc ^ bytes[index]!) & 0xff]! ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngWithChunk(type: string, data: Uint8Array): Uint8Array {
+  const source = createSyntheticSourcePng();
+  const insertAt = 33;
+  const chunk = new Uint8Array(12 + data.byteLength);
+  const chunkView = new DataView(chunk.buffer);
+  chunkView.setUint32(0, data.byteLength, false);
+  chunk.set(new TextEncoder().encode(type), 4);
+  chunk.set(data, 8);
+  chunkView.setUint32(
+    8 + data.byteLength,
+    pngCrc32(chunk, 4, 8 + data.byteLength),
+    false,
+  );
+  const result = new Uint8Array(source.byteLength + chunk.byteLength);
+  result.set(source.subarray(0, insertAt));
+  result.set(chunk, insertAt);
+  result.set(source.subarray(insertAt), insertAt + chunk.byteLength);
+  return result;
+}
+
+function pngWithDimensions(width: number, height: number): Uint8Array {
+  const png = createSyntheticSourcePng();
+  const view = new DataView(png.buffer);
+  view.setUint32(16, width, false);
+  view.setUint32(20, height, false);
+  view.setUint32(29, pngCrc32(png, 12, 29), false);
+  return png;
+}
 
 function structuralJpeg(): Uint8Array {
   return new Uint8Array([
@@ -141,12 +188,32 @@ describe("asset file validation", () => {
     expect(
       validateAssetFileBytes("source", "image/webp", structuralWebp()),
     ).toBe("image/webp");
-    expect(
-      validateAssetFileBytes("source", "image/webp", animatedWebp(1)),
-    ).toBe("image/webp");
     expect(() => validateAssetFileBytes("source", "image/jpeg", png)).toThrow(
       AssetFileValidationError,
     );
+  });
+
+  it("rejects animated sources and images above the browser decode budget", () => {
+    const animationControl = new Uint8Array(8);
+    new DataView(animationControl.buffer).setUint32(0, 1, false);
+
+    expect(() =>
+      validateAssetFileBytes(
+        "source",
+        "image/png",
+        pngWithChunk("acTL", animationControl),
+      ),
+    ).toThrow(AssetFileValidationError);
+    expect(() =>
+      validateAssetFileBytes("source", "image/webp", animatedWebp(1)),
+    ).toThrow(AssetFileValidationError);
+    expect(() =>
+      validateAssetFileBytes(
+        "source",
+        "image/png",
+        pngWithDimensions(6_000, 4_001),
+      ),
+    ).toThrow(AssetFileValidationError);
   });
 
   it("rejects signature-only, truncated and checksum-corrupted images", () => {
@@ -209,7 +276,7 @@ describe("asset file validation", () => {
   });
 
   it("accepts a complete glTF 2.0 GLB and rejects length tampering", () => {
-    const glb = minimalGlb();
+    const glb = createSyntheticDraftGlb();
     expect(
       validateAssetFileBytes("model", "application/octet-stream", glb),
     ).toBe("model/gltf-binary");
@@ -220,7 +287,7 @@ describe("asset file validation", () => {
     ).toThrow(AssetFileValidationError);
   });
 
-  it("rejects external resources but accepts embedded data URIs", () => {
+  it("rejects external resources and GLBs without bounded renderable geometry", () => {
     const external = minimalGlb({
       buffers: [{ byteLength: 4, uri: "https://example.com/model.bin" }],
     });
@@ -228,16 +295,22 @@ describe("asset file validation", () => {
       validateAssetFileBytes("model", "model/gltf-binary", external),
     ).toThrow(AssetFileValidationError);
 
-    const embedded = minimalGlb({
-      buffers: [
+    const unboundedAccessor = minimalGlb({
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+      accessors: [
         {
-          byteLength: 4,
-          uri: "data:application/octet-stream;base64,AAAAAA==",
+          componentType: 5126,
+          count: 100_000_000,
+          type: "VEC3",
+          min: [0, 0, 0],
+          max: [1, 1, 1],
         },
       ],
     });
-    expect(validateAssetFileBytes("model", "model/gltf-binary", embedded)).toBe(
-      "model/gltf-binary",
-    );
+    expect(() =>
+      validateAssetFileBytes("model", "model/gltf-binary", unboundedAccessor),
+    ).toThrow(AssetFileValidationError);
   });
 });

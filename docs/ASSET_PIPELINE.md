@@ -1,6 +1,6 @@
 # Asset handling boundary
 
-The current public release accepts one private source image and one self-contained GLB per visual-asset record. Production validates the declared MIME type, binary signature and bounded size before storing an opaque R2 object key in workspace-scoped D1 metadata. Authorized reads stream the object through the Worker without exposing its key, checksum or a permanent URL.
+The current public release accepts one private static source image and one self-contained GLB per visual-asset record. Production validates the declared MIME type, binary signature, encoded size and effective browser resource budget before storing an opaque R2 object key in workspace-scoped D1 metadata. Source images are limited to 8,192 px per edge and 24 MP; APNG and animated WebP are rejected. Manual and generated GLBs share strict buffer, accessor, node-graph, dimension, triangle and texture limits. Authorized reads stream the object through the Worker without exposing its key, checksum or a permanent URL.
 
 The browser creates short-lived blob URLs for the current page and lazy-loads Three.js only when a GLB is available. Camera presets, fit-to-view, shaded, wireframe and static controls support manual visual inspection. After approval, the builder may retrieve the currently selected component through the same protected route; changing the selection revokes the previous object URL. A GLB remains a draft until an owner or admin completes every checklist item and supplies human-verified dimensions.
 
@@ -18,6 +18,6 @@ The active upload and review boundary preserves these rules:
 - Make long-running work asynchronous and idempotent.
 - Provide explicit failure and retry states without automatically duplicating paid work.
 
-The v1.1 Workflow can ingest only a runtime synthetic, zero-cost GLB when simulation is explicitly enabled. The local-development milestone validates its full binary structure and declared geometry limits before private storage and again after read-back, increments the review version and resets prior evidence. It also reserves one non-monetary capability unit and records one immutable provider attempt. Tracked production configuration remains disabled, so this path is orchestration evidence rather than an external 3D-generation capability.
+The v1.1 Workflow can ingest only a runtime synthetic, zero-cost GLB when simulation is explicitly enabled. The local-development milestone applies the same shared GLB safety policy used by manual uploads before private storage and again after read-back, increments the review version and resets prior evidence. It also reserves one non-monetary capability unit and records one immutable provider attempt. Tracked production configuration remains disabled, so this path is orchestration evidence rather than an external 3D-generation capability.
 
 External provider generation, paid retries and provider callbacks remain inactive. No provider choice, commercial routing rule or private quality target is recorded in this repository. See [Generation pipeline](GENERATION_PIPELINE.md).
