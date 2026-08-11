@@ -75,7 +75,7 @@ function jobRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function workflowStub() {
+function workflowStub(instanceStatus = "unknown") {
   const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
     [];
   const workflow = {
@@ -91,7 +91,7 @@ function workflowStub() {
       return {
         id,
         async status() {
-          return { status: "unknown" as const };
+          return { status: instanceStatus };
         },
       } as WorkflowInstance;
     },
@@ -99,18 +99,47 @@ function workflowStub() {
   return { creates, workflow };
 }
 
-function request() {
-  return new Request(
-    "https://app.example/api/assets/asset-fixture/generation-jobs",
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": "request-fixture-001",
-      },
-      body: JSON.stringify({ expectedVersion: 2 }),
+function sourceBucketStub(
+  options: {
+    checksumByte?: number;
+    contentType?: string;
+    error?: Error;
+    missing?: boolean;
+    size?: number;
+  } = {},
+) {
+  const heads: string[] = [];
+  const bucket = {
+    async head(key: string) {
+      heads.push(key);
+      if (options.error) {
+        throw options.error;
+      }
+      if (options.missing) {
+        return null;
+      }
+      return {
+        checksums: {
+          sha256: new Uint8Array(32).fill(options.checksumByte ?? 0xaa).buffer,
+        },
+        size: options.size ?? 8,
+        httpMetadata: { contentType: options.contentType ?? "image/png" },
+      };
     },
-  );
+  } as unknown as R2Bucket;
+  return { bucket, heads };
+}
+
+function request(expectedVersion = 2, assetId = "asset-fixture") {
+  return new Request("https://app.example/api/assets/item/generation-jobs", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "idempotency-key": "request-fixture-001",
+      "x-rigstage-asset-id": assetId,
+    },
+    body: JSON.stringify({ expectedVersion }),
+  });
 }
 
 describe("generation job routes", () => {
@@ -137,16 +166,21 @@ describe("generation job routes", () => {
       ],
     });
     const { workflow } = workflowStub();
+    const listRequest = new Request(
+      "https://app.example/api/assets/item/generation-jobs",
+      { headers: { "x-rigstage-asset-id": "asset-fixture" } },
+    );
 
     const response = await generationJobListResponse(
+      listRequest,
       {
         ASSET_GENERATION: workflow,
         DB: db,
         GENERATION_MODE: "disabled",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context("viewer"),
-      "asset-fixture",
     );
 
     const body = await response.json();
@@ -180,6 +214,152 @@ describe("generation job routes", () => {
     expect(JSON.stringify(body)).not.toContain("private/output");
   });
 
+  it.each([
+    { failure_code: "private parser detail" },
+    { validation_code: "GLB-VALID" },
+    { failure_code: `A${"B".repeat(128)}` },
+  ])("fails closed on an unsafe stored diagnostic code: %j", async (code) => {
+    const { db } = createD1Stub({
+      firstResults: [
+        assetRow(),
+        {
+          available_units: 0,
+          reserved_units: 0,
+          settled_units: 0,
+          released_units: 0,
+        },
+      ],
+      allResults: [[jobRow({ status: "failed", ...code })]],
+    });
+    const { workflow } = workflowStub();
+
+    await expect(
+      generationJobListResponse(
+        new Request("https://app.example/api/assets/item/generation-jobs", {
+          headers: { "x-rigstage-asset-id": "asset-fixture" },
+        }),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "disabled",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context("viewer"),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed job-list target before database work: %s",
+    async (assetId) => {
+      const { calls, db } = createD1Stub();
+      const { workflow } = workflowStub();
+      const headers = new Headers();
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const listRequest = new Request(
+        "https://app.example/api/assets/item/generation-jobs",
+        { headers },
+      );
+
+      await expect(
+        generationJobListResponse(
+          listRequest,
+          {
+            ASSET_GENERATION: workflow,
+            DB: db,
+            GENERATION_MODE: "disabled",
+            GENERATION_MAX_COST_MINOR: "0",
+            PRIVATE_ASSETS: sourceBucketStub().bucket,
+          },
+          context("viewer"),
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed generation target before body, D1, R2 or Workflow: %s",
+    async (assetId) => {
+      const { calls, db } = createD1Stub();
+      const { creates, workflow } = workflowStub();
+      const headers = new Headers({
+        "content-type": "application/json",
+        "idempotency-key": "request-target-fixture",
+      });
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const startRequest = new Request(
+        "https://app.example/api/assets/item/generation-jobs",
+        { method: "POST", headers, body: "{malformed" },
+      );
+
+      await expect(
+        generationJobStartResponse(
+          startRequest,
+          {
+            ASSET_GENERATION: workflow,
+            DB: db,
+            GENERATION_MODE: "simulation",
+            GENERATION_MAX_COST_MINOR: "0",
+            PRIVATE_ASSETS: sourceBucketStub().bucket,
+          },
+          context(),
+          "request-target-fixture",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(startRequest.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(creates).toHaveLength(0);
+    },
+  );
+
+  it("rejects staff before reading a missing target or malformed body", async () => {
+    const { calls, db } = createD1Stub();
+    const { creates, workflow } = workflowStub();
+    const startRequest = new Request(
+      "https://app.example/api/assets/item/generation-jobs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "request-role-fixture",
+        },
+        body: "{malformed",
+      },
+    );
+
+    await expect(
+      generationJobStartResponse(
+        startRequest,
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context("staff"),
+        "request-role-fixture",
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "ROLE_FORBIDDEN",
+      message: expect.stringMatching(/owner.+admin.+Only workspace/iu),
+    });
+    expect(startRequest.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(creates).toHaveLength(0);
+  });
+
   it("creates one workspace-bound zero-cost job and starts its Workflow", async () => {
     const { calls, db } = createD1Stub({
       firstResults: [null, null, assetRow(), jobRow()],
@@ -193,9 +373,9 @@ describe("generation job routes", () => {
         DB: db,
         GENERATION_MODE: "simulation",
         GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
       },
       context(),
-      "asset-fixture",
       "request-fixture",
     );
 
@@ -225,18 +405,295 @@ describe("generation job routes", () => {
 
     await expect(
       generationJobStartResponse(
+        request(2, "asset-other"),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context(),
+        "request-fixture",
+      ),
+    ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+    expect(creates).toHaveLength(0);
+  });
+
+  it("does not replay an idempotency key across different review versions", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [jobRow({ requested_review_version: 2 })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
+        request(3),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context(),
+        "request-version-reuse",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "IDEMPOTENCY_KEY_REUSED",
+      message: expect.stringMatching(
+        /此 Idempotency-Key.+This Idempotency-Key/u,
+      ),
+    });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("replays the original job without another reservation or Workflow", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [jobRow({ status: "running" })],
+    });
+    const { creates, workflow } = workflowStub("running");
+
+    const response = await generationJobStartResponse(
+      request(),
+      {
+        ASSET_GENERATION: workflow,
+        DB: db,
+        GENERATION_MODE: "simulation",
+        GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
+      },
+      context(),
+      "request-replay",
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "generation-fixture",
+      assetId: "asset-fixture",
+      status: "running",
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("recovers a missing Workflow by its existing fixed identifier", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [jobRow()] });
+    const { creates, workflow } = workflowStub();
+
+    const response = await generationJobStartResponse(
+      request(),
+      {
+        ASSET_GENERATION: workflow,
+        DB: db,
+        GENERATION_MODE: "simulation",
+        GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: sourceBucketStub().bucket,
+      },
+      context(),
+      "request-recovery",
+    );
+
+    expect(response.status).toBe(200);
+    expect(creates).toEqual([
+      {
+        id: "generation-fixture",
+        params: {
+          jobId: "generation-fixture",
+          workspaceId: "workspace-fixture",
+          assetId: "asset-fixture",
+          requestedReviewVersion: 2,
+        },
+      },
+    ]);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("blocks a second key while the same asset has an active job", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [null, jobRow({ id: "generation-active" })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
         request(),
         {
           ASSET_GENERATION: workflow,
           DB: db,
           GENERATION_MODE: "simulation",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
-        "asset-other",
-        "request-fixture",
+        "request-concurrent",
       ),
-    ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+    ).rejects.toMatchObject({ code: "GENERATION_ALREADY_ACTIVE" });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it("rejects a stale asset version before reserving credit", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [null, null, assetRow({ review_version: 3 })],
+    });
+    const { creates, workflow } = workflowStub();
+
+    await expect(
+      generationJobStartResponse(
+        request(),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
+        },
+        context(),
+        "request-stale",
+      ),
+    ).rejects.toMatchObject({ code: "ASSET_VERSION_CONFLICT" });
+    expect(creates).toHaveLength(0);
+    expect(calls.some((call) => /\b(?:INSERT|UPDATE)\b/u.test(call.sql))).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    { label: "missing object", options: { missing: true } },
+    { label: "size drift", options: { size: 7 } },
+    { label: "content-type drift", options: { contentType: "image/jpeg" } },
+    { label: "checksum drift", options: { checksumByte: 0xbb } },
+  ])(
+    "rejects generation for a $label before reserving credit",
+    async ({ options }) => {
+      const { calls, db } = createD1Stub({
+        firstResults: [null, null, assetRow()],
+      });
+      const { creates, workflow } = workflowStub();
+      const { bucket, heads } = sourceBucketStub(options);
+
+      await expect(
+        generationJobStartResponse(
+          request(),
+          {
+            ASSET_GENERATION: workflow,
+            DB: db,
+            GENERATION_MODE: "simulation",
+            GENERATION_MAX_COST_MINOR: "0",
+            PRIVATE_ASSETS: bucket,
+          },
+          context(),
+          "request-source-unavailable",
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        code: "GENERATION_SOURCE_REQUIRED",
+      });
+      expect(heads).toEqual(["private/source-fixture"]);
+      expect(creates).toHaveLength(0);
+      expect(
+        calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+      ).toBe(false);
+    },
+  );
+
+  it("keeps a source R2 lookup failure as an operational error", async () => {
+    const storageError = new Error(
+      "synthetic generation source lookup failure",
+    );
+    const { calls, db } = createD1Stub({
+      firstResults: [null, null, assetRow()],
+    });
+    const { creates, workflow } = workflowStub();
+    const { bucket } = sourceBucketStub({ error: storageError });
+
+    await expect(
+      generationJobStartResponse(
+        request(),
+        {
+          ASSET_GENERATION: workflow,
+          DB: db,
+          GENERATION_MODE: "simulation",
+          GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: bucket,
+        },
+        context(),
+        "request-source-r2-failure",
+      ),
+    ).rejects.toBe(storageError);
+    expect(creates).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("rejects malformed and oversized input before database access", async () => {
+    const { calls, db } = createD1Stub();
+    const { creates, workflow } = workflowStub();
+    const env = {
+      ASSET_GENERATION: workflow,
+      DB: db,
+      GENERATION_MODE: "simulation",
+      GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: sourceBucketStub().bucket,
+    };
+    const malformed = new Request(
+      "https://app.example/api/assets/item/generation-jobs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "request-malformed",
+          "x-rigstage-asset-id": "asset-fixture",
+        },
+        body: JSON.stringify({ expectedVersion: -1 }),
+      },
+    );
+    const oversized = new Request(
+      "https://app.example/api/assets/item/generation-jobs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "request-oversized",
+          "x-rigstage-asset-id": "asset-fixture",
+        },
+        body: JSON.stringify({
+          expectedVersion: 2,
+          padding: "x".repeat(32 * 1024),
+        }),
+      },
+    );
+
+    await expect(
+      generationJobStartResponse(
+        malformed,
+        env,
+        context(),
+        "request-malformed",
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      generationJobStartResponse(
+        oversized,
+        env,
+        context(),
+        "request-oversized",
+      ),
+    ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    expect(calls).toHaveLength(0);
     expect(creates).toHaveLength(0);
   });
 
@@ -248,6 +705,7 @@ describe("generation job routes", () => {
       DB: db,
       GENERATION_MODE: "simulation",
       GENERATION_MAX_COST_MINOR: "0",
+      PRIVATE_ASSETS: sourceBucketStub().bucket,
     };
 
     await expect(
@@ -255,7 +713,6 @@ describe("generation job routes", () => {
         request(),
         env,
         context("staff"),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
@@ -268,7 +725,6 @@ describe("generation job routes", () => {
         request(),
         { ...env, DB: noRightsDb },
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_RIGHTS_REQUIRED" });
@@ -286,9 +742,9 @@ describe("generation job routes", () => {
           DB: db,
           GENERATION_MODE: "disabled",
           GENERATION_MAX_COST_MINOR: "0",
+          PRIVATE_ASSETS: sourceBucketStub().bucket,
         },
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "GENERATION_DISABLED" });

@@ -15,7 +15,7 @@
 | D1 | 儲存 workspace-scoped relational metadata；repository 只帶 schema migrations，不帶 production rows | [D1](https://developers.cloudflare.com/d1/) |
 | R2 | 儲存 private source image 及 GLB；不使用 public bucket URL | [R2](https://developers.cloudflare.com/r2/) |
 | Workflows | 執行 bounded、idempotent generation validation steps | [Workflows](https://developers.cloudflare.com/workflows/) |
-| Rate Limiting binding | 在 protected database work 前按已驗證 subject 限流 | [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
+| Rate Limiting binding | 在 protected database work 前按已驗證 subject 的版本化 SHA-256 opaque key 限流 | [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 | Workers Builds | 可選的 Git-based build、migration 及 Worker deployment | [Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) |
 
 Tracked `wrangler.jsonc` 是 identifier-free template。實際 Worker、D1、R2、Workflow、rate namespace、hostname、Access audience 及 account details 不屬於公開技術清單。
@@ -63,6 +63,7 @@ Tracked `wrangler.jsonc` 是 identifier-free template。實際 Worker、D1、R2�
 - Repository 不包含 production catalogue、真實價格／庫存、merchant/customer/user identity、workspace data、private image、render、GLB、prompt、provider response、log 或 database dump。
 - Compatibility result 只來自人手核實的 structured specification 及 deterministic rules；不從 mesh、圖片、品牌名稱或 AI 推斷。
 - Public landing 的 workspace 圖像只可來自 synthetic local UI，不得擷取真實 session 或 production data。
+- 目前四張 public workspace 圖像均由本版本的 `/demo/*` 介面重新擷取；可見廠商名稱統一為 `RigStage Fixture`，不使用第三方品牌、商標、真實 SKU、實際報價或內部 record ID。
 - 第三方官方文件只作 implementation reference，不會把第三方網站內容、sample dataset 或 media 複製到本 repository。
 
 ## 測試、格式及品質工具

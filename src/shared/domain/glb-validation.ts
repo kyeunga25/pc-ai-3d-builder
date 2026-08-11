@@ -1,6 +1,11 @@
+import { validateImageStructure } from "./image-validation";
+
 export type GlbSafetyPolicy = {
   maxBytes: number;
+  maxDecodedGeometryBytes: number;
   maxDimensionMm: number;
+  maxNodes: number;
+  maxPrimitives: number;
   maxTriangles: number;
   maxTextures: number;
   maxTextureBytes: number;
@@ -13,6 +18,18 @@ export type GlbValidationReport = {
   textureCount: number;
   triangleCount: number;
 };
+
+export const rigStageGlbSafetyPolicy = {
+  maxBytes: 25 * 1024 * 1024,
+  maxDecodedGeometryBytes: 64 * 1024 * 1024,
+  maxDimensionMm: 10_000,
+  maxNodes: 4_096,
+  maxPrimitives: 4_096,
+  maxTriangles: 500_000,
+  maxTextures: 16,
+  maxTextureBytes: 16 * 1024 * 1024,
+  selfContained: true,
+} as const satisfies GlbSafetyPolicy;
 
 export class GlbValidationError extends Error {
   constructor(
@@ -34,7 +51,7 @@ export class GlbValidationError extends Error {
 type JsonRecord = Record<string, unknown>;
 
 type ParsedGlb = {
-  binaryLength: number;
+  binary: Uint8Array | null;
   document: JsonRecord;
 };
 
@@ -100,7 +117,7 @@ function parseGlb(bytes: Uint8Array): ParsedGlb {
 
   let offset = 12;
   let rawJson: Uint8Array | null = null;
-  let binaryLength = 0;
+  let binary: Uint8Array | null = null;
   let hasBinaryChunk = false;
   let chunkIndex = 0;
   while (offset < bytes.byteLength) {
@@ -133,7 +150,7 @@ function parseGlb(bytes: Uint8Array): ParsedGlb {
         throw structureError("GLB 只可包含一個 binary chunk。");
       }
       hasBinaryChunk = true;
-      binaryLength = length;
+      binary = bytes.subarray(dataStart, dataEnd);
     } else {
       throw structureError("GLB 包含不支援的 chunk 類型。");
     }
@@ -166,7 +183,7 @@ function parseGlb(bytes: Uint8Array): ParsedGlb {
     throw structureError("GLB 未宣告有效的 glTF 2.0 asset。");
   }
 
-  return { binaryLength, document };
+  return { binary, document };
 }
 
 function assertSelfContained(document: JsonRecord): void {
@@ -200,10 +217,10 @@ function assertSelfContained(document: JsonRecord): void {
   }
 }
 
-function dataUriBytes(
+function decodeDataUri(
   uri: string,
   allowedMimeTypes?: readonly string[],
-): number {
+): { bytes: Uint8Array; mimeType: string } {
   const comma = uri.indexOf(",");
   const descriptor = comma < 0 ? "" : uri.slice(5, comma).toLowerCase();
   const mimeType = descriptor.split(";")[0] ?? "";
@@ -220,7 +237,38 @@ function dataUriBytes(
     throw structureError("內嵌圖片 data URI 無效。");
   }
   const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
-  return (payload.length / 4) * 3 - padding;
+  const decodedLength = (payload.length / 4) * 3 - padding;
+  if (decodedLength > rigStageGlbSafetyPolicy.maxBytes) {
+    throw structureError("內嵌 data URI 超出安全限制。");
+  }
+  let decoded: string;
+  try {
+    decoded = atob(payload);
+  } catch {
+    throw structureError("內嵌 data URI 無法解碼。");
+  }
+  if (decoded.length !== decodedLength) {
+    throw structureError("內嵌 data URI 長度不一致。");
+  }
+  return {
+    bytes: Uint8Array.from(decoded, (value) => value.charCodeAt(0)),
+    mimeType,
+  };
+}
+
+function validateEmbeddedImage(
+  bytes: Uint8Array,
+  declaredMimeType: string,
+): void {
+  let inferredMimeType: string;
+  try {
+    inferredMimeType = validateImageStructure(bytes);
+  } catch {
+    throw structureError("GLB 內嵌貼圖結構無效或超出安全限制。");
+  }
+  if (inferredMimeType !== declaredMimeType) {
+    throw structureError("GLB 內嵌貼圖 MIME 與檔案內容不一致。");
+  }
 }
 
 function componentBytes(componentType: number): number | null {
@@ -259,12 +307,12 @@ function componentCount(type: unknown): number | null {
   }
 }
 
-function inspectGeneratedStructure(
+function inspectSafeStructure(
   parsed: ParsedGlb,
   policy: GlbSafetyPolicy,
 ): GlbValidationReport {
   const buffers = recordArray(parsed.document.buffers, "buffers");
-  const bufferLengths = buffers.map((buffer, index) => {
+  const bufferData = buffers.map((buffer, index) => {
     const byteLength = integer(buffer.byteLength, 1);
     if (byteLength === null) {
       throw structureError("buffer byteLength 無效。");
@@ -272,25 +320,25 @@ function inspectGeneratedStructure(
     if (buffer.uri === undefined) {
       if (
         index !== 0 ||
-        parsed.binaryLength === 0 ||
-        byteLength > parsed.binaryLength
+        !parsed.binary ||
+        byteLength > parsed.binary.byteLength
       ) {
         throw structureError("GLB binary buffer 長度無效。");
       }
-      return byteLength;
+      return parsed.binary.subarray(0, byteLength);
     }
     if (typeof buffer.uri !== "string") {
       throw structureError("buffer URI 無效。");
     }
-    const embeddedBytes = dataUriBytes(buffer.uri);
-    if (embeddedBytes < byteLength) {
+    const embedded = decodeDataUri(buffer.uri);
+    if (embedded.bytes.byteLength < byteLength) {
       throw structureError("內嵌 buffer 長度不足。");
     }
-    return byteLength;
+    return embedded.bytes.subarray(0, byteLength);
   });
 
   const bufferViews = recordArray(parsed.document.bufferViews, "bufferViews");
-  const bufferViewLengths = bufferViews.map((bufferView) => {
+  const bufferViewData = bufferViews.map((bufferView) => {
     const bufferIndex = integer(bufferView.buffer);
     const byteOffset = integer(bufferView.byteOffset ?? 0);
     const byteLength = integer(bufferView.byteLength, 1);
@@ -298,8 +346,8 @@ function inspectGeneratedStructure(
       bufferIndex === null ||
       byteOffset === null ||
       byteLength === null ||
-      bufferLengths[bufferIndex] === undefined ||
-      byteOffset + byteLength > bufferLengths[bufferIndex]
+      bufferData[bufferIndex] === undefined ||
+      byteOffset + byteLength > bufferData[bufferIndex].byteLength
     ) {
       throw structureError("bufferView 超出 buffer 邊界。");
     }
@@ -310,10 +358,15 @@ function inspectGeneratedStructure(
     ) {
       throw structureError("bufferView byteStride 無效。");
     }
-    return byteLength;
+    return bufferData[bufferIndex].subarray(
+      byteOffset,
+      byteOffset + byteLength,
+    );
   });
+  const bufferViewLengths = bufferViewData.map((bytes) => bytes.byteLength);
 
   const accessors = recordArray(parsed.document.accessors, "accessors");
+  let decodedGeometryBytes = 0;
   const accessorCounts = accessors.map((accessor) => {
     const count = integer(accessor.count, 1);
     const viewIndex = integer(accessor.bufferView);
@@ -332,6 +385,14 @@ function inspectGeneratedStructure(
     }
     const bufferView = bufferViews[viewIndex]!;
     const elementBytes = bytesPerComponent * components;
+    const allocationBytes = count * elementBytes;
+    if (!Number.isSafeInteger(allocationBytes)) {
+      throw structureError("accessor 解碼大小無效。");
+    }
+    decodedGeometryBytes += allocationBytes;
+    if (decodedGeometryBytes > policy.maxDecodedGeometryBytes) {
+      throw structureError("GLB 解碼後的幾何資料超出安全限制。");
+    }
     const stride = integer(bufferView.byteStride ?? elementBytes, elementBytes);
     if (
       stride === null ||
@@ -345,9 +406,10 @@ function inspectGeneratedStructure(
 
   const meshes = recordArray(parsed.document.meshes, "meshes");
   if (meshes.length === 0) {
-    throw structureError("生成 GLB 必須包含 mesh。");
+    throw structureError("GLB 必須包含 mesh。");
   }
   let triangleCount = 0;
+  let primitiveCount = 0;
   let largestDimensionMm = 0;
   for (const mesh of meshes) {
     const primitives = recordArray(mesh.primitives, "mesh primitives");
@@ -355,8 +417,12 @@ function inspectGeneratedStructure(
       throw structureError("mesh 必須包含 primitive。");
     }
     for (const primitive of primitives) {
+      primitiveCount += 1;
+      if (primitiveCount > policy.maxPrimitives) {
+        throw structureError("GLB primitive 數量超出安全限制。");
+      }
       if ((primitive.mode ?? 4) !== 4 || !isRecord(primitive.attributes)) {
-        throw structureError("生成 GLB 只接受三角形 mesh primitive。");
+        throw structureError("GLB 只接受三角形 mesh primitive。");
       }
       const positionIndex = integer(primitive.attributes.POSITION);
       const positionAccessor =
@@ -379,7 +445,7 @@ function inspectGeneratedStructure(
       ) {
         throw new GlbValidationError(
           "GLB_DIMENSIONS_EXCEEDED",
-          "生成 GLB 必須提供可驗證的 POSITION bounds。",
+          "GLB 必須提供可驗證的 POSITION bounds。",
         );
       }
       const spans = min.map((value, index) => {
@@ -419,19 +485,23 @@ function inspectGeneratedStructure(
       if (triangleCount > policy.maxTriangles) {
         throw new GlbValidationError(
           "GLB_POLYGON_LIMIT_EXCEEDED",
-          "生成 GLB 的三角形數量超出安全限制。",
+          "GLB 的三角形數量超出安全限制。",
         );
       }
     }
   }
 
   const nodes = recordArray(parsed.document.nodes, "nodes");
+  if (nodes.length > policy.maxNodes) {
+    throw structureError("GLB node 數量超出安全限制。");
+  }
   const nodeScales: number[] = [];
   const nodeChildren: number[][] = [];
   const parentCounts = Array.from({ length: nodes.length }, () => 0);
+  let nodeEdgeCount = 0;
   for (const node of nodes) {
     if (node.matrix !== undefined) {
-      throw structureError("生成 GLB 不接受未展開的 node matrix。");
+      throw structureError("GLB 不接受未展開的 node matrix。");
     }
     let localScale = 1;
     if (node.scale !== undefined) {
@@ -462,6 +532,10 @@ function inspectGeneratedStructure(
       throw structureError("node child index 無效。");
     }
     const validChildren = childIndexes as number[];
+    nodeEdgeCount += validChildren.length;
+    if (nodeEdgeCount > policy.maxNodes) {
+      throw structureError("GLB node 關係數量超出安全限制。");
+    }
     for (const child of validChildren) {
       parentCounts[child] = (parentCounts[child] ?? 0) + 1;
       if (parentCounts[child] > 1) {
@@ -472,23 +546,25 @@ function inspectGeneratedStructure(
   }
   let maximumNodeScale = 1;
   const visited = new Set<number>();
-  const visitNode = (index: number, inheritedScale: number): void => {
-    if (visited.has(index)) {
-      throw structureError("node graph 包含循環。");
-    }
-    visited.add(index);
-    const cumulativeScale = inheritedScale * (nodeScales[index] ?? 1);
-    if (!Number.isFinite(cumulativeScale)) {
-      throw structureError("node scale 超出可驗證範圍。");
-    }
-    maximumNodeScale = Math.max(maximumNodeScale, cumulativeScale);
-    for (const child of nodeChildren[index] ?? []) {
-      visitNode(child, cumulativeScale);
-    }
-  };
   parentCounts.forEach((count, index) => {
     if (count === 0) {
-      visitNode(index, 1);
+      const pending = [{ index, inheritedScale: 1 }];
+      while (pending.length > 0) {
+        const current = pending.pop()!;
+        if (visited.has(current.index)) {
+          throw structureError("node graph 包含循環。");
+        }
+        visited.add(current.index);
+        const cumulativeScale =
+          current.inheritedScale * (nodeScales[current.index] ?? 1);
+        if (!Number.isFinite(cumulativeScale)) {
+          throw structureError("node scale 超出可驗證範圍。");
+        }
+        maximumNodeScale = Math.max(maximumNodeScale, cumulativeScale);
+        for (const child of nodeChildren[current.index] ?? []) {
+          pending.push({ index: child, inheritedScale: cumulativeScale });
+        }
+      }
     }
   });
   if (visited.size !== nodes.length) {
@@ -498,7 +574,7 @@ function inspectGeneratedStructure(
   if (largestDimensionMm > policy.maxDimensionMm) {
     throw new GlbValidationError(
       "GLB_DIMENSIONS_EXCEEDED",
-      "生成 GLB 的幾何尺寸超出安全限制。",
+      "GLB 的幾何尺寸超出安全限制。",
     );
   }
 
@@ -510,7 +586,7 @@ function inspectGeneratedStructure(
   ) {
     throw new GlbValidationError(
       "GLB_TEXTURE_LIMIT_EXCEEDED",
-      "生成 GLB 的貼圖數量超出安全限制。",
+      "GLB 的貼圖數量超出安全限制。",
     );
   }
   for (const texture of textures) {
@@ -526,25 +602,34 @@ function inspectGeneratedStructure(
       mimeType !== undefined &&
       !["image/jpeg", "image/png", "image/webp"].includes(String(mimeType))
     ) {
-      throw structureError("生成 GLB 包含不支援的貼圖格式。");
+      throw structureError("GLB 包含不支援的貼圖格式。");
     }
     if (typeof image.uri === "string") {
-      textureBytes += dataUriBytes(image.uri, [
+      const embedded = decodeDataUri(image.uri, [
         "image/jpeg",
         "image/png",
         "image/webp",
       ]);
+      if (mimeType !== undefined && String(mimeType) !== embedded.mimeType) {
+        throw structureError("GLB 內嵌貼圖 MIME 宣告不一致。");
+      }
+      validateEmbeddedImage(embedded.bytes, embedded.mimeType);
+      textureBytes += embedded.bytes.byteLength;
     } else {
       const viewIndex = integer(image.bufferView);
       if (viewIndex === null || bufferViewLengths[viewIndex] === undefined) {
         throw structureError("內嵌貼圖 bufferView 無效。");
       }
+      if (typeof mimeType !== "string") {
+        throw structureError("內嵌貼圖缺少 MIME 宣告。");
+      }
+      validateEmbeddedImage(bufferViewData[viewIndex]!, mimeType);
       textureBytes += bufferViewLengths[viewIndex]!;
     }
     if (textureBytes > policy.maxTextureBytes) {
       throw new GlbValidationError(
         "GLB_TEXTURE_LIMIT_EXCEEDED",
-        "生成 GLB 的貼圖資料超出安全限制。",
+        "GLB 的貼圖資料超出安全限制。",
       );
     }
   }
@@ -557,24 +642,26 @@ function inspectGeneratedStructure(
   };
 }
 
-export function validateGlbStructure(bytes: Uint8Array): void {
-  const parsed = parseGlb(bytes);
-  assertSelfContained(parsed.document);
-}
-
-export function validateGeneratedGlb(
+export function validateGlbSafety(
   bytes: Uint8Array,
   policy: GlbSafetyPolicy,
 ): GlbValidationReport {
   if (bytes.byteLength > policy.maxBytes) {
     throw new GlbValidationError(
       "GLB_LENGTH_MISMATCH",
-      "生成 GLB 超出檔案大小限制。",
+      "GLB 超出檔案大小限制。",
     );
   }
   const parsed = parseGlb(bytes);
   if (policy.selfContained) {
     assertSelfContained(parsed.document);
   }
-  return inspectGeneratedStructure(parsed, policy);
+  return inspectSafeStructure(parsed, policy);
+}
+
+export function validateGeneratedGlb(
+  bytes: Uint8Array,
+  policy: GlbSafetyPolicy,
+): GlbValidationReport {
+  return validateGlbSafety(bytes, policy);
 }

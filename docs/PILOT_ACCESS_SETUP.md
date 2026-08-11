@@ -40,7 +40,7 @@ Cloudflare Workers Builds 連接 GitHub `main` 分支：
 - Root directory：`/`
 - Production branch：`main`
 
-儲存 binding 的 ID 及名稱只存入 Cloudflare build secrets。`npm run deploy:ci` 會先套用尚未執行的 D1 migrations，成功後才部署 Worker。更新部署設定後，先推送一個經檢查的 commit，再於 Cloudflare Builds 及 GitHub check run 核對結果。
+儲存 binding 的 ID 及名稱只存入 Cloudflare build secrets。`npm run deploy:ci` 會先套用尚未執行的 D1 migrations，成功後才部署 Worker；兩個遠端 Wrangler 指令都由私密 wrapper 有界擷取 stdout／stderr，正常 build log 只會收到不含資源座標的通用結果。更新部署設定後，先推送一個經檢查的 commit，再於 Cloudflare Builds 及 GitHub check run 核對結果。
 
 ## D1 migration
 
@@ -75,7 +75,7 @@ npm run owner:onboard
 - 無邀請、無 active membership 或跨 workspace 要求會被拒絕。
 - 相同邀請的衝突 subject 綁定會被拒絕。
 - `users.status`、membership 或 workspace 被停用時會被拒絕。
-- 超出每 subject 限額時回傳 429 及 `Retry-After`。
+- 超出每個版本化 subject 摘要鍵的限額時回傳 429 及 `Retry-After`；raw subject 不傳入 Rate Limiting binding。
 - Session 讀取不寫入 D1 audit table。
 - 回應及 log 不含 Cloudflare identifier、電郵或原始 exception。
 - `/cdn-cgi/access/logout` 清除 Access session；expired AJAX request 回傳 `401`，重新登入使用 top-level navigation。

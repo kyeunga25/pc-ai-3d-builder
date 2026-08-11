@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   Boxes,
+  CircleCheck,
+  CircleQuestionMark,
   Download,
   Save,
   WalletCards,
@@ -8,6 +10,23 @@ import {
 
 import type { BuildCompatibilitySummary } from "../../shared/domain/builds";
 import { formatHkd } from "../../shared/i18n/locale";
+import {
+  bilingualStatusBarTitle,
+  builderCompatibilitySummaryPresentation,
+  builderSelectedComponentsCopy,
+  builderStatusBarCopy,
+  builderStatusBarExportTitle,
+  type BuilderStatusBarCopy,
+} from "./builder-status-bar-copy";
+
+function StatusCopy({ copy }: { copy: BuilderStatusBarCopy }) {
+  return (
+    <span className="build-status-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
 
 export function BuildStatusBar({
   summary,
@@ -28,41 +47,50 @@ export function BuildStatusBar({
   onSave: () => void;
   onExport: () => void;
 }) {
-  const compatibilityMessage =
-    summary.errorCount > 0
-      ? `${summary.errorCount} 項嚴重錯誤`
-      : summary.unknownCount > 0
-        ? `${summary.unknownCount} 項結果未知`
-        : summary.warningCount > 0
-          ? `可繼續，尚有 ${summary.warningCount} 項警告`
-          : "已通過所有可用規則";
+  const compatibility = builderCompatibilitySummaryPresentation(summary);
+  const selectedComponents = builderSelectedComponentsCopy(selectedCount);
+  const CompatibilityIcon =
+    compatibility.tone === "success"
+      ? CircleCheck
+      : compatibility.tone === "unknown"
+        ? CircleQuestionMark
+        : AlertTriangle;
 
   return (
-    <footer className="build-status-bar">
+    <footer
+      aria-label={bilingualStatusBarTitle(builderStatusBarCopy.barLabel)}
+      className="build-status-bar"
+    >
       <div
-        className={`build-status-item${
-          summary.errorCount > 0 || summary.unknownCount > 0
-            ? " build-status-item--warning"
-            : ""
-        }`}
+        className={`build-status-item build-status-item--${compatibility.tone}`}
       >
-        <AlertTriangle aria-hidden="true" />
+        <CompatibilityIcon aria-hidden="true" />
         <span>
-          <small>相容性</small>
-          <strong>{compatibilityMessage}</strong>
+          <small>
+            <StatusCopy copy={builderStatusBarCopy.compatibility} />
+          </small>
+          <strong title={bilingualStatusBarTitle(compatibility.copy)}>
+            <StatusCopy copy={compatibility.copy} />
+          </strong>
         </span>
       </div>
       <div className="build-status-item">
         <Boxes aria-hidden="true" />
         <span>
-          <small>已選組件</small>
-          <strong>{selectedCount} / 9</strong>
+          <small>
+            <StatusCopy copy={builderStatusBarCopy.selectedComponents} />
+          </small>
+          <strong title={bilingualStatusBarTitle(selectedComponents)}>
+            <StatusCopy copy={selectedComponents} />
+          </strong>
         </span>
       </div>
       <div className="build-status-item">
         <WalletCards aria-hidden="true" />
         <span>
-          <small>工作空間總價</small>
+          <small>
+            <StatusCopy copy={builderStatusBarCopy.workspaceTotal} />
+          </small>
           <strong>{formatHkd(totalPriceMinor)}</strong>
         </span>
       </div>
@@ -70,25 +98,23 @@ export function BuildStatusBar({
         <button
           className="button button--secondary"
           type="button"
+          aria-label={bilingualStatusBarTitle(builderStatusBarCopy.save)}
           disabled={!canSave || busy}
           onClick={onSave}
         >
           <Save aria-hidden="true" />
-          儲存
+          <StatusCopy copy={builderStatusBarCopy.save} />
         </button>
         <button
           className="button button--primary"
           type="button"
+          aria-label={bilingualStatusBarTitle(builderStatusBarCopy.export)}
           disabled={!canExport || busy}
-          title={
-            canExport
-              ? "匯出不含身份、價格、庫存及私人素材的 JSON"
-              : "先儲存變更，並解決嚴重錯誤及未知相容性結果"
-          }
+          title={builderStatusBarExportTitle(canExport)}
           onClick={onExport}
         >
           <Download aria-hidden="true" />
-          匯出
+          <StatusCopy copy={builderStatusBarCopy.export} />
         </button>
       </div>
     </footer>

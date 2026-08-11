@@ -13,8 +13,9 @@ type UserRow = {
   last_workspace_id: string | null;
 };
 
-type BoundSubjectRow = {
+type ActiveBoundSubjectRow = {
   access_subject: string | null;
+  has_active_membership: number;
 };
 
 export type WorkspaceMembershipRow = {
@@ -38,26 +39,42 @@ export type RequestContext = {
 
 const workspaceIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 
+function inviteRequired(): ApiError {
+  return new ApiError(
+    403,
+    "INVITE_REQUIRED",
+    "此帳戶沒有有效的 RigStage 工作空間成員資格。 / This account has no active RigStage workspace membership.",
+  );
+}
+
+function workspaceForbidden(): ApiError {
+  return new ApiError(
+    403,
+    "WORKSPACE_FORBIDDEN",
+    "你無權存取所要求的工作空間。 / You cannot access the requested workspace.",
+  );
+}
+
+function identityBindingConflict(): ApiError {
+  return new ApiError(
+    403,
+    "IDENTITY_BINDING_CONFLICT",
+    "此邀請已連結至另一個身份，請聯絡工作空間管理員。 / This invitation is already linked to another identity. Contact a workspace administrator.",
+  );
+}
+
 export function chooseCurrentWorkspace(
   memberships: WorkspaceMembershipRow[],
   requestedWorkspaceId: string | null,
   lastWorkspaceId: string | null,
 ): WorkspaceMembershipRow {
   if (memberships.length === 0) {
-    throw new ApiError(
-      403,
-      "INVITE_REQUIRED",
-      "此帳戶尚未獲邀加入 RigStage 工作空間。",
-    );
+    throw inviteRequired();
   }
 
   if (requestedWorkspaceId) {
     if (!workspaceIdPattern.test(requestedWorkspaceId)) {
-      throw new ApiError(
-        403,
-        "WORKSPACE_FORBIDDEN",
-        "你無權存取所要求的工作空間。",
-      );
+      throw workspaceForbidden();
     }
 
     const requested = memberships.find(
@@ -65,11 +82,7 @@ export function chooseCurrentWorkspace(
     );
 
     if (!requested) {
-      throw new ApiError(
-        403,
-        "WORKSPACE_FORBIDDEN",
-        "你無權存取所要求的工作空間。",
-      );
+      throw workspaceForbidden();
     }
 
     return requested;
@@ -102,11 +115,7 @@ export async function resolveRequestContext(
     .first<UserRow>();
 
   if (!user) {
-    throw new ApiError(
-      403,
-      "INVITE_REQUIRED",
-      "此帳戶尚未獲邀加入 RigStage 工作空間。",
-    );
+    throw inviteRequired();
   }
 
   const membershipResult = await db
@@ -142,7 +151,16 @@ export async function resolveRequestContext(
         `UPDATE users
          SET access_subject = ?, last_workspace_id = ?,
              last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND access_subject IS NULL`,
+         WHERE id = ? AND access_subject IS NULL AND status = 'active'
+           AND EXISTS (
+             SELECT 1
+             FROM workspace_memberships AS wm
+             INNER JOIN workspaces AS w ON w.id = wm.workspace_id
+             WHERE wm.user_id = users.id
+               AND wm.workspace_id = ?2
+               AND wm.status = 'active'
+               AND w.status = 'active'
+           )`,
       )
       .bind(identity.subject, currentWorkspace.id, user.id)
       .run();
@@ -150,31 +168,35 @@ export async function resolveRequestContext(
     if (bindingResult.meta.changes !== 1) {
       const boundUser = await db
         .prepare(
-          `SELECT access_subject
-           FROM users
-           WHERE id = ? AND status = 'active'`,
+          `SELECT u.access_subject,
+                  EXISTS (
+                    SELECT 1
+                    FROM workspace_memberships AS wm
+                    INNER JOIN workspaces AS w ON w.id = wm.workspace_id
+                    WHERE wm.user_id = u.id
+                      AND wm.workspace_id = ?2
+                      AND wm.status = 'active'
+                      AND w.status = 'active'
+                  ) AS has_active_membership
+           FROM users AS u
+           WHERE u.id = ?1 AND u.status = 'active'`,
         )
-        .bind(user.id)
-        .first<BoundSubjectRow>();
+        .bind(user.id, currentWorkspace.id)
+        .first<ActiveBoundSubjectRow>();
 
-      if (boundUser?.access_subject !== identity.subject) {
-        throw new ApiError(
-          403,
-          "IDENTITY_BINDING_CONFLICT",
-          "此邀請已連結至另一個身份，請聯絡工作空間管理員。",
-        );
+      if (
+        boundUser?.access_subject &&
+        boundUser.access_subject !== identity.subject
+      ) {
+        throw identityBindingConflict();
+      }
+      if (
+        boundUser?.access_subject !== identity.subject ||
+        boundUser.has_active_membership !== 1
+      ) {
+        throw inviteRequired();
       }
     }
-  } else if (currentWorkspace.id !== user.last_workspace_id) {
-    await db
-      .prepare(
-        `UPDATE users
-         SET last_workspace_id = ?, last_seen_at = CURRENT_TIMESTAMP,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-      )
-      .bind(currentWorkspace.id, user.id)
-      .run();
   }
 
   return {
@@ -187,4 +209,33 @@ export async function resolveRequestContext(
     currentWorkspace,
     workspaces,
   };
+}
+
+export async function persistWorkspaceSelection(
+  db: D1Database,
+  context: RequestContext,
+  accessSubject: string,
+): Promise<void> {
+  const switchResult = await db
+    .prepare(
+      `UPDATE users
+       SET last_workspace_id = ?, last_seen_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND access_subject = ? AND status = 'active'
+         AND EXISTS (
+           SELECT 1
+           FROM workspace_memberships AS wm
+           INNER JOIN workspaces AS w ON w.id = wm.workspace_id
+           WHERE wm.user_id = users.id
+             AND wm.workspace_id = ?1
+             AND wm.status = 'active'
+             AND w.status = 'active'
+         )`,
+    )
+    .bind(context.currentWorkspace.id, context.user.id, accessSubject)
+    .run();
+
+  if (switchResult.meta.changes !== 1) {
+    throw workspaceForbidden();
+  }
 }

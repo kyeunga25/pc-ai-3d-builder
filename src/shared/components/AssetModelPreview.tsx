@@ -3,6 +3,11 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
+import {
+  assetModelPreviewCopy,
+  assetModelPreviewLabel,
+} from "./asset-model-preview-copy";
+
 type AssetModelPreviewProps = {
   cameraPreset: string;
   renderMode?: "shaded" | "static" | "wireframe";
@@ -78,9 +83,12 @@ export function AssetModelPreview({
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.setAttribute("aria-label", "可旋轉的私人 GLB 模型");
+    renderer.domElement.setAttribute(
+      "aria-label",
+      assetModelPreviewLabel(assetModelPreviewCopy.canvasLabel),
+    );
     renderer.domElement.setAttribute("role", "img");
-    container.append(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     scene.add(new THREE.HemisphereLight(0xdce9ff, 0x111827, 2.1));
     const keyLight = new THREE.DirectionalLight(0xffffff, 3.4);
@@ -214,9 +222,16 @@ export function AssetModelPreview({
     <div className="asset-model-preview" ref={containerRef}>
       {state !== "ready" ? (
         <span className={`asset-model-preview__state is-${state}`}>
-          {state === "loading"
-            ? "正在解碼私人 GLB…"
-            : "無法顯示此 GLB；檔案仍維持私人。"}
+          <span>
+            {state === "loading"
+              ? assetModelPreviewCopy.loading.zhHant
+              : assetModelPreviewCopy.error.zhHant}
+          </span>
+          <small lang="en">
+            {state === "loading"
+              ? assetModelPreviewCopy.loading.english
+              : assetModelPreviewCopy.error.english}
+          </small>
         </span>
       ) : null}
     </div>

@@ -4,6 +4,43 @@
   place-items: center;
 }
 
+.dashboard-bilingual-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.dashboard-bilingual-copy > span:first-child {
+  color: inherit;
+  font-size: inherit;
+}
+
+.dashboard-bilingual-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.8em;
+  font-weight: 500;
+  letter-spacing: normal;
+  line-height: 1.3;
+  opacity: 0.8;
+  text-transform: none;
+}
+
+.dashboard-page .page-header h1 .dashboard-bilingual-copy > [lang="en"] {
+  color: var(--text-secondary);
+  font-size: 0.48em;
+  font-weight: 550;
+}
+
+.dashboard-page .page-header__actions .dashboard-bilingual-copy {
+  text-align: center;
+}
+
+.dashboard-page .page-header__actions .button {
+  min-height: 54px;
+}
+
 .dashboard-metrics {
   display: grid;
   border-top: 1px solid var(--border-strong);
@@ -46,6 +83,18 @@
   white-space: nowrap;
 }
 
+.dashboard-metrics .dashboard-bilingual-copy,
+.dashboard-metrics .dashboard-bilingual-copy > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.dashboard-metrics small > .dashboard-bilingual-copy {
+  color: inherit;
+  font-size: 13px;
+}
+
 .dashboard-metrics strong {
   margin: 4px 0 2px;
   font-family: var(--font-display);
@@ -81,6 +130,22 @@
   gap: 20px;
   border-bottom: 1px solid var(--border-subtle);
   padding: 24px;
+}
+
+.dashboard-section-heading > div {
+  min-width: 0;
+}
+
+.dashboard-section-heading
+  .section-title
+  .dashboard-bilingual-copy
+  > [lang="en"] {
+  font-size: 0.68em;
+}
+
+.dashboard-section-heading .status-badge {
+  min-height: 38px;
+  white-space: normal;
 }
 
 .queue-list {
@@ -129,6 +194,38 @@
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.queue-row__details,
+.queue-row__status-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+
+.queue-row__details > small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.82;
+}
+
+.queue-row .status-badge {
+  min-height: 38px;
+  white-space: normal;
+}
+
+.queue-row__status-copy {
+  font-size: inherit;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.queue-row__status-copy > small {
+  font-size: 0.82em;
+  line-height: 1.15;
+  opacity: 0.82;
 }
 
 .queue-row > svg {

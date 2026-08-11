@@ -12,11 +12,11 @@ Represents an isolated merchant workspace. Protected queries must derive the wor
 
 ## `users`
 
-Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. A zero-row update must be re-read and accepted only when the persisted subject equals the requester.
+Stores invited application users. The verified Cloudflare Access subject is initially null and is bound with a conditional update after active membership has been resolved. The update itself requires the user, selected workspace and membership to remain active. A zero-row result is accepted only when the persisted subject equals the requester and that selected membership is still active; a revoked membership leaves the subject and workspace selection unchanged. After binding, ordinary session and product reads never update this row. Later `last_workspace_id` changes occur only through the explicit workspace-selection mutation and are conditional on the same bound subject, active user, active workspace and active membership.
 
 ## `workspace_memberships`
 
-Links users to workspaces with an explicit role and status. Server routes select only active memberships and active workspaces.
+Links users to workspaces with an explicit role and status. Server routes select only active memberships and active workspaces, and identity/workspace persistence repeats that check at its D1 write boundary so a concurrent suspension fails closed.
 
 Private owner onboarding activates one existing non-archived owner workspace or creates one generic owner workspace. It never seeds an identity or workspace in a migration. If the optional generation credit schema exists, onboarding may create a bounded non-monetary account without overwriting an existing ledger.
 
@@ -26,13 +26,13 @@ Reserved for meaningful state transitions. Read-only session resolution does not
 
 ## `catalog_parts`
 
-Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. A non-negative record version protects concurrent edits, while `status` supports logical archive without deleting records. No production catalogue rows are included in migrations.
+Stores workspace-scoped product identity, pricing, stock state and structured-specification verification status. SKU uniqueness is enforced within a workspace. A non-negative record version protects concurrent edits, while `status` supports logical archive without deleting records. A status-update trigger prevents an active part from becoming archived while its generated asset has an `awaiting_review` job with a reserved entitlement; this keeps the review path visible until human approval or rejection resolves the credit. No production catalogue rows are included in migrations.
 
 ## `product_assets`
 
-Stores one current visual-asset review record per workspace catalogue part. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from private source-image and GLB metadata.
+Stores one current visual-asset review record per workspace catalogue part. A `BEFORE INSERT` trigger requires the workspace-scoped catalogue part to remain active at the D1 creation boundary. A separate `BEFORE UPDATE` trigger enforces the same relationship for review, private-file replacement, generation staging and any direct asset mutation. This closes archive races after route validation: if archive commits first, the complete mutation batch aborts without a version, review, audit or credit transition. The review version supports optimistic concurrency. Source-rights confirmation, completed checklist identifiers and human-verified dimensions are stored independently from private source-image and GLB metadata.
 
-Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. They never appear in browser API records, audit metadata, logs or checked-in fixtures.
+Private file columns store opaque R2 object keys, validated content types, bounded byte sizes and SHA-256 checksums. Worker uploads also supply that digest to R2 for write-time integrity checking. Private-file reads require R2 existence, byte size, content type and checksum agreement before streaming; legacy objects without R2 SHA-256 metadata receive a bounded read-back, file validation and digest comparison. Asset approval always performs the bounded model read-back, repeats the GLB structure and self-containment validation, and compares the object SHA-256 with D1 before committing a review transition. Missing, invalid or drifted objects fail closed until an authorized replacement restores the exact validated bytes. Private file metadata never appears in browser API records, audit metadata, logs or checked-in fixtures.
 
 ## `asset_review_events`
 
@@ -44,13 +44,13 @@ Stores workspace-scoped draft identity, logical status, optimistic record versio
 
 ## `build_items`
 
-Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. Archived catalogue parts remain referentially intact for existing builds but cannot be newly selected.
+Stores at most one selected catalogue part per build and component category. Composite foreign keys require the build, catalogue part and recorded category to belong to the same workspace. A referenced catalogue part keeps its category until every build reference is removed; other catalogue fields remain editable through optimistic version checks. Archived catalogue parts remain referentially intact for existing builds, while an insertion trigger rejects new selections if a part becomes inactive after application validation. Portable schema 2 serializes each selected part's current catalogue record version, making a later revision visible even though `build_items` remains a live reference rather than a historical snapshot.
 
 ## `generation_jobs`
 
 Stores one durable, workspace-scoped orchestration record per explicit request. The record includes the asset, requester, unique idempotency key, unique Workflow instance ID, requested review version, input checksum, execution mode, zero monetary cap, provider cost-unit cap, state, stable failure/validation codes and private output metadata.
 
-The browser representation omits the input checksum, Workflow ID, object keys, output checksum, requester and private attempt identifiers. It may return bounded provider-neutral cost units, entitlement state and a stable validation code; these values contain no price or provider identity. A partial unique index permits at most one queued, running or validating job for a workspace asset, while the request guard also blocks a new job when an `awaiting_review` job still owns a reserved entitlement. The currently valid execution mode is `simulation`; no external-provider identifier appears in the table or public domain model.
+The browser representation omits the input checksum, Workflow ID, object keys, output checksum, requester and private attempt identifiers. It may return bounded provider-neutral cost units, entitlement state and a stable validation code; these values contain no price or provider identity. Failure and validation codes are nullable; every non-null value must contain 1–128 ASCII uppercase letters, digits or underscores and start with a letter. Migration `0015` validates existing non-null values in place and adds matching insert/update triggers for jobs, job events and provider-attempt validation results. Source R2 existence, size, content type and SHA-256 are checked before the reservation batch and again inside the Workflow before a provider attempt. A missing or checksum-drifted source at the second boundary records `GENERATION_INPUT_MISSING` and releases the entitlement once. A `BEFORE INSERT` trigger also requires the catalogue part to remain active and the asset status, review version, source checksum and saved rights confirmation to remain current at the reservation commit boundary. A stale insert aborts the complete batch, including the credit move and audit statements. A partial unique index permits at most one queued, running or validating job for a workspace asset, while the request guard also blocks a new job when an `awaiting_review` job still owns a reserved entitlement. The currently valid execution mode is `simulation`; no external-provider identifier appears in the table or public domain model.
 
 ## `generation_job_events`
 
@@ -83,8 +83,9 @@ Stores one internal attempt row per `(workspace, job, attempt_key)`. A row moves
 - Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
 - Build selection updates must use an expected version and server-only mutation token in one D1 batch.
-- Generation requests must reserve an available entitlement and persist the job, entitlement, credit event, initial job event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
-- Generated output may update an asset only while its source checksum, saved rights confirmation and review version still match the requested input.
+- Catalogue archive must remain blocked while any linked generation entitlement is reserved; a denied archive must not increment the catalogue version or append an audit event.
+- Generation requests must validate matching private source metadata before reserving an available entitlement, then persist the job, entitlement, credit event, initial job event and minimal audit record before triggering a Workflow. Idempotency is unique within the workspace.
+- Generated output may update an asset only while its catalogue part remains active and its source checksum, saved rights confirmation and review version still match the requested input.
 - Staging a generated draft must update the asset review version, job state, job event and minimal audit record in one guarded batch; output remains private and unapproved.
 - Approval must settle a reserved entitlement; rejection, terminal failure, start failure or generated-draft replacement must release it. Retried terminal transitions must make no additional account or event change.
 - Provider attempt results must use the same attempt key, match an active job and transition only from `started`. Do not persist raw provider errors or payloads.

@@ -1,5 +1,5 @@
-import { Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
@@ -31,10 +31,27 @@ import {
   mutateBuild,
 } from "./build-api";
 import { BuildInspector } from "./BuildInspector";
+import { BuilderInspectorDrawer } from "./BuilderInspectorDrawer";
 import { BuilderCommandBar } from "./BuilderCommandBar";
-import { BuilderViewport, type BuilderDisplayMode } from "./BuilderViewport";
+import {
+  BuilderViewport,
+  type BuilderCameraPreset,
+  type BuilderDisplayMode,
+} from "./BuilderViewport";
 import { BuildStatusBar } from "./BuildStatusBar";
 import { ComponentRail } from "./ComponentRail";
+import {
+  builderArchivedStatus,
+  builderFailureStatus,
+  builderLoadedStatus,
+  builderSavedStatus,
+  builderStatusCopy,
+  type BuilderOperationStatus,
+} from "./builder-status";
+import {
+  bilingualInspectorDrawerTitle,
+  builderInspectorDrawerCopy,
+} from "./builder-inspector-drawer";
 import "./builder.css";
 
 type StepId = ComponentCategory | "summary";
@@ -84,7 +101,9 @@ async function fetchBuilderCatalogue(
       return parts;
     }
   }
-  throw new Error("產品目錄超出組裝工具的 1,000 項讀取上限。");
+  throw new Error(
+    "產品目錄超出組裝工具的 1,000 項讀取上限。 / The catalogue exceeds the builder read limit of 1,000 products.",
+  );
 }
 
 function createLocalInitialBuild(parts: CatalogPart[]): BuildRecord {
@@ -129,14 +148,14 @@ export function BuilderPage() {
   const [selectedCategory, setSelectedCategory] = useState<StepId>(
     localApprovedAssetId ? "cooling" : "gpu",
   );
-  const [camera, setCamera] = useState("等角");
+  const [camera, setCamera] = useState<BuilderCameraPreset>("等角");
   const [displayMode, setDisplayMode] = useState<BuilderDisplayMode>("著色");
-  const [saveState, setSaveState] = useState(
+  const [saveState, setSaveState] = useState<BuilderOperationStatus>(
     isLocalPreview
       ? localApprovedAssetId
-        ? "已載入剛核准的本機合成 GLB"
-        : "本地合成組裝已載入"
-      : "正在載入組裝",
+        ? builderStatusCopy.localApprovedLoaded
+        : builderStatusCopy.localBuildLoaded
+      : builderStatusCopy.loading,
   );
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [catalogue, setCatalogue] = useState<CatalogPart[]>(
@@ -164,6 +183,7 @@ export function BuilderPage() {
     isLocalPreview ? currentWorkspace.id : null,
   );
   const [reloadToken, setReloadToken] = useState(0);
+  const closeInspector = useCallback(() => setInspectorOpen(false), []);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -187,8 +207,8 @@ export function BuilderPage() {
         setArchiveArmed(false);
         setSaveState(
           initial
-            ? `已載入版本 ${initial.version}`
-            : "目前沒有組裝；讀取沒有建立新資料",
+            ? builderLoadedStatus(initial.version)
+            : builderStatusCopy.emptyRead,
         );
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
@@ -225,10 +245,10 @@ export function BuilderPage() {
     [build, selectedCategory],
   );
 
-  const markDirty = (message: string) => {
+  const markDirty = (status: BuilderOperationStatus) => {
     setArchiveArmed(false);
     setDirty(true);
-    setSaveState(message);
+    setSaveState(status);
   };
 
   const choosePart = (part: CatalogPart) => {
@@ -248,12 +268,12 @@ export function BuilderPage() {
         name: build.name,
       }),
     );
-    markDirty("產品選擇有未儲存變更");
+    markDirty(builderStatusCopy.partSelectionDirty);
   };
 
   const changeBuildName = (name: string) => {
     setDraftName(name);
-    markDirty("組裝名稱有未儲存變更");
+    markDirty(builderStatusCopy.buildNameDirty);
   };
 
   const createNewBuild = async () => {
@@ -261,11 +281,11 @@ export function BuilderPage() {
       return;
     }
     if (dirty) {
-      setSaveState("請先儲存目前組裝，再建立新組裝");
+      setSaveState(builderStatusCopy.saveBeforeCreate);
       return;
     }
     setBusy(true);
-    setSaveState("正在建立新組裝…");
+    setSaveState(builderStatusCopy.creating);
     try {
       const created = isLocalPreview
         ? composeBuildRecord({
@@ -287,9 +307,13 @@ export function BuilderPage() {
       setDirty(false);
       setArchiveArmed(false);
       setSelectedCategory("case");
-      setSaveState(isLocalPreview ? "本地新組裝已建立" : "新組裝草稿已建立");
+      setSaveState(
+        isLocalPreview
+          ? builderStatusCopy.localCreated
+          : builderStatusCopy.created,
+      );
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法建立新組裝");
+      setSaveState(builderFailureStatus(error, "create"));
     } finally {
       setBusy(false);
     }
@@ -300,7 +324,7 @@ export function BuilderPage() {
       return;
     }
     if (dirty) {
-      setSaveState("請先儲存目前組裝，再切換另一個組裝");
+      setSaveState(builderStatusCopy.saveBeforeSwitch);
       return;
     }
     setArchiveArmed(false);
@@ -308,11 +332,11 @@ export function BuilderPage() {
     if (cached) {
       setBuild(cached);
       setDraftName(cached.name);
-      setSaveState(`已載入版本 ${cached.version}`);
+      setSaveState(builderLoadedStatus(cached.version));
       return;
     }
     setBusy(true);
-    setSaveState("正在切換組裝…");
+    setSaveState(builderStatusCopy.switching);
     const controller = new AbortController();
     try {
       const loaded = await fetchBuild(
@@ -323,9 +347,9 @@ export function BuilderPage() {
       setBuild(loaded);
       setDraftName(loaded.name);
       setBuildCache((current) => ({ ...current, [loaded.id]: loaded }));
-      setSaveState(`已載入版本 ${loaded.version}`);
+      setSaveState(builderLoadedStatus(loaded.version));
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法切換組裝");
+      setSaveState(builderFailureStatus(error, "switch"));
     } finally {
       controller.abort();
       setBusy(false);
@@ -337,7 +361,7 @@ export function BuilderPage() {
       return;
     }
     setBusy(true);
-    setSaveState("正在儲存組裝…");
+    setSaveState(builderStatusCopy.saving);
     try {
       const updated = isLocalPreview
         ? composeBuildRecord({
@@ -353,7 +377,9 @@ export function BuilderPage() {
             selectedPartIds: build.selectedParts.map((part) => part.id),
           });
       if (!updated) {
-        throw new Error("組裝未有回傳更新內容。");
+        throw new Error(
+          "組裝未有回傳更新內容。 / The build update did not return updated data.",
+        );
       }
       setBuild(updated);
       setDraftName(updated.name);
@@ -361,19 +387,13 @@ export function BuilderPage() {
       setBuildCache((current) => ({ ...current, [updated.id]: updated }));
       setDirty(false);
       setArchiveArmed(false);
-      setSaveState(
-        isLocalPreview
-          ? `本地版本 ${updated.version} 已儲存`
-          : `D1 版本 ${updated.version} 已儲存`,
-      );
+      setSaveState(builderSavedStatus(updated.version, isLocalPreview));
     } catch (error) {
       setSaveState(
         error instanceof BuildRequestError &&
           error.code === "BUILD_VERSION_CONFLICT"
-          ? "組裝版本已改變，請重新載入"
-          : error instanceof Error
-            ? error.message
-            : "無法儲存組裝",
+          ? builderStatusCopy.versionConflict
+          : builderFailureStatus(error, "save"),
       );
     } finally {
       setBusy(false);
@@ -385,17 +405,17 @@ export function BuilderPage() {
       return;
     }
     if (dirty) {
-      setSaveState("請先儲存目前變更，再封存組裝");
+      setSaveState(builderStatusCopy.saveBeforeArchive);
       return;
     }
     if (!archiveArmed) {
       setArchiveArmed(true);
-      setSaveState("再次按下封存按鈕以確認；資料不會被永久刪除");
+      setSaveState(builderStatusCopy.confirmArchive);
       return;
     }
 
     setBusy(true);
-    setSaveState("正在封存組裝…");
+    setSaveState(builderStatusCopy.archiving);
     const controller = new AbortController();
     try {
       if (!isLocalPreview) {
@@ -430,19 +450,13 @@ export function BuilderPage() {
       setDraftName(nextBuild?.name ?? "");
       setDirty(false);
       setSelectedCategory(nextBuild?.selectedParts[0]?.category ?? "case");
-      setSaveState(
-        nextBuild
-          ? `已封存上一個組裝；已載入版本 ${nextBuild.version}`
-          : "組裝已封存；目前沒有其他草稿",
-      );
+      setSaveState(builderArchivedStatus(nextBuild?.version ?? null));
     } catch (error) {
       setSaveState(
         error instanceof BuildRequestError &&
           error.code === "BUILD_VERSION_CONFLICT"
-          ? "組裝版本已改變，請重新載入"
-          : error instanceof Error
-            ? error.message
-            : "無法封存組裝",
+          ? builderStatusCopy.versionConflict
+          : builderFailureStatus(error, "archive"),
       );
     } finally {
       controller.abort();
@@ -456,7 +470,7 @@ export function BuilderPage() {
       return;
     }
     setBusy(true);
-    setSaveState("正在準備安全匯出…");
+    setSaveState(builderStatusCopy.exporting);
     try {
       const blob = isLocalPreview
         ? new Blob(
@@ -468,11 +482,9 @@ export function BuilderPage() {
           )
         : await fetchBuildExport(currentWorkspace.id, build.id);
       downloadBlob(blob);
-      setSaveState(
-        "已匯出；檔案不含身份、工作空間識別資料、價格、庫存或私人素材",
-      );
+      setSaveState(builderStatusCopy.exported);
     } catch (error) {
-      setSaveState(error instanceof Error ? error.message : "無法匯出組裝");
+      setSaveState(builderFailureStatus(error, "export"));
     } finally {
       setBusy(false);
     }
@@ -481,7 +493,10 @@ export function BuilderPage() {
   if (visibleLoadState === "loading") {
     return (
       <div className="page builder-page builder-page--state">
-        <LoadingState label="正在載入組裝及產品目錄" />
+        <LoadingState
+          label="正在載入組裝及產品目錄"
+          labelEnglish="Loading builds and catalogue"
+        />
       </div>
     );
   }
@@ -491,6 +506,7 @@ export function BuilderPage() {
       <div className="page builder-page builder-page--state">
         <ErrorState
           title="無法載入組裝工具"
+          titleEnglish="Unable to load the PC builder"
           onRetry={() => {
             setLoadState("loading");
             setLoadedWorkspaceId(null);
@@ -506,10 +522,16 @@ export function BuilderPage() {
       <div className="page builder-page builder-page--state">
         <EmptyState
           title="目前沒有組裝草稿"
+          titleEnglish="No build drafts yet"
           message={
             canWrite
               ? "讀取空清單不會自動建立資料。按下方按鈕明確建立第一個工作空間組裝草稿。"
               : "你的角色可查看組裝，但目前工作空間尚未建立任何草稿。"
+          }
+          messageEnglish={
+            canWrite
+              ? "Reading an empty list does not create data. Use the button below to create the first workspace build draft explicitly."
+              : "Your role can view builds, but this workspace does not have any drafts yet."
           }
         />
         {canWrite ? (
@@ -520,7 +542,7 @@ export function BuilderPage() {
             onClick={() => void createNewBuild()}
           >
             <Plus aria-hidden="true" />
-            建立新組裝草稿
+            建立新組裝草稿 <span lang="en">Create build draft</span>
           </button>
         ) : null}
       </div>
@@ -564,7 +586,12 @@ export function BuilderPage() {
           isLocalPreview={isLocalPreview}
           localApprovedAssetId={localApprovedAssetId}
         />
-        <aside className="desktop-inspector" aria-label="組裝檢查器">
+        <aside
+          className="desktop-inspector"
+          aria-label={bilingualInspectorDrawerTitle(
+            builderInspectorDrawerCopy.title,
+          )}
+        >
           <BuildInspector part={selectedPart} findings={visibleFindings} />
         </aside>
       </main>
@@ -581,28 +608,11 @@ export function BuilderPage() {
       />
 
       {inspectorOpen ? (
-        <div className="inspector-drawer-layer">
-          <button
-            className="inspector-drawer-backdrop"
-            type="button"
-            aria-label="關閉檢查器"
-            onClick={() => setInspectorOpen(false)}
-          />
-          <aside className="inspector-drawer" aria-label="組裝檢查器">
-            <div className="inspector-drawer__top">
-              <strong>組裝檢查器</strong>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="關閉檢查器"
-                onClick={() => setInspectorOpen(false)}
-              >
-                <X aria-hidden="true" />
-              </button>
-            </div>
-            <BuildInspector part={selectedPart} findings={visibleFindings} />
-          </aside>
-        </div>
+        <BuilderInspectorDrawer
+          part={selectedPart}
+          findings={visibleFindings}
+          onClose={closeInspector}
+        />
       ) : null}
     </div>
   );

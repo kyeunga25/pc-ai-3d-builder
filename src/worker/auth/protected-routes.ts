@@ -1,15 +1,7 @@
-import { isProtectedWorkspacePath } from "../../shared/domain/workspace-routes";
-
-export const protectedWorkspaceRoutePatterns = [
-  "/dashboard",
-  "/dashboard/*",
-  "/catalogue",
-  "/catalogue/*",
-  "/asset-review",
-  "/asset-review/*",
-  "/builder",
-  "/builder/*",
-] as const;
+import {
+  isProtectedWorkspacePath,
+  safeWorkspaceLoginReturnPath,
+} from "../../shared/domain/workspace-routes";
 
 export { isProtectedWorkspacePath };
 
@@ -37,7 +29,10 @@ export function protectedWorkspaceLoginRedirect(
     "reason",
     status === 401 ? "access-required" : "not-authorized",
   );
-  loginUrl.searchParams.set("next", `${url.pathname}${url.search}`);
+  loginUrl.searchParams.set(
+    "next",
+    safeWorkspaceLoginReturnPath(`${url.pathname}${url.search}`),
+  );
 
   return new Response(null, {
     status: 302,

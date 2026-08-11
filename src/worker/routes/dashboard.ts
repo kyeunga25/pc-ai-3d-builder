@@ -2,6 +2,10 @@ import {
   dashboardResponseSchema,
   type DashboardWorkItem,
 } from "../../shared/domain/dashboard";
+import {
+  dashboardAssetReviewWorkCopy,
+  dashboardBuildWorkCopy,
+} from "../../shared/domain/dashboard-work-copy";
 import { composeBuildRecord } from "../../shared/domain/builds";
 import type { CatalogPart } from "../../shared/domain/schemas";
 import type { RequestContext } from "../auth/workspace";
@@ -194,29 +198,22 @@ export async function dashboardResponse(
 
   const recentWork: DashboardWorkItem[] = [
     ...assetResult.results.map((asset): DashboardWorkItem => ({
-      kind: "asset_review",
+      ...dashboardAssetReviewWorkCopy(asset.status),
       title: `${asset.manufacturer} ${asset.model}`,
-      detailZhHant:
-        asset.status === "in_review"
-          ? "3D 素材正在審核"
-          : "3D 素材草稿等待處理",
-      statusZhHant: asset.status === "in_review" ? "審核中" : "需要審核",
-      tone: "warning",
-      href: `/asset-review?asset=${encodeURIComponent(asset.id)}`,
+      href: "/asset-review",
+      targetAssetId: asset.id,
       updatedAt: asset.updated_at,
     })),
     ...builds.map((build): DashboardWorkItem => {
-      const hasError = build.summary.errorCount > 0;
-      const ready = !hasError && build.summary.unknownCount === 0;
       return {
-        kind: ready ? "build_ready" : "build_attention",
+        ...dashboardBuildWorkCopy({
+          errorCount: build.summary.errorCount,
+          partCount: build.selectedParts.length,
+          unknownCount: build.summary.unknownCount,
+        }),
         title: build.name,
-        detailZhHant: ready
-          ? `${build.selectedParts.length} 個組件 · 可安全匯出`
-          : `${build.summary.errorCount} 個嚴重錯誤 · ${build.summary.unknownCount} 個未知結果`,
-        statusZhHant: ready ? "可匯出" : hasError ? "需要修正" : "資料未齊",
-        tone: ready ? "success" : hasError ? "danger" : "warning",
         href: "/builder",
+        targetAssetId: null,
         updatedAt: build.updatedAt,
       };
     }),

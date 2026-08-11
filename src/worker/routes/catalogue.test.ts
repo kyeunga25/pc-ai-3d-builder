@@ -49,7 +49,18 @@ describe("catalogue route", () => {
     ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
     expect(() =>
       parseCatalogueOptions(
-        new URL("https://app.example/api/catalogue?cursor=../../escape"),
+        new URL("https://app.example/api/catalogue?cursor=part-private"),
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "VALIDATION_ERROR",
+        message: "產品目錄篩選條件無效。 / The catalogue filters are invalid.",
+      }),
+    );
+    expect(() =>
+      parseCatalogueOptions(
+        new URL("https://app.example/api/catalogue"),
+        "../../escape",
       ),
     ).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
@@ -78,7 +89,7 @@ describe("catalogue route", () => {
     const response = await catalogueResponse(
       db,
       context,
-      new URL("https://app.example/api/catalogue?limit=20&category=case"),
+      new Request("https://app.example/api/catalogue?limit=20&category=case"),
     );
 
     expect(response.status).toBe(200);
@@ -123,7 +134,9 @@ describe("catalogue route", () => {
     const response = await catalogueResponse(
       db,
       context,
-      new URL("https://app.example/api/catalogue?limit=2&cursor=part-0"),
+      new Request("https://app.example/api/catalogue?limit=2", {
+        headers: { "x-rigstage-catalogue-cursor": "part-0" },
+      }),
     );
     const body = await response.json();
 

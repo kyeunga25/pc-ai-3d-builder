@@ -15,7 +15,22 @@ import {
   type CataloguePartInput,
   type CatalogPart,
 } from "../../shared/domain/schemas";
-import { categoryLabels, stockStatusLabels } from "./catalogue-options";
+import {
+  catalogueEditorCopy,
+  catalogueEditorTitleCopy,
+  catalogueEditorVersionCopy,
+} from "./catalogue-editor-copy";
+import {
+  bilingualCataloguePageTitle,
+  catalogueCategoryCopy,
+  catalogueStockStatusPresentation,
+  type CataloguePageCopy,
+} from "./catalogue-page-copy";
+import {
+  catalogueFailureStatus,
+  catalogueStatusCopy,
+  type CatalogueOperationStatus,
+} from "./catalogue-status";
 
 type CatalogueEditorDialogProps = {
   part: CatalogPart | null;
@@ -38,6 +53,19 @@ type EditorDraft = {
   stockCount: string;
   stockStatus: string;
 };
+
+type CatalogueEditorOperation = "archive" | "asset-draft" | "save";
+
+function EditorCopy({ copy }: { copy: CataloguePageCopy }) {
+  return (
+    <span className="catalogue-editor-copy">
+      <span>{copy.zhHant}</span>
+      {copy.english === copy.zhHant ? null : (
+        <span lang="en">{copy.english}</span>
+      )}
+    </span>
+  );
+}
 
 function editorDraft(part: CatalogPart | null): EditorDraft {
   if (!part) {
@@ -116,9 +144,11 @@ export function CatalogueEditorDialog({
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => editorDraft(part));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<CatalogueOperationStatus | null>(null);
+  const [busyOperation, setBusyOperation] =
+    useState<CatalogueEditorOperation | null>(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const busy = busyOperation !== null;
 
   useEffect(() => {
     const previousFocus =
@@ -144,7 +174,7 @@ export function CatalogueEditorDialog({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) {
+      if (event.key === "Escape" && !busy) {
         event.preventDefault();
         onClose();
       }
@@ -173,14 +203,14 @@ export function CatalogueEditorDialog({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, saving]);
+  }, [busy, onClose]);
 
   const update = <Key extends keyof EditorDraft>(
     key: Key,
     value: EditorDraft[Key],
   ) => {
     setDraft((current) => ({ ...current, [key]: value }));
-    setError(null);
+    setMessage(null);
     setConfirmArchive(false);
   };
 
@@ -191,22 +221,18 @@ export function CatalogueEditorDialog({
     }
     const input = parseDraft(draft);
     if (!input) {
-      setError("請檢查必填欄位、港幣售價、庫存數量及規格 JSON。");
+      setMessage(catalogueStatusCopy.invalidFields);
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("save");
+    setMessage(catalogueStatusCopy.saving);
     try {
       await onSave(input);
     } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "無法儲存產品，請重新載入後再試。",
-      );
+      setMessage(catalogueFailureStatus(saveError, "save"));
     } finally {
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
 
@@ -216,22 +242,18 @@ export function CatalogueEditorDialog({
     }
     if (!confirmArchive) {
       setConfirmArchive(true);
-      setError("再次按下「確認封存」即可從目前目錄隱藏此產品。");
+      setMessage(catalogueStatusCopy.confirmArchive);
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("archive");
+    setMessage(catalogueStatusCopy.archiving);
     try {
       await onArchive();
     } catch (archiveError) {
-      setError(
-        archiveError instanceof Error
-          ? archiveError.message
-          : "無法封存產品，請重新載入後再試。",
-      );
+      setMessage(catalogueFailureStatus(archiveError, "archive"));
     } finally {
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
 
@@ -245,29 +267,49 @@ export function CatalogueEditorDialog({
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    setBusyOperation("asset-draft");
+    setMessage(catalogueStatusCopy.creatingAssetDraft);
     try {
       await onCreateAssetFromSource(file);
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "無法建立私人素材草稿。",
-      );
+      setMessage(catalogueFailureStatus(uploadError, "asset-draft"));
     } finally {
       inputElement.value = "";
-      setSaving(false);
+      setBusyOperation(null);
     }
   };
+
+  const currentMessage =
+    message ??
+    (readOnly
+      ? catalogueStatusCopy.readOnly
+      : catalogueStatusCopy.writeBoundary);
+  const titleCopy = catalogueEditorTitleCopy(Boolean(part), readOnly);
+  const archiveActionCopy =
+    busyOperation === "archive"
+      ? catalogueEditorCopy.archiving
+      : confirmArchive
+        ? catalogueEditorCopy.confirmArchive
+        : catalogueEditorCopy.archiveProduct;
+  const assetDraftActionCopy =
+    busyOperation === "asset-draft"
+      ? catalogueEditorCopy.creatingAssetDraft
+      : catalogueEditorCopy.createAssetDraft;
+  const saveActionCopy =
+    busyOperation === "save"
+      ? catalogueEditorCopy.saving
+      : catalogueEditorCopy.saveProduct;
+  const closeEditorLabel = bilingualCataloguePageTitle(
+    catalogueEditorCopy.closeEditor,
+  );
 
   return (
     <div className="catalogue-dialog-layer">
       <button
         className="catalogue-dialog-backdrop"
         type="button"
-        aria-label="關閉產品編輯器"
-        disabled={saving}
+        aria-label={closeEditorLabel}
+        disabled={busy}
         onClick={onClose}
       />
       <section
@@ -281,17 +323,23 @@ export function CatalogueEditorDialog({
         <header className="catalogue-dialog__header">
           <div>
             <span className="eyebrow">
-              {part ? `版本 ${part.version}` : "工作空間目錄"}
+              <EditorCopy
+                copy={
+                  part
+                    ? catalogueEditorVersionCopy(part.version)
+                    : catalogueEditorCopy.workspaceCatalogue
+                }
+              />
             </span>
             <h2 id={titleId}>
-              {readOnly ? "查看產品" : part ? "編輯產品" : "新增產品"}
+              <EditorCopy copy={titleCopy} />
             </h2>
           </div>
           <button
             className="icon-button"
             type="button"
-            aria-label="關閉產品編輯器"
-            disabled={saving}
+            aria-label={closeEditorLabel}
+            disabled={busy}
             onClick={onClose}
           >
             <X aria-hidden="true" />
@@ -304,16 +352,16 @@ export function CatalogueEditorDialog({
             hidden
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            disabled={saving || readOnly}
+            disabled={busy || readOnly}
             onChange={(event) => void createAssetFromSource(event)}
           />
           <fieldset
             className="catalogue-editor-fields"
-            disabled={saving || readOnly}
+            disabled={busy || readOnly}
           >
             <div className="catalogue-editor-grid">
               <label>
-                <span>SKU</span>
+                <EditorCopy copy={catalogueEditorCopy.sku} />
                 <input
                   ref={skuInputRef}
                   required
@@ -323,20 +371,22 @@ export function CatalogueEditorDialog({
                 />
               </label>
               <label>
-                <span>分類</span>
+                <EditorCopy copy={catalogueEditorCopy.category} />
                 <select
                   value={draft.category}
                   onChange={(event) => update("category", event.target.value)}
                 >
                   {componentCategorySchema.options.map((value) => (
                     <option key={value} value={value}>
-                      {categoryLabels[value]}
+                      {bilingualCataloguePageTitle(
+                        catalogueCategoryCopy[value],
+                      )}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                <span>品牌／製造商</span>
+                <EditorCopy copy={catalogueEditorCopy.manufacturer} />
                 <input
                   required
                   maxLength={100}
@@ -347,7 +397,7 @@ export function CatalogueEditorDialog({
                 />
               </label>
               <label>
-                <span>型號</span>
+                <EditorCopy copy={catalogueEditorCopy.model} />
                 <input
                   required
                   maxLength={120}
@@ -356,7 +406,7 @@ export function CatalogueEditorDialog({
                 />
               </label>
               <label>
-                <span>售價（HKD）</span>
+                <EditorCopy copy={catalogueEditorCopy.priceHkd} />
                 <input
                   required
                   inputMode="decimal"
@@ -366,7 +416,7 @@ export function CatalogueEditorDialog({
                 />
               </label>
               <label>
-                <span>庫存狀態</span>
+                <EditorCopy copy={catalogueEditorCopy.stockStatus} />
                 <select
                   value={draft.stockStatus}
                   onChange={(event) => {
@@ -379,24 +429,32 @@ export function CatalogueEditorDialog({
                 >
                   {stockStatusSchema.options.map((value) => (
                     <option key={value} value={value}>
-                      {stockStatusLabels[value]}
+                      {bilingualCataloguePageTitle(
+                        catalogueStockStatusPresentation[value].copy,
+                      )}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                <span>庫存數量</span>
+                <EditorCopy copy={catalogueEditorCopy.stockCount} />
                 <input
                   inputMode="numeric"
                   placeholder={
-                    draft.stockStatus === "unknown" ? "可以留空" : "1"
+                    draft.stockStatus === "unknown"
+                      ? bilingualCataloguePageTitle(
+                          catalogueEditorCopy.unknownCountPlaceholder,
+                        )
+                      : "1"
                   }
                   value={draft.stockCount}
                   onChange={(event) => update("stockCount", event.target.value)}
                 />
               </label>
               <label>
-                <span>規格核實狀態</span>
+                <EditorCopy
+                  copy={catalogueEditorCopy.specificationVerification}
+                />
                 <select
                   value={draft.specificationStatus}
                   onChange={(event) =>
@@ -406,14 +464,22 @@ export function CatalogueEditorDialog({
                     )
                   }
                 >
-                  <option value="unverified">尚未核實</option>
-                  <option value="verified">已人手核實</option>
+                  <option value="unverified">
+                    {bilingualCataloguePageTitle(
+                      catalogueEditorCopy.unverifiedSpecification,
+                    )}
+                  </option>
+                  <option value="verified">
+                    {bilingualCataloguePageTitle(
+                      catalogueEditorCopy.humanVerifiedSpecification,
+                    )}
+                  </option>
                 </select>
               </label>
             </div>
 
             <label className="catalogue-editor-specifications">
-              <span>結構化規格（JSON）</span>
+              <EditorCopy copy={catalogueEditorCopy.structuredSpecifications} />
               <textarea
                 rows={7}
                 spellCheck={false}
@@ -423,21 +489,17 @@ export function CatalogueEditorDialog({
                 }
               />
               <small>
-                只記錄已知資料；尚未核實的欄位不要猜測。相容性不會從 3D
-                外觀推斷。
+                <EditorCopy copy={catalogueEditorCopy.specificationGuidance} />
               </small>
             </label>
           </fieldset>
 
           <p
             id={messageId}
-            className="catalogue-editor-message"
-            role={error ? "alert" : "status"}
+            className={`catalogue-editor-message is-${currentMessage.tone}`}
+            role={currentMessage.tone === "error" ? "alert" : "status"}
           >
-            {error ??
-              (readOnly
-                ? "目前角色是唯讀；資料不會被修改。"
-                : "儲存後只會更新目前已驗證的工作空間，並留下精簡操作紀錄。")}
+            {currentMessage.message}
           </p>
 
           <footer className="catalogue-dialog__actions">
@@ -446,33 +508,33 @@ export function CatalogueEditorDialog({
                 <button
                   className="button button--danger"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => void archive()}
                 >
                   <Archive aria-hidden="true" />
-                  {confirmArchive ? "確認封存" : "封存產品"}
+                  <EditorCopy copy={archiveActionCopy} />
                 </button>
               ) : null}
               {!readOnly && part && onCreateAssetFromSource ? (
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => sourceInputRef.current?.click()}
                 >
                   <Upload aria-hidden="true" />
-                  建立素材草稿
+                  <EditorCopy copy={assetDraftActionCopy} />
                 </button>
               ) : null}
               {part && onOpenAssetReview ? (
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={onOpenAssetReview}
                 >
                   <Cuboid aria-hidden="true" />
-                  前往素材審核
+                  <EditorCopy copy={catalogueEditorCopy.reviewAsset} />
                 </button>
               ) : null}
             </div>
@@ -480,19 +542,19 @@ export function CatalogueEditorDialog({
               <button
                 className="button button--secondary"
                 type="button"
-                disabled={saving}
+                disabled={busy}
                 onClick={onClose}
               >
-                取消
+                <EditorCopy copy={catalogueEditorCopy.cancel} />
               </button>
               {!readOnly ? (
                 <button
                   className="button button--primary"
                   type="submit"
-                  disabled={saving}
+                  disabled={busy}
                 >
                   <Save aria-hidden="true" />
-                  {saving ? "正在儲存…" : "儲存產品"}
+                  <EditorCopy copy={saveActionCopy} />
                 </button>
               ) : null}
             </div>

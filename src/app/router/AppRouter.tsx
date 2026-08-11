@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes } from "react-router";
 
 import { MerchantShell } from "../shell/MerchantShell";
 import { AssetReviewPage } from "../../features/asset-review/AssetReviewPage";
+import { AssetReviewNavigationProvider } from "../../features/asset-review/AssetReviewNavigationProvider";
 import { SessionGate } from "../../features/auth/SessionGate";
 import { SessionProvider } from "../../features/auth/SessionProvider";
 import { LoginPage } from "../../features/auth/LoginPage";
@@ -20,7 +21,9 @@ function ProtectedWorkspace() {
   return (
     <SessionProvider>
       <SessionGate>
-        <Outlet />
+        <AssetReviewNavigationProvider>
+          <Outlet />
+        </AssetReviewNavigationProvider>
       </SessionGate>
     </SessionProvider>
   );
@@ -51,7 +54,12 @@ export function AppRouter({ demoMode = false }: { demoMode?: boolean }) {
           path="/builder"
           element={
             <Suspense
-              fallback={<LoadingState label="正在載入電腦組裝工作空間" />}
+              fallback={
+                <LoadingState
+                  label="正在載入電腦組裝工作空間"
+                  labelEnglish="Loading PC builder workspace"
+                />
+              }
             >
               <BuilderPage />
             </Suspense>

@@ -3,6 +3,7 @@ import {
   assetModelContentType,
   type AssetSourceContentType,
 } from "../../shared/domain/asset-files";
+import { rigStageGlbSafetyPolicy } from "../../shared/domain/glb-validation";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { syntheticProviderCostLimitUnits } from "./accounting";
 
@@ -18,7 +19,10 @@ export type GenerationOutputRequirements = {
   format: "glb";
   selfContained: true;
   maxBytes: number;
+  maxDecodedGeometryBytes: number;
   maxDimensionMm: number;
+  maxNodes: number;
+  maxPrimitives: number;
   maxTriangles: number;
   maxTextures: number;
   maxTextureBytes: number;
@@ -40,12 +44,7 @@ export type GenerationProviderInput = {
 
 export const generationOutputRequirements = {
   format: "glb",
-  selfContained: true,
-  maxBytes: assetFileLimits.model,
-  maxDimensionMm: 10_000,
-  maxTriangles: 500_000,
-  maxTextures: 16,
-  maxTextureBytes: 16 * 1024 * 1024,
+  ...rigStageGlbSafetyPolicy,
 } as const satisfies GenerationOutputRequirements;
 
 export interface GenerationProvider {
@@ -74,8 +73,13 @@ class SyntheticGenerationProvider implements GenerationProvider {
       input.requirements.format === generationOutputRequirements.format &&
       input.requirements.selfContained &&
       input.requirements.maxBytes === generationOutputRequirements.maxBytes &&
+      input.requirements.maxDecodedGeometryBytes ===
+        generationOutputRequirements.maxDecodedGeometryBytes &&
       input.requirements.maxDimensionMm ===
         generationOutputRequirements.maxDimensionMm &&
+      input.requirements.maxNodes === generationOutputRequirements.maxNodes &&
+      input.requirements.maxPrimitives ===
+        generationOutputRequirements.maxPrimitives &&
       input.requirements.maxTriangles ===
         generationOutputRequirements.maxTriangles &&
       input.requirements.maxTextures ===

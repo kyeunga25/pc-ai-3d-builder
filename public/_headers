@@ -9,5 +9,8 @@
   X-Frame-Options: DENY
   X-Robots-Tag: noindex, nofollow
 
+/login
+  Cache-Control: no-store
+
 /assets/*
   Cache-Control: public, max-age=31556952, immutable

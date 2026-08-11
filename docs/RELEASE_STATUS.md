@@ -11,7 +11,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 - [x] Cloudflare Worker health endpoint and Static Assets delivery.
 - [x] Cloudflare Access verification and D1 workspace membership enforcement.
 - [x] Concurrent identity-binding protection.
-- [x] Subject-keyed API rate limiting.
+- [x] Subject-derived opaque API rate limiting without sending the raw identifier to the binding.
 - [x] Bounded workspace-scoped catalogue API and production UI states.
 - [x] Role-protected catalogue creation, optimistic update and logical archive.
 - [x] Validated CSV template and transactional import of at most 50 records.

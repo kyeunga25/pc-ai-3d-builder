@@ -11,6 +11,8 @@ import {
   type CatalogPart,
 } from "../../shared/domain/schemas";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { catalogueCursorHeader } from "../../shared/lib/catalogue-pagination";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
 export class CatalogueRequestError extends Error {
   readonly code: string;
@@ -39,7 +41,7 @@ async function assertCatalogueResponse(response: Response): Promise<void> {
       : "CATALOGUE_REQUEST_FAILED",
     typeof body?.error?.message === "string"
       ? body.error.message
-      : "無法完成產品目錄操作。",
+      : "無法完成產品目錄操作。 / Unable to complete the catalogue operation.",
   );
 }
 
@@ -56,13 +58,14 @@ export async function fetchCataloguePage(
   cursor: string | null = null,
 ): Promise<CatalogueResponse> {
   const query = new URLSearchParams({ limit: "100" });
-  if (cursor) {
-    query.set("cursor", cursor);
+  const headers = workspaceHeaders(workspaceId);
+  if (cursor !== null) {
+    headers.set(catalogueCursorHeader, cursor);
   }
 
   const response = await apiFetch(`/api/catalogue?${query.toString()}`, {
     credentials: "same-origin",
-    headers: workspaceHeaders(workspaceId),
+    headers,
     signal,
   });
 
@@ -97,15 +100,13 @@ export async function mutateCataloguePart(
   const body = catalogueMutationSchema.parse(mutation);
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await apiFetch(
-    `/api/catalogue/${encodeURIComponent(partId)}`,
-    {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(body),
-    },
-  );
+  headers.set(cataloguePartTargetHeader, partId);
+  const response = await apiFetch("/api/catalogue/part", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(body),
+  });
 
   await assertCatalogueResponse(response);
   if (response.status === 204) {

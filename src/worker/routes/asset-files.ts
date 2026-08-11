@@ -6,6 +6,11 @@ import {
   type AssetFileKind,
 } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import {
+  assetFileKindHeader,
+  assetTargetHeader,
+} from "../../shared/lib/asset-target";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   findReservedGenerationForAsset,
@@ -16,6 +21,7 @@ import { sha256Hex } from "../lib/digest";
 import {
   assetObjectKey,
   deletePrivateObjectQuietly,
+  getVerifiedPrivateObject,
   putPrivateObject,
 } from "../lib/private-assets";
 import { readBoundedBinary } from "../lib/request-body";
@@ -36,7 +42,7 @@ function writeRoleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權上載私人素材。",
+    "你目前的工作空間角色無權上載私人素材。 / Your current workspace role cannot upload private asset files.",
   );
 }
 
@@ -46,23 +52,41 @@ function assertWriteRole(role: WorkspaceRole): void {
   }
 }
 
-function validationError(message = "素材上載內容無效。"): ApiError {
+function validationError(
+  message = "素材上載內容無效。 / The asset upload is invalid.",
+): ApiError {
   return new ApiError(400, "VALIDATION_ERROR", message);
 }
 
 function assetNotFound(): ApiError {
-  return new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  return new ApiError(
+    404,
+    "ASSET_NOT_FOUND",
+    "找不到所要求的素材。 / The requested asset was not found.",
+  );
+}
+
+function cataloguePartNotFound(): ApiError {
+  return new ApiError(
+    404,
+    "CATALOGUE_PART_NOT_FOUND",
+    "找不到可建立素材的有效產品。 / No active product was found for this asset.",
+  );
 }
 
 function assetFileNotFound(): ApiError {
-  return new ApiError(404, "ASSET_FILE_NOT_FOUND", "找不到所要求的素材檔案。");
+  return new ApiError(
+    404,
+    "ASSET_FILE_NOT_FOUND",
+    "找不到可安全讀取的素材檔案，請重新上載後再試。 / No safely readable asset file was found. Upload it again and retry.",
+  );
 }
 
 function assetVersionConflict(): ApiError {
   return new ApiError(
     409,
     "ASSET_VERSION_CONFLICT",
-    "素材已由另一個操作更新，請重新載入後再試。",
+    "素材已由另一個操作更新，請重新載入後再試。 / The asset changed in another operation. Reload and retry.",
   );
 }
 
@@ -113,12 +137,12 @@ export async function createAssetSourceResponse(
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  partId: string,
   requestId: string,
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
-  if (!catalogueRecordIdPattern.test(partId)) {
-    throw new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
+  const partId = request.headers.get(cataloguePartTargetHeader);
+  if (!partId || !catalogueRecordIdPattern.test(partId)) {
+    throw cataloguePartNotFound();
   }
 
   const part = await db
@@ -131,7 +155,7 @@ export async function createAssetSourceResponse(
     .bind(partId, context.currentWorkspace.id)
     .first<CataloguePartIdentity>();
   if (!part) {
-    throw new ApiError(404, "CATALOGUE_PART_NOT_FOUND", "找不到所要求的產品。");
+    throw cataloguePartNotFound();
   }
 
   const existing = await db
@@ -147,7 +171,7 @@ export async function createAssetSourceResponse(
     throw new ApiError(
       409,
       "ASSET_ALREADY_EXISTS",
-      "此產品已經有素材記錄，請前往素材審核更新檔案。",
+      "此產品已經有素材記錄，請前往素材審核更新檔案。 / This product already has an asset record. Update its file in asset review.",
     );
   }
 
@@ -158,7 +182,13 @@ export async function createAssetSourceResponse(
     assetId,
     "source",
   );
-  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
+  await putPrivateObject(
+    bucket,
+    objectKey,
+    file.bytes,
+    file.contentType,
+    file.sha256,
+  );
 
   try {
     await db.batch([
@@ -206,11 +236,17 @@ export async function createAssetSourceResponse(
     ]);
   } catch (error) {
     await deletePrivateObjectQuietly(bucket, objectKey);
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw cataloguePartNotFound();
+    }
     if (error instanceof Error && error.message.includes("UNIQUE")) {
       throw new ApiError(
         409,
         "ASSET_ALREADY_EXISTS",
-        "此產品已經有素材記錄，請前往素材審核更新檔案。",
+        "此產品已經有素材記錄，請前往素材審核更新檔案。 / This product already has an asset record. Update its file in asset review.",
       );
     }
     throw error;
@@ -230,11 +266,15 @@ export async function createAssetSourceResponse(
 function expectedVersion(request: Request): number {
   const rawVersion = request.headers.get("x-rigstage-expected-version");
   if (!rawVersion || !/^\d{1,10}$/u.test(rawVersion)) {
-    throw validationError("素材上載必須包含有效的目前版本。");
+    throw validationError(
+      "素材上載必須包含有效的目前版本。 / The upload must include a valid current asset version.",
+    );
   }
   const version = Number(rawVersion);
   if (!Number.isSafeInteger(version)) {
-    throw validationError("素材上載版本無效。");
+    throw validationError(
+      "素材上載版本無效。 / The asset upload version is invalid.",
+    );
   }
   return version;
 }
@@ -244,13 +284,13 @@ export async function assetFileUploadResponse(
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
-  rawKind: string,
   requestId: string,
 ): Promise<Response> {
   assertWriteRole(context.currentWorkspace.role);
+  const assetId = request.headers.get(assetTargetHeader);
+  const rawKind = request.headers.get(assetFileKindHeader);
   const kindResult = assetFileKindSchema.safeParse(rawKind);
-  if (!assetRecordIdPattern.test(assetId) || !kindResult.success) {
+  if (!assetId || !assetRecordIdPattern.test(assetId) || !kindResult.success) {
     throw assetNotFound();
   }
   const kind = kindResult.data;
@@ -259,7 +299,11 @@ export async function assetFileUploadResponse(
     throw assetNotFound();
   }
   if (current.status === "approved") {
-    throw new ApiError(409, "ASSET_LOCKED", "已核准素材不可直接取代。");
+    throw new ApiError(
+      409,
+      "ASSET_LOCKED",
+      "已核准素材不可直接取代。 / An approved asset cannot be replaced directly.",
+    );
   }
 
   const currentVersion = expectedVersion(request);
@@ -281,7 +325,13 @@ export async function assetFileUploadResponse(
         )
       : null;
   const nextVersion = currentVersion + 1;
-  await putPrivateObject(bucket, objectKey, file.bytes, file.contentType);
+  await putPrivateObject(
+    bucket,
+    objectKey,
+    file.bytes,
+    file.contentType,
+    file.sha256,
+  );
 
   const updateStatement =
     kind === "source"
@@ -397,6 +447,12 @@ export async function assetFileUploadResponse(
     [updateResult] = await db.batch(statements);
   } catch (error) {
     await deletePrivateObjectQuietly(bucket, objectKey);
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw assetNotFound();
+    }
     throw error;
   }
 
@@ -434,14 +490,15 @@ function fileExtension(kind: AssetFileKind, contentType: string): string {
 }
 
 export async function assetFileResponse(
+  request: Request,
   db: D1Database,
   bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
-  rawKind: string,
 ): Promise<Response> {
+  const assetId = request.headers.get(assetTargetHeader);
+  const rawKind = request.headers.get(assetFileKindHeader);
   const kindResult = assetFileKindSchema.safeParse(rawKind);
-  if (!assetRecordIdPattern.test(assetId) || !kindResult.success) {
+  if (!assetId || !assetRecordIdPattern.test(assetId) || !kindResult.success) {
     throw assetFileNotFound();
   }
   const kind = kindResult.data;
@@ -454,12 +511,22 @@ export async function assetFileResponse(
     kind === "source" ? asset.source_object_key : asset.model_object_key;
   const contentType =
     kind === "source" ? asset.source_content_type : asset.model_content_type;
-  if (!objectKey || !contentType) {
+  const sizeBytes =
+    kind === "source" ? asset.source_size_bytes : asset.model_size_bytes;
+  const sha256 = kind === "source" ? asset.source_sha256 : asset.model_sha256;
+  if (!objectKey || !contentType || sizeBytes === null || !sha256) {
     throw assetFileNotFound();
   }
 
-  const object = await bucket.get(objectKey);
-  if (!object || !("body" in object)) {
+  const object = await getVerifiedPrivateObject(
+    bucket,
+    objectKey,
+    kind,
+    contentType,
+    sizeBytes,
+    sha256,
+  );
+  if (!object) {
     throw assetFileNotFound();
   }
 
@@ -467,7 +534,7 @@ export async function assetFileResponse(
     headers: {
       "cache-control": "private, no-store",
       "content-disposition": `inline; filename="${kind}.${fileExtension(kind, contentType)}"`,
-      "content-length": String(object.size),
+      "content-length": String(object.sizeBytes),
       "content-type": contentType,
     },
   });

@@ -8,12 +8,14 @@ import {
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { assetTargetHeader } from "../../shared/lib/asset-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   findReservedGenerationForAsset,
   generationReviewAccountingStatements,
 } from "../generation/accounting";
 import { ApiError } from "../lib/api-error";
+import { privateModelObjectMatches } from "../lib/private-assets";
 import { readBoundedJson } from "../lib/request-body";
 
 export type AssetReviewRow = {
@@ -52,7 +54,29 @@ function roleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "你目前的工作空間角色無權執行這項審核操作。",
+    "你目前的工作空間角色無權執行這項審核操作。 / Your current workspace role cannot perform this review action.",
+  );
+}
+
+function assertReviewMutationRole(role: WorkspaceRole): void {
+  if (role === "viewer") {
+    throw roleError();
+  }
+}
+
+function assetModelRequired(): ApiError {
+  return new ApiError(
+    409,
+    "ASSET_MODEL_REQUIRED",
+    "上載並檢查完整的 GLB 模型後才可核准素材。 / Upload and verify the complete GLB model before approving this asset.",
+  );
+}
+
+function assetNotFound(): ApiError {
+  return new ApiError(
+    404,
+    "ASSET_NOT_FOUND",
+    "找不到所要求的素材。 / The requested asset was not found.",
   );
 }
 
@@ -60,9 +84,7 @@ export function resolveReviewTransition(
   role: WorkspaceRole,
   input: AssetReviewMutation,
 ): ReviewTransition {
-  if (role === "viewer") {
-    throw roleError();
-  }
+  assertReviewMutationRole(role);
 
   if (
     (input.action === "approve" || input.action === "reject") &&
@@ -88,7 +110,7 @@ export function resolveReviewTransition(
       throw new ApiError(
         409,
         "ASSET_APPROVAL_INCOMPLETE",
-        "所有核准項目及核實尺寸完成後才可核准素材。",
+        "所有核准項目及核實尺寸完成後才可核准素材。 / Complete every approval check and verified dimension before approving the asset.",
       );
     }
 
@@ -176,16 +198,17 @@ export async function findAsset(
 }
 
 export async function assetDetailResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
-  assetId: string,
 ): Promise<Response> {
-  if (!assetRecordIdPattern.test(assetId)) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
+    throw assetNotFound();
   }
   const asset = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!asset) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+    throw assetNotFound();
   }
 
   return Response.json(mapAssetReviewRow(asset), {
@@ -220,40 +243,60 @@ export async function assetReviewQueueResponse(
 export async function assetReviewMutationResponse(
   request: Request,
   db: D1Database,
+  bucket: R2Bucket,
   context: RequestContext,
-  assetId: string,
   requestId: string,
 ): Promise<Response> {
-  if (!assetRecordIdPattern.test(assetId)) {
-    throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+  assertReviewMutationRole(context.currentWorkspace.role);
+  const assetId = request.headers.get(assetTargetHeader);
+  if (!assetId || !assetRecordIdPattern.test(assetId)) {
+    throw assetNotFound();
   }
 
   const parsed = assetReviewMutationSchema.safeParse(
     await readBoundedJson(request),
   );
   if (!parsed.success) {
-    throw new ApiError(400, "VALIDATION_ERROR", "素材審核內容無效。");
+    throw new ApiError(
+      400,
+      "VALIDATION_ERROR",
+      "素材審核內容無效。 / The asset review data is invalid.",
+    );
   }
 
   const input = parsed.data;
-  let current: AssetReviewRow | null = null;
-  if (input.action === "approve" || input.action === "reject") {
-    current = await findAsset(db, context.currentWorkspace.id, assetId);
-    if (!current) {
-      throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
-    }
-    if (input.action === "approve" && !current.model_object_key) {
-      throw new ApiError(
-        409,
-        "ASSET_MODEL_REQUIRED",
-        "上載並檢查 GLB 模型後才可核准素材。",
-      );
-    }
-  }
   const transition = resolveReviewTransition(
     context.currentWorkspace.role,
     input,
   );
+  let current: AssetReviewRow | null = null;
+  if (input.action === "approve" || input.action === "reject") {
+    current = await findAsset(db, context.currentWorkspace.id, assetId);
+    if (!current) {
+      throw assetNotFound();
+    }
+    if (input.action === "approve") {
+      if (
+        !current.model_object_key ||
+        !current.model_content_type ||
+        !current.model_size_bytes ||
+        !current.model_sha256
+      ) {
+        throw assetModelRequired();
+      }
+      if (
+        !(await privateModelObjectMatches(
+          bucket,
+          current.model_object_key,
+          current.model_content_type,
+          current.model_size_bytes,
+          current.model_sha256,
+        ))
+      ) {
+        throw assetModelRequired();
+      }
+    }
+  }
   const orderedChecks = assetReviewChecks.filter((check) =>
     input.completedChecks.includes(check),
   );
@@ -375,17 +418,28 @@ export async function assetReviewMutationResponse(
     );
   }
 
-  const [updateResult] = await db.batch(statements);
+  let updateResult: D1Result<unknown> | undefined;
+  try {
+    [updateResult] = await db.batch(statements);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw assetNotFound();
+    }
+    throw error;
+  }
   if (updateResult?.meta.changes !== 1) {
     const existing = await findAsset(db, context.currentWorkspace.id, assetId);
     if (!existing) {
-      throw new ApiError(404, "ASSET_NOT_FOUND", "找不到所要求的素材。");
+      throw assetNotFound();
     }
 
     throw new ApiError(
       409,
       "ASSET_VERSION_CONFLICT",
-      "素材已由另一個審核動作更新，請重新載入後再試。",
+      "素材已由另一個審核動作更新，請重新載入後再試。 / The asset changed in another review action. Reload and try again.",
     );
   }
 

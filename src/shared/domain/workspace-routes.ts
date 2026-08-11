@@ -7,10 +7,45 @@ export const workspaceRouteRoots = [
   "/builder",
 ] as const;
 
-export function isProtectedWorkspacePath(pathname: string): boolean {
-  return workspaceRouteRoots.some(
-    (root) => pathname === root || pathname.startsWith(`${root}/`),
+export type WorkspaceDestinationCopy = {
+  readonly english: string;
+  readonly zhHant: string;
+};
+
+type WorkspaceRouteRoot = (typeof workspaceRouteRoots)[number];
+
+const workspaceDestinationCopyByRoot = {
+  "/dashboard": {
+    english: "Merchant dashboard",
+    zhHant: "商戶儀表板",
+  },
+  "/catalogue": {
+    english: "Product catalogue",
+    zhHant: "產品目錄",
+  },
+  "/asset-review": {
+    english: "3D asset review",
+    zhHant: "3D 素材審核",
+  },
+  "/builder": {
+    english: "PC builder",
+    zhHant: "電腦組裝工作台",
+  },
+} as const satisfies Record<WorkspaceRouteRoot, WorkspaceDestinationCopy>;
+
+function matchingWorkspaceRouteRoot(
+  pathname: string,
+): WorkspaceRouteRoot | undefined {
+  const normalizedPathname = pathname.split(/[?#]/u, 1)[0]!.toLowerCase();
+
+  return workspaceRouteRoots.find(
+    (root) =>
+      normalizedPathname === root || normalizedPathname.startsWith(`${root}/`),
   );
+}
+
+export function isProtectedWorkspacePath(pathname: string): boolean {
+  return matchingWorkspaceRouteRoot(pathname) !== undefined;
 }
 
 export function safeWorkspaceReturnPath(candidate: string | null): string {
@@ -33,15 +68,21 @@ export function safeWorkspaceReturnPath(candidate: string | null): string {
   }
 }
 
+export function safeWorkspaceLoginReturnPath(candidate: string | null): string {
+  const returnPath = safeWorkspaceReturnPath(candidate);
+  const pathname = new URL(returnPath, "https://rigstage.invalid").pathname;
+
+  return matchingWorkspaceRouteRoot(pathname) ?? defaultWorkspacePath;
+}
+
 export function workspaceDestinationLabel(pathname: string): string {
-  if (pathname.startsWith("/catalogue")) {
-    return "產品目錄";
-  }
-  if (pathname.startsWith("/asset-review")) {
-    return "3D 素材審核";
-  }
-  if (pathname.startsWith("/builder")) {
-    return "電腦組裝工作台";
-  }
-  return "商戶儀表板";
+  return workspaceDestinationCopy(pathname).zhHant;
+}
+
+export function workspaceDestinationCopy(
+  pathname: string,
+): WorkspaceDestinationCopy {
+  const routeRoot =
+    matchingWorkspaceRouteRoot(pathname) ?? defaultWorkspacePath;
+  return workspaceDestinationCopyByRoot[routeRoot];
 }

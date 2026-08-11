@@ -17,6 +17,21 @@
   margin-top: 0;
 }
 
+.landing-bilingual-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.landing-bilingual-copy > [lang="en"] {
+  color: inherit;
+  font-size: 0.82em;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
 .landing-header {
   position: sticky;
   top: 0;
@@ -49,6 +64,7 @@
   color: var(--text-secondary);
   font-size: 15px;
   font-weight: 620;
+  text-align: center;
 }
 
 .landing-header__nav a::after {
@@ -93,6 +109,12 @@
   transition:
     background-color 160ms ease,
     color 160ms ease;
+}
+
+.landing-button,
+.landing-login-link,
+.landing-text-link {
+  white-space: normal;
 }
 
 .landing-login-link:hover {
@@ -166,6 +188,24 @@
   text-wrap: balance;
 }
 
+.landing-hero h1 .landing-bilingual-copy {
+  gap: 12px;
+}
+
+.landing-hero h1 .landing-bilingual-copy > [lang="en"],
+.landing-section-heading h2 .landing-bilingual-copy > [lang="en"],
+.landing-workflow-case__copy h3 .landing-bilingual-copy > [lang="en"],
+.landing-use-cases__intro h2 .landing-bilingual-copy > [lang="en"],
+.landing-use-cases__list h3 .landing-bilingual-copy > [lang="en"],
+.landing-trust__statement h2 .landing-bilingual-copy > [lang="en"],
+.landing-signin__copy h2 .landing-bilingual-copy > [lang="en"] {
+  font-family: var(--font-ui);
+  font-size: clamp(17px, 0.34em, 23px);
+  font-weight: 550;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
 .landing-hero__summary {
   max-width: 600px;
   margin-bottom: 14px;
@@ -174,7 +214,7 @@
   line-height: 1.8;
 }
 
-.landing-hero__english {
+.landing-hero__tagline {
   margin-bottom: 34px;
   color: var(--accent-cyan);
   font-family: var(--font-mono);
@@ -258,6 +298,10 @@
   gap: 10px;
   color: var(--text-secondary);
   font-size: 15px;
+}
+
+.landing-hero__proof .landing-bilingual-copy {
+  flex: 1;
 }
 
 .landing-hero__proof svg {
@@ -353,6 +397,7 @@
   flex: 0 0 auto;
   color: var(--accent-cyan);
   font-weight: 650;
+  text-align: right;
 }
 
 .landing-workspace-shot figcaption svg {
@@ -380,6 +425,19 @@
   font-size: 14px;
   font-weight: 650;
   letter-spacing: 0.05em;
+}
+
+.landing-workflow-case__label {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+}
+
+.landing-workflow-case__label .landing-bilingual-copy > [lang="en"] {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
 }
 
 .landing-section-heading h2,
@@ -458,6 +516,12 @@
   text-wrap: balance;
 }
 
+.landing-section-heading h2 .landing-bilingual-copy,
+.landing-workflow-case__copy h3 .landing-bilingual-copy,
+.landing-use-cases__intro h2 .landing-bilingual-copy {
+  gap: 10px;
+}
+
 .landing-workflow-case__copy > p {
   margin-bottom: 25px;
   color: var(--text-secondary);
@@ -488,6 +552,11 @@
   height: 18px;
   margin-top: 4px;
   color: var(--success);
+}
+
+.landing-workflow-case__copy li .landing-bilingual-copy {
+  min-width: 0;
+  gap: 4px;
 }
 
 .landing-use-cases {
@@ -560,6 +629,10 @@
   line-height: 1.75;
 }
 
+.landing-use-cases__list :is(h3, p, strong) .landing-bilingual-copy {
+  gap: 4px;
+}
+
 .landing-trust {
   border-bottom: 1px solid var(--border-strong);
   background: #0b111c;
@@ -624,6 +697,10 @@
   font-weight: 680;
 }
 
+.landing-trust__list .landing-bilingual-copy {
+  gap: 3px;
+}
+
 .landing-trust__list p {
   margin-bottom: 0;
   color: var(--text-secondary);
@@ -678,8 +755,12 @@
   font-size: 14px;
 }
 
-.landing-footer span:first-child {
+.landing-footer > .landing-bilingual-copy:first-child {
   font-family: var(--font-mono);
+}
+
+.landing-footer > .landing-bilingual-copy:last-child {
+  text-align: right;
 }
 
 @keyframes landing-copy-in {
@@ -806,7 +887,7 @@
   }
 
   .landing-login-link {
-    min-height: 40px;
+    min-height: 48px;
     gap: 9px;
     padding: 0 12px;
     font-size: 14px;
@@ -828,7 +909,7 @@
     line-height: 1.78;
   }
 
-  .landing-hero__english {
+  .landing-hero__tagline {
     margin-bottom: 28px;
     font-size: 14px;
   }
@@ -960,6 +1041,10 @@
     justify-content: center;
     padding: 22px 18px;
     font-size: 14px;
+  }
+
+  .landing-footer > .landing-bilingual-copy:last-child {
+    text-align: left;
   }
 }
 

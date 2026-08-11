@@ -23,10 +23,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
+import {
+  createAbortBoundObjectUrl,
+  type AbortBoundObjectUrl,
+} from "../../shared/lib/private-object-url";
 import {
   EmptyState,
   ErrorState,
@@ -52,16 +56,80 @@ import {
 } from "../../shared/domain/generation-jobs";
 import { reviewAsset } from "../../shared/domain/mockData";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
+import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import {
+  acquireGenerationRequestLease,
   AssetReviewApiError,
   fetchAssetFileBlob,
   fetchAssetReview,
   fetchAssetReviewQueue,
   fetchGenerationJobs,
+  shouldRetainGenerationRequestLease,
   startGenerationJob,
+  type GenerationRequestLease,
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
+import {
+  assetReviewChecklistCopy,
+  assetReviewChecklistProgressCopy,
+  assetReviewDimensionItems,
+  assetReviewEvidenceCopy,
+  type AssetReviewDimensionKey,
+} from "./asset-review-evidence-copy";
+import {
+  assetReviewFileActionCopy,
+  assetReviewFileControlCopy,
+} from "./asset-review-file-copy";
+import {
+  assetReviewGenerationCreditHistoryCopy,
+  assetReviewGenerationCreditSummaryCopy,
+  assetReviewGenerationEntitlementCopy,
+  assetReviewGenerationModeCopy,
+  assetReviewGenerationStatusCopy,
+  generationInspectorCopy,
+} from "./asset-review-generation-copy";
+import {
+  assetReviewHeaderCopy,
+  assetReviewHeaderEyebrowCopy,
+  assetReviewQualityCopy,
+  assetReviewQueueSuffixCopy,
+  assetReviewSourceKindCopy,
+  assetReviewStatusPresentation,
+} from "./asset-review-metadata-copy";
+import {
+  assetReviewErrorNotice,
+  assetReviewGenerationFailureNotice,
+  assetReviewQueueNotice,
+  assetReviewRejectActionLabel,
+  assetReviewSavedNotice,
+  assetReviewSavingNotice,
+  assetReviewStatusCopy,
+  bilingualCopy,
+  bilingualTitle,
+  nextAssetReviewRejectIntent,
+  type AssetReviewNotice,
+  type BilingualCopy,
+} from "./asset-review-status";
+import {
+  assetReviewSourceCopy,
+  assetReviewSourceFrameCopy,
+  assetReviewSourcePreviewAltCopy,
+  assetReviewSourceViewCopy,
+  assetReviewSourceViews,
+} from "./asset-review-source-copy";
+import {
+  assetReviewCameraPresetCopy,
+  assetReviewCameraPresets,
+  assetReviewCameraReadoutCopy,
+  assetReviewViewportCopy,
+  type AssetReviewCameraPreset,
+} from "./asset-review-viewport-copy";
+import {
+  targetAssetIdForWorkspace,
+  useAssetReviewNavigation,
+} from "./asset-review-navigation";
+import { AssetReviewStatusView } from "./AssetReviewStatusView";
 import "./asset-review.css";
 
 const AssetModelPreview = lazy(async () => {
@@ -69,27 +137,10 @@ const AssetModelPreview = lazy(async () => {
   return { default: module.AssetModelPreview };
 });
 
-const checklist: Array<{ id: AssetReviewCheck; label: string }> = [
-  { id: "model_identity", label: "型號及 SKU 正確" },
-  { id: "variant_identity", label: "顏色及版本正確" },
-  { id: "standard_orientation", label: "已設定標準方向" },
-  { id: "verified_dimensions", label: "已輸入核實尺寸" },
-  { id: "installation_pivot", label: "樞軸適合作安裝" },
-  { id: "source_rights", label: "已確認圖片使用權" },
-];
-
-const cameraPresets = ["正面", "左側", "頂部", "等角"];
-const sourceViews = ["正面", "背面", "左側", "三分之四角度"];
-const dimensions = [
-  { key: "width", label: "闊度" },
-  { key: "height", label: "高度" },
-  { key: "depth", label: "深度" },
-] as const;
-
 type ReviewForm = {
   asset: AssetReviewItem;
   checks: Set<AssetReviewCheck>;
-  dimensions: Record<(typeof dimensions)[number]["key"], string>;
+  dimensions: Record<AssetReviewDimensionKey, string>;
 };
 
 type AssetFileUrls = {
@@ -103,12 +154,50 @@ type LocalAssetNavigationState = {
   sourceUrl?: string;
 };
 
-const syntheticSourcePngBase64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+const reviewActionCopy = {
+  approve: bilingualCopy("核准素材", "Approve asset"),
+  approving: bilingualCopy("核准中…", "Approving…"),
+  builder: bilingualCopy("在 Builder 檢查", "Check in Builder"),
+  create: bilingualCopy("建立模擬 GLB 草稿", "Create simulated GLB draft"),
+  creating: bilingualCopy("建立中…", "Creating…"),
+  running: bilingualCopy("模擬工作進行中", "Simulation in progress"),
+  save: bilingualCopy("儲存草稿", "Save draft"),
+  saving: bilingualCopy("儲存中…", "Saving…"),
+} as const;
 
-function createSyntheticSourcePng(): Uint8Array {
-  const raw = atob(syntheticSourcePngBase64);
-  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+function BilingualActionLabel({ copy }: { copy: BilingualCopy }) {
+  return (
+    <span className="review-action-label">
+      <span>{copy.zhHant}</span>
+      <small lang="en">{copy.english}</small>
+    </span>
+  );
+}
+
+function BilingualInterfaceText({
+  copy,
+  className,
+}: {
+  copy: BilingualCopy;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`review-bilingual-copy${className ? ` ${className}` : ""}`}
+    >
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </span>
+  );
+}
+
+function BilingualStrongText({ copy }: { copy: BilingualCopy }) {
+  return (
+    <strong className="review-bilingual-copy">
+      <span>{copy.zhHant}</span>
+      <span lang="en">{copy.english}</span>
+    </strong>
+  );
 }
 
 function assetKey(asset: AssetReviewItem): string {
@@ -146,71 +235,23 @@ function parseDimension(value: string): number | null {
     : null;
 }
 
-function reviewBadge(status: AssetReviewItem["status"]) {
-  switch (status) {
-    case "draft":
-      return { label: "草稿", tone: "info" as const };
-    case "in_review":
-      return { label: "需要審核", tone: "warning" as const };
-    case "approved":
-      return { label: "已核准", tone: "success" as const };
-    case "rejected":
-      return { label: "已拒絕", tone: "danger" as const };
-  }
-}
-
-const sourceKindLabels: Record<AssetReviewItem["sourceKind"], string> = {
-  synthetic: "合成測試素材",
-  uploaded: "私人上載素材",
-  generated: "生成流程草稿",
-};
-
-const generationStatusLabels: Record<GenerationJob["status"], string> = {
-  queued: "已排入佇列",
-  running: "正在建立草稿",
-  validating: "正在驗證 GLB",
-  awaiting_review: "等待人工審核",
-  failed: "工作失敗",
-  cancelled: "工作已取消",
-};
-
-const generationEntitlementLabels: Record<
-  NonNullable<GenerationJob["entitlementStatus"]>,
-  string
-> = {
-  reserved: "已保留，等待人工決定",
-  settled: "已結算",
-  released: "已釋放",
-};
-
-function generationStatusLabel(job: GenerationJob) {
-  if (job.status === "awaiting_review" && job.entitlementStatus === "settled") {
-    return "人工審核已核准";
-  }
-
-  return generationStatusLabels[job.status];
-}
-
-const qualityLabels: Record<AssetReviewItem["quality"], string> = {
-  unreviewed: "未審核",
-  draft: "草稿品質",
-  reviewed: "已審核",
-  approved: "已核准",
-};
-
 export function AssetReviewPage() {
   const { currentWorkspace } = useAuthenticatedSession();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { target, clearAssetReviewTarget } = useAssetReviewNavigation();
+  const [initialNavigationTarget] = useState(() => target);
   const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
-  const targetAssetId = searchParams.get("asset");
+  const targetAssetId = targetAssetIdForWorkspace(
+    initialNavigationTarget,
+    currentWorkspace.id,
+  );
   const localNavigationState =
     (location.state as LocalAssetNavigationState | null) ?? null;
   const initialAsset = isLocalPreview
     ? (localNavigationState?.localAsset ?? reviewAsset)
     : null;
-  const [camera, setCamera] = useState("等角");
+  const [camera, setCamera] = useState<AssetReviewCameraPreset>("等角");
   const [modelRenderMode, setModelRenderMode] = useState<
     "shaded" | "wireframe"
   >("shaded");
@@ -241,13 +282,17 @@ export function AssetReviewPage() {
       localNavigationState?.sourceUrl ? [localNavigationState.sourceUrl] : [],
     ),
   );
-  const [submitting, setSubmitting] = useState(false);
-  const [reviewStatus, setReviewStatus] = useState(() =>
+  const [submittingAction, setSubmittingAction] = useState<
+    AssetReviewMutation["action"] | null
+  >(null);
+  const submitting = submittingAction !== null;
+  const [rejectArmedKey, setRejectArmedKey] = useState<string | null>(null);
+  const [reviewNotice, setReviewNotice] = useState<AssetReviewNotice>(() =>
     isLocalPreview
-      ? localNavigationState?.localAsset
-        ? "私人上載預覽只保留在目前本地工作階段"
-        : "合成資料變更只保留在本機"
-      : "已載入工作空間審核狀態",
+      ? localNavigationState?.localAsset?.sourceKind === "uploaded"
+        ? assetReviewStatusCopy.localUploadSession
+        : assetReviewStatusCopy.localSyntheticSession
+      : assetReviewStatusCopy.workspaceLoaded,
   );
   const [generationState, setGenerationState] =
     useState<GenerationJobListResponse>(() => ({
@@ -265,6 +310,22 @@ export function AssetReviewPage() {
     }));
   const [generationSubmitting, setGenerationSubmitting] = useState(false);
   const appliedGenerationJobRef = useRef<string | null>(null);
+  const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
+
+  useEffect(() => {
+    if (initialNavigationTarget) {
+      clearAssetReviewTarget(initialNavigationTarget);
+    }
+  }, [clearAssetReviewTarget, initialNavigationTarget]);
+
+  useEffect(() => {
+    if (location.search || location.hash) {
+      void navigate("/asset-review", {
+        replace: true,
+        state: location.state,
+      });
+    }
+  }, [location.hash, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (isLocalPreview) {
@@ -286,12 +347,12 @@ export function AssetReviewPage() {
         setForm(items[0] ? createReviewForm(items[0]) : null);
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
-        setReviewStatus(
+        setReviewNotice(
           targetAssetId && items[0]
-            ? `已載入指定素材 ${items[0].id}`
+            ? assetReviewStatusCopy.selectedLoaded
             : items.length > 0
-              ? `審核佇列共有 ${items.length} 項素材`
-              : "審核佇列目前沒有項目",
+              ? assetReviewQueueNotice(items.length)
+              : assetReviewStatusCopy.queueEmpty,
         );
       })
       .catch(() => {
@@ -324,7 +385,7 @@ export function AssetReviewPage() {
     const controller = new AbortController();
     const currentAsset = activeAsset;
     const currentAssetKey = assetKey(currentAsset);
-    const createdUrls: string[] = [];
+    const privateUrls: AbortBoundObjectUrl[] = [];
     const loadFile = async (kind: AssetFileKind, available: boolean) => {
       if (!available) {
         return null;
@@ -336,9 +397,12 @@ export function AssetReviewPage() {
           currentAsset.id,
           kind,
         );
-        const url = URL.createObjectURL(blob);
-        createdUrls.push(url);
-        return url;
+        const privateUrl = createAbortBoundObjectUrl(blob, controller.signal);
+        if (!privateUrl) {
+          return null;
+        }
+        privateUrls.push(privateUrl);
+        return privateUrl.url;
       } catch {
         return null;
       }
@@ -359,7 +423,7 @@ export function AssetReviewPage() {
 
     return () => {
       controller.abort();
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+      privateUrls.forEach((privateUrl) => privateUrl.revoke());
     };
   }, [activeAsset, currentWorkspace.id, isLocalPreview]);
 
@@ -432,18 +496,16 @@ export function AssetReviewPage() {
           if (!controller.signal.aborted) {
             appliedGenerationJobRef.current = latest.id;
             setForm(createReviewForm(updated));
-            setReviewStatus(
-              "模擬 GLB 草稿已通過格式驗證；必須重新完成人工審核",
-            );
+            setReviewNotice(assetReviewStatusCopy.generatedDraftValidated);
           }
         } else if (latest?.status === "failed") {
-          setReviewStatus(
-            `模擬生成失敗：${latest.failureCode ?? "GENERATION_WORKFLOW_FAILED"}`,
-          );
+          const failureCode =
+            latest.failureCode ?? "GENERATION_WORKFLOW_FAILED";
+          setReviewNotice(assetReviewGenerationFailureNotice(failureCode));
         }
       } catch {
         if (!controller.signal.aborted) {
-          setReviewStatus("暫時無法更新生成工作狀態");
+          setReviewNotice(assetReviewStatusCopy.generationPollFailed);
         }
       } finally {
         refreshing = false;
@@ -469,7 +531,10 @@ export function AssetReviewPage() {
   if (visibleLoadState === "loading") {
     return (
       <div className="page asset-review-page">
-        <LoadingState label="正在載入素材審核佇列" />
+        <LoadingState
+          label="正在載入素材審核佇列"
+          labelEnglish="Loading asset review queue"
+        />
       </div>
     );
   }
@@ -477,7 +542,11 @@ export function AssetReviewPage() {
   if (visibleLoadState === "error") {
     return (
       <div className="page asset-review-page">
-        <ErrorState title="無法載入素材審核佇列" onRetry={retryQueue} />
+        <ErrorState
+          title="無法載入素材審核佇列"
+          titleEnglish="Unable to load the asset review queue"
+          onRetry={retryQueue}
+        />
       </div>
     );
   }
@@ -487,14 +556,22 @@ export function AssetReviewPage() {
       <div className="page asset-review-page">
         <EmptyState
           title="沒有等待審核的素材"
+          titleEnglish="No assets are waiting for review"
           message="請先在產品目錄為一項產品上載私人來源圖片，建立新的素材草稿。"
+          messageEnglish="First upload a private source image to a catalogue product to create a new asset draft."
         />
       </div>
     );
   }
 
   const { asset } = form;
-  const badge = reviewBadge(asset.status);
+  const currentRejectKey = `${currentWorkspace.id}:${assetKey(asset)}`;
+  const rejectArmed = rejectArmedKey === currentRejectKey;
+  const badge = assetReviewStatusPresentation[asset.status];
+  const queueSuffix = assetReviewQueueSuffixCopy(
+    targetAssetId !== null,
+    queueCount,
+  );
   const visibleFileUrls =
     fileUrls.assetKey === assetKey(asset)
       ? fileUrls
@@ -504,6 +581,7 @@ export function AssetReviewPage() {
   const canDecide =
     (currentWorkspace.role === "owner" || currentWorkspace.role === "admin") &&
     asset.status !== "approved";
+  const sourceRightsRecorded = form.checks.has("source_rights");
   const parsedDimensions = {
     width: parseDimension(form.dimensions.width),
     height: parseDimension(form.dimensions.height),
@@ -516,6 +594,23 @@ export function AssetReviewPage() {
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
   const latestGenerationJob = generationState.items[0] ?? null;
+  const generationModeLabel = assetReviewGenerationModeCopy(
+    generationState.capability.mode,
+  );
+  const generationStatusLabel = latestGenerationJob
+    ? assetReviewGenerationStatusCopy(latestGenerationJob)
+    : generationInspectorCopy.noJob;
+  const generationCreditLabel = assetReviewGenerationCreditSummaryCopy(
+    generationState.capability.credits,
+  );
+  const generationCreditHistoryLabel = assetReviewGenerationCreditHistoryCopy(
+    generationState.capability.credits,
+  );
+  const generationEntitlementLabel = latestGenerationJob?.entitlementStatus
+    ? assetReviewGenerationEntitlementCopy(
+        latestGenerationJob.entitlementStatus,
+      )
+    : generationInspectorCopy.notApplicable;
   const generationActive = generationState.items.some(
     (job) =>
       ["queued", "running", "validating"].includes(job.status) ||
@@ -538,6 +633,86 @@ export function AssetReviewPage() {
     generationState.capability.credits.availableUnits >= 1 &&
     !generationActive &&
     !generationSubmitting;
+  const generationActionLabel = generationSubmitting
+    ? reviewActionCopy.creating
+    : generationActive
+      ? reviewActionCopy.running
+      : reviewActionCopy.create;
+  const approveActionLabel =
+    submittingAction === "approve"
+      ? reviewActionCopy.approving
+      : reviewActionCopy.approve;
+  const rejectActionLabel = assetReviewRejectActionLabel(
+    rejectArmed,
+    submittingAction === "reject",
+  );
+  const saveActionLabel =
+    submittingAction === "save_draft"
+      ? reviewActionCopy.saving
+      : reviewActionCopy.save;
+  const sourceFileActionLabel = assetReviewFileActionCopy(
+    "source",
+    asset.files.source !== null,
+    uploadingKind === "source",
+  );
+  const modelFileActionLabel = assetReviewFileActionCopy(
+    "model",
+    asset.files.model !== null,
+    uploadingKind === "model",
+  );
+  const generationActionTitle =
+    generationState.capability.mode !== "simulation"
+      ? bilingualTitle(
+          "Production kill switch 維持關閉",
+          "Production generation remains disabled",
+        )
+      : !canDecide
+        ? bilingualTitle(
+            "只有 owner 或 admin 可建立生成工作",
+            "Only an owner or admin can create a generation job",
+          )
+        : asset.files.source === null
+          ? bilingualTitle(
+              "先上載私人來源圖片",
+              "Upload a private source image first",
+            )
+          : generationState.capability.credits.availableUnits < 1
+            ? bilingualTitle(
+                "沒有可保留的本機測試 credit",
+                "No local test credit is available to reserve",
+              )
+            : generationActive
+              ? bilingualTitle(
+                  "已有進行中或等待人工決定的生成工作",
+                  "A generation job is active or awaiting a human decision",
+                )
+              : !asset.sourceRightsConfirmed || reviewHasUnsavedChanges
+                ? bilingualTitle(
+                    "先儲存來源圖片使用權確認及其他審核變更",
+                    "Save the source-rights confirmation and other review changes first",
+                  )
+                : bilingualTitle(
+                    "建立零成本合成 GLB 草稿，不呼叫外部供應商",
+                    "Create a zero-cost synthetic GLB draft without an external provider",
+                  );
+  const approveActionTitle = asset.files.model
+    ? bilingualTitle(
+        "所有清單及尺寸完成後可核准",
+        "Complete every check and dimension before approval",
+      )
+    : bilingualTitle(
+        "上載並檢查 GLB 模型後才可核准",
+        "Upload and inspect a GLB model before approval",
+      );
+  const rejectActionTitle = rejectArmed
+    ? bilingualTitle(
+        "再次按下以確認拒絕；私人檔案不會被刪除",
+        "Press again to confirm rejection; private files will not be deleted",
+      )
+    : bilingualTitle(
+        "拒絕會更新審核狀態",
+        "Rejection updates the review status",
+      );
 
   const transitionLocalReservedGeneration = (
     transition: "released" | "settled",
@@ -596,6 +771,7 @@ export function AssetReviewPage() {
     if (!isLocalPreview || !currentForm || !canEdit || uploadingKind) {
       return;
     }
+    setRejectArmedKey(null);
     const bytes = createSyntheticSourcePng();
     const contentType = validateAssetFileBytes("source", "image/png", bytes);
     const objectUrl = URL.createObjectURL(
@@ -645,15 +821,14 @@ export function AssetReviewPage() {
       };
     });
     setForm(createReviewForm(updated));
-    setReviewStatus(
-      "本機合成 PNG 已建立；請明確確認使用權並儲存後再建立 3D 草稿",
-    );
+    setReviewNotice(assetReviewStatusCopy.localSourceCreated);
   };
 
   const toggleCheck = (check: AssetReviewCheck) => {
     if (!canEdit) {
       return;
     }
+    setRejectArmedKey(null);
 
     setForm((current) => {
       if (!current) {
@@ -668,16 +843,14 @@ export function AssetReviewPage() {
       }
       return { ...current, checks };
     });
-    setReviewStatus("核准清單有未儲存變更");
+    setReviewNotice(assetReviewStatusCopy.checklistDirty);
   };
 
-  const updateDimension = (
-    key: (typeof dimensions)[number]["key"],
-    value: string,
-  ) => {
+  const updateDimension = (key: AssetReviewDimensionKey, value: string) => {
     if (!canEdit) {
       return;
     }
+    setRejectArmedKey(null);
 
     setForm((current) =>
       current
@@ -687,7 +860,7 @@ export function AssetReviewPage() {
           }
         : current,
     );
-    setReviewStatus("核實尺寸有未儲存變更");
+    setReviewNotice(assetReviewStatusCopy.dimensionsDirty);
   };
 
   const handleFileSelection = async (
@@ -702,16 +875,19 @@ export function AssetReviewPage() {
       return;
     }
 
+    setRejectArmedKey(null);
     setUploadingKind(kind);
-    setReviewStatus(
-      kind === "source" ? "正在驗證及上載來源圖片…" : "正在驗證及上載 GLB…",
+    setReviewNotice(
+      kind === "source"
+        ? assetReviewStatusCopy.uploadingSource
+        : assetReviewStatusCopy.uploadingModel,
     );
     try {
       if (file.size > assetFileLimits[kind]) {
         throw new AssetFileValidationError(
           kind === "source"
-            ? "來源圖片必須小於或等於 10 MiB。"
-            : "GLB 模型必須小於或等於 25 MiB。",
+            ? "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller."
+            : "GLB 模型必須小於或等於 25 MiB。 / The GLB model must be 25 MiB or smaller.",
         );
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -780,18 +956,17 @@ export function AssetReviewPage() {
       }
 
       setForm(createReviewForm(updated));
-      setReviewStatus(
+      setReviewNotice(
         kind === "source"
-          ? "私人來源圖片已上載；核准清單已重設"
-          : "私人 GLB 已上載；請重新檢查方向、樞軸及尺寸",
+          ? assetReviewStatusCopy.sourceUploaded
+          : assetReviewStatusCopy.modelUploaded,
       );
     } catch (error) {
-      setReviewStatus(
-        error instanceof Error
-          ? error.message
-          : kind === "source"
-            ? "無法上載來源圖片"
-            : "無法上載 GLB 模型",
+      setReviewNotice(
+        assetReviewErrorNotice(
+          error,
+          kind === "source" ? "source-upload" : "model-upload",
+        ),
       );
     } finally {
       inputElement.value = "";
@@ -804,8 +979,9 @@ export function AssetReviewPage() {
     if (!currentForm || !canRequestGeneration) {
       return;
     }
+    setRejectArmedKey(null);
     setGenerationSubmitting(true);
-    setReviewStatus("正在建立零成本模擬生成工作…");
+    setReviewNotice(assetReviewStatusCopy.creatingGeneration);
     try {
       if (isLocalPreview) {
         const bytes = createSyntheticDraftGlb();
@@ -883,27 +1059,37 @@ export function AssetReviewPage() {
         }));
         setForm(createReviewForm(updated));
       } else {
+        const lease = acquireGenerationRequestLease(
+          generationRequestLeaseRef.current,
+          {
+            workspaceId: currentWorkspace.id,
+            assetId: currentForm.asset.id,
+            expectedVersion: currentForm.asset.version,
+          },
+        );
+        generationRequestLeaseRef.current = lease;
         const job = await startGenerationJob(
           currentWorkspace.id,
           currentForm.asset.id,
           { expectedVersion: currentForm.asset.version },
+          lease.idempotencyKey,
         );
+        generationRequestLeaseRef.current = null;
         setGenerationState((current) => ({
           ...current,
           items: [job, ...current.items.filter((item) => item.id !== job.id)],
         }));
       }
-      setReviewStatus(
+      setReviewNotice(
         isLocalPreview
-          ? "本地模擬 GLB 已建立；核准證據已重設"
-          : "模擬生成工作已排入 Workflow；不會產生供應商費用",
+          ? assetReviewStatusCopy.localGenerationCreated
+          : assetReviewStatusCopy.generationQueued,
       );
     } catch (error) {
-      setReviewStatus(
-        error instanceof AssetReviewApiError
-          ? error.message
-          : "無法建立模擬生成工作；沒有產生供應商費用",
-      );
+      if (!isLocalPreview && !shouldRetainGenerationRequestLease(error)) {
+        generationRequestLeaseRef.current = null;
+      }
+      setReviewNotice(assetReviewErrorNotice(error, "generation"));
     } finally {
       setGenerationSubmitting(false);
     }
@@ -914,6 +1100,7 @@ export function AssetReviewPage() {
     if (!currentForm || submitting) {
       return;
     }
+    setRejectArmedKey(null);
     const hadReservedGeneration = generationState.items.some(
       (job) =>
         job.assetId === currentForm.asset.id &&
@@ -928,8 +1115,8 @@ export function AssetReviewPage() {
       ),
       dimensionsMm: parsedDimensions,
     };
-    setSubmitting(true);
-    setReviewStatus("正在儲存審核結果…");
+    setSubmittingAction(action);
+    setReviewNotice(assetReviewSavingNotice(action));
 
     try {
       let updated: AssetReviewItem;
@@ -980,29 +1167,39 @@ export function AssetReviewPage() {
         }
       }
       setForm(createReviewForm(updated));
-      setReviewStatus(
-        action === "approve"
-          ? hadReservedGeneration
-            ? "素材已核准；已結算保留 credit 並記錄審核事件"
-            : "素材已核准並記錄審核事件"
-          : action === "reject"
-            ? hadReservedGeneration
-              ? "素材已拒絕；已釋放保留 credit 並記錄審核事件"
-              : "素材已拒絕並記錄審核事件"
-            : "審核草稿已儲存",
-      );
+      setReviewNotice(assetReviewSavedNotice(action, hadReservedGeneration));
     } catch (error) {
-      const message =
+      const failureOperation =
+        action === "approve"
+          ? "approve"
+          : action === "reject"
+            ? "reject"
+            : "save";
+      const notice =
         error instanceof AssetReviewApiError &&
         error.code === "ASSET_VERSION_CONFLICT"
-          ? "素材已被另一個審核動作更新，請重新載入"
-          : error instanceof AssetReviewApiError
-            ? error.message
-            : "無法儲存審核結果；原有資料未有變更";
-      setReviewStatus(message);
+          ? assetReviewStatusCopy.versionConflict
+          : assetReviewErrorNotice(error, failureOperation);
+      setReviewNotice(notice);
     } finally {
-      setSubmitting(false);
+      setSubmittingAction(null);
     }
+  };
+
+  const requestReject = () => {
+    if (!canDecide || submitting) {
+      return;
+    }
+    const intent = nextAssetReviewRejectIntent(
+      rejectArmedKey,
+      currentRejectKey,
+    );
+    setRejectArmedKey(intent.nextArmedKey);
+    if (!intent.shouldSubmit) {
+      setReviewNotice(assetReviewStatusCopy.confirmReject);
+      return;
+    }
+    void submitReview("reject");
   };
 
   return (
@@ -1025,79 +1222,123 @@ export function AssetReviewPage() {
       />
       <header className="asset-review-header">
         <div>
-          <span className="eyebrow">
-            素材 {asset.id} · 版本 {asset.version}
-          </span>
+          <BilingualInterfaceText
+            className="eyebrow"
+            copy={assetReviewHeaderEyebrowCopy(asset.version)}
+          />
           <h1>
             {asset.part.manufacturer} {asset.part.model}
           </h1>
-          <p>所有生成或上載素材均為草稿，必須經授權人員核准才可使用。</p>
+          <p>
+            <BilingualInterfaceText copy={assetReviewHeaderCopy.guidance} />
+          </p>
         </div>
         <div className="asset-review-header__meta">
-          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-          <span aria-live="polite">
-            {reviewStatus}
-            {targetAssetId ? " · 指定素材" : ` · 佇列 ${queueCount} 項`}
-          </span>
+          <StatusBadge tone={badge.tone}>
+            <BilingualInterfaceText copy={badge.copy} />
+          </StatusBadge>
+          <AssetReviewStatusView
+            notice={reviewNotice}
+            zhHantSuffix={queueSuffix.zhHant}
+            englishSuffix={queueSuffix.english}
+          />
         </div>
       </header>
 
       <div className="review-workspace">
-        <aside className="source-filmstrip" aria-label="來源圖片">
+        <aside
+          className="source-filmstrip"
+          aria-label={bilingualTitle(
+            assetReviewSourceCopy.heading.zhHant,
+            assetReviewSourceCopy.heading.english,
+          )}
+        >
           <div className="review-panel-heading">
             <Image aria-hidden="true" />
             <div>
-              <strong>來源圖片</strong>
-              <span>
-                {visibleFileUrls.source
-                  ? "已透過授權 API 載入"
-                  : "尚未載入私人來源圖片"}
-              </span>
+              <BilingualStrongText copy={assetReviewSourceCopy.heading} />
+              <BilingualInterfaceText
+                copy={
+                  visibleFileUrls.source
+                    ? assetReviewSourceCopy.loaded
+                    : assetReviewSourceCopy.missing
+                }
+              />
             </div>
           </div>
-          {sourceViews.map((view, index) => (
-            <button
-              className={`source-frame${index === 0 ? " is-selected" : ""}`}
-              key={view}
-              type="button"
-              aria-label={
-                index === 0 && visibleFileUrls.source
-                  ? `${view}私人來源圖片`
-                  : `${view}來源圖片介面佔位`
-              }
-              disabled
-            >
-              {index === 0 && visibleFileUrls.source ? (
-                <img
-                  src={visibleFileUrls.source}
-                  alt={`${asset.part.manufacturer} ${asset.part.model} 私人來源預覽`}
-                />
-              ) : (
-                <span
-                  className={`source-frame__object source-frame__object--${index + 1}`}
-                >
-                  <Box aria-hidden="true" />
-                </span>
-              )}
-              <small>{view}</small>
-            </button>
-          ))}
-          <div className="source-rights">
-            {form.checks.has("source_rights") ? (
+          {assetReviewSourceViews.map((view, index) => {
+            const hasPrivateImage =
+              index === 0 && visibleFileUrls.source !== null;
+            const frameCopy = assetReviewSourceFrameCopy(view, hasPrivateImage);
+            const previewAltCopy = assetReviewSourcePreviewAltCopy(
+              asset.part.manufacturer,
+              asset.part.model,
+            );
+            return (
+              <button
+                className={`source-frame${index === 0 ? " is-selected" : ""}`}
+                key={view}
+                type="button"
+                aria-label={bilingualTitle(frameCopy.zhHant, frameCopy.english)}
+                disabled
+              >
+                {hasPrivateImage && visibleFileUrls.source ? (
+                  <img
+                    src={visibleFileUrls.source}
+                    alt={bilingualTitle(
+                      previewAltCopy.zhHant,
+                      previewAltCopy.english,
+                    )}
+                  />
+                ) : (
+                  <span
+                    className={`source-frame__object source-frame__object--${index + 1}`}
+                  >
+                    <Box aria-hidden="true" />
+                  </span>
+                )}
+                <small>
+                  <BilingualInterfaceText
+                    copy={assetReviewSourceViewCopy[view]}
+                  />
+                </small>
+              </button>
+            );
+          })}
+          <div
+            className={`source-rights is-${sourceRightsRecorded ? "confirmed" : "missing"}`}
+          >
+            {sourceRightsRecorded ? (
               <Check aria-hidden="true" />
             ) : (
               <X aria-hidden="true" />
             )}
-            {form.checks.has("source_rights")
-              ? "已記錄商業使用權確認"
-              : "尚未確認圖片使用權"}
+            <BilingualInterfaceText
+              copy={
+                sourceRightsRecorded
+                  ? assetReviewSourceCopy.rightsConfirmed
+                  : assetReviewSourceCopy.rightsMissing
+              }
+            />
           </div>
         </aside>
 
-        <section className="review-viewport" aria-label="3D 素材審核視窗">
+        <section
+          className="review-viewport"
+          aria-label={bilingualTitle(
+            assetReviewViewportCopy.viewportLabel.zhHant,
+            assetReviewViewportCopy.viewportLabel.english,
+          )}
+        >
           <div className="review-viewport__toolbar">
-            <div role="group" aria-label="鏡頭預設角度">
-              {cameraPresets.map((preset) => (
+            <div
+              role="group"
+              aria-label={bilingualTitle(
+                assetReviewViewportCopy.cameraGroupLabel.zhHant,
+                assetReviewViewportCopy.cameraGroupLabel.english,
+              )}
+            >
+              {assetReviewCameraPresets.map((preset) => (
                 <button
                   className={camera === preset ? "is-active" : ""}
                   key={preset}
@@ -1106,14 +1347,23 @@ export function AssetReviewPage() {
                   disabled={!visibleFileUrls.model}
                   onClick={() => setCamera(preset)}
                 >
-                  {preset}
+                  <BilingualActionLabel
+                    copy={assetReviewCameraPresetCopy[preset]}
+                  />
                 </button>
               ))}
             </div>
             <div>
               <button
                 type="button"
-                aria-label="調整模型至合適視野"
+                aria-label={bilingualTitle(
+                  assetReviewViewportCopy.fitModel.zhHant,
+                  assetReviewViewportCopy.fitModel.english,
+                )}
+                title={bilingualTitle(
+                  assetReviewViewportCopy.fitModel.zhHant,
+                  assetReviewViewportCopy.fitModel.english,
+                )}
                 disabled={!visibleFileUrls.model}
                 onClick={() => {
                   setCamera("等角");
@@ -1124,7 +1374,14 @@ export function AssetReviewPage() {
               </button>
               <button
                 type="button"
-                aria-label="切換線框顯示"
+                aria-label={bilingualTitle(
+                  assetReviewViewportCopy.toggleWireframe.zhHant,
+                  assetReviewViewportCopy.toggleWireframe.english,
+                )}
+                title={bilingualTitle(
+                  assetReviewViewportCopy.toggleWireframe.zhHant,
+                  assetReviewViewportCopy.toggleWireframe.english,
+                )}
                 aria-pressed={modelRenderMode === "wireframe"}
                 disabled={!visibleFileUrls.model}
                 onClick={() =>
@@ -1143,7 +1400,9 @@ export function AssetReviewPage() {
               <Suspense
                 fallback={
                   <span className="asset-model-preview__state is-loading">
-                    正在載入 3D 預覽元件…
+                    <BilingualInterfaceText
+                      copy={assetReviewViewportCopy.loadingComponent}
+                    />
                   </span>
                 }
               >
@@ -1172,9 +1431,9 @@ export function AssetReviewPage() {
             </div>
             <div className="viewport-readout">
               <Rotate3D aria-hidden="true" />
-              <span>
-                鏡頭 <strong>{camera}</strong>
-              </span>
+              <BilingualInterfaceText
+                copy={assetReviewCameraReadoutCopy(camera)}
+              />
               <span className="mono">
                 {parsedDimensions.width ?? "—"} ×{" "}
                 {parsedDimensions.height ?? "—"} ×{" "}
@@ -1183,12 +1442,16 @@ export function AssetReviewPage() {
             </div>
           </div>
           <div className="review-viewport__footer">
-            <span>
-              {visibleFileUrls.model
-                ? "授權讀取的私人 GLB · 只在目前瀏覽器工作階段解碼"
-                : "尚未上載私人 GLB · 顯示合成幾何佔位"}
-            </span>
-            <span className="mono">視覺素材不構成相容性證明</span>
+            <BilingualInterfaceText
+              copy={
+                visibleFileUrls.model
+                  ? assetReviewViewportCopy.authorizedModel
+                  : assetReviewViewportCopy.missingModel
+              }
+            />
+            <BilingualInterfaceText
+              copy={assetReviewViewportCopy.evidenceLimit}
+            />
           </div>
         </section>
 
@@ -1197,22 +1460,42 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Camera aria-hidden="true" />
               <div>
-                <strong>素材資料</strong>
-                <span>{sourceKindLabels[asset.sourceKind]}</span>
+                <BilingualStrongText
+                  copy={assetReviewHeaderCopy.metadataHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewSourceKindCopy[asset.sourceKind]}
+                />
               </div>
             </div>
             <dl className="technical-list">
               <div>
-                <dt>SKU</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.skuLabel}
+                  />
+                </dt>
                 <dd className="mono">{asset.part.sku}</dd>
               </div>
               <div>
-                <dt>品質</dt>
-                <dd>{qualityLabels[asset.quality]}</dd>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.qualityLabel}
+                  />
+                </dt>
+                <dd>
+                  <BilingualInterfaceText
+                    copy={assetReviewQualityCopy[asset.quality]}
+                  />
+                </dd>
               </div>
               <div>
-                <dt>素材 ID</dt>
-                <dd className="mono">{asset.id}</dd>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={assetReviewHeaderCopy.reviewVersionLabel}
+                  />
+                </dt>
+                <dd className="mono">v{asset.version}</dd>
               </div>
             </dl>
           </div>
@@ -1221,18 +1504,29 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <FileBox aria-hidden="true" />
               <div>
-                <strong>私人素材檔案</strong>
-                <span>Access 及 workspace 驗證後才可讀取</span>
+                <BilingualStrongText
+                  copy={assetReviewFileControlCopy.heading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewFileControlCopy.accessBoundary}
+                />
               </div>
             </div>
             <div className="asset-file-control">
               <div>
-                <strong>來源圖片</strong>
-                <span>
-                  {asset.files.source
-                    ? `${asset.files.source.contentType} · ${formatFileSize(asset.files.source.sizeBytes)}`
-                    : "JPEG、PNG 或 WebP · 最多 10 MiB"}
-                </span>
+                <BilingualStrongText
+                  copy={assetReviewFileControlCopy.sourceImage}
+                />
+                {asset.files.source ? (
+                  <span>
+                    {asset.files.source.contentType} ·{" "}
+                    {formatFileSize(asset.files.source.sizeBytes)}
+                  </span>
+                ) : (
+                  <BilingualInterfaceText
+                    copy={assetReviewFileControlCopy.sourceRequirements}
+                  />
+                )}
               </div>
               <div className="asset-file-control__actions">
                 {isLocalPreview ? (
@@ -1240,52 +1534,64 @@ export function AssetReviewPage() {
                     className="button button--secondary"
                     type="button"
                     disabled={!canEdit || uploadingKind !== null}
+                    title={bilingualTitle(
+                      assetReviewFileControlCopy.syntheticImageTitle.zhHant,
+                      assetReviewFileControlCopy.syntheticImageTitle.english,
+                    )}
                     onClick={createLocalSyntheticSource}
                   >
                     <Sparkles aria-hidden="true" />
-                    合成圖片
+                    <BilingualActionLabel
+                      copy={assetReviewFileControlCopy.syntheticImage}
+                    />
                   </button>
                 ) : null}
                 <button
                   className="button button--secondary"
                   type="button"
                   disabled={!canEdit || uploadingKind !== null}
+                  title={bilingualTitle(
+                    assetReviewFileControlCopy.sourceUploadTitle.zhHant,
+                    assetReviewFileControlCopy.sourceUploadTitle.english,
+                  )}
                   onClick={() => sourceInputRef.current?.click()}
                 >
                   <Upload aria-hidden="true" />
-                  {uploadingKind === "source"
-                    ? "上載中…"
-                    : asset.files.source
-                      ? "取代圖片"
-                      : "上載圖片"}
+                  <BilingualActionLabel copy={sourceFileActionLabel} />
                 </button>
               </div>
             </div>
             <div className="asset-file-control">
               <div>
-                <strong>3D 模型</strong>
-                <span>
-                  {asset.files.model
-                    ? `GLB · ${formatFileSize(asset.files.model.sizeBytes)}`
-                    : "自包含 glTF 2.0 GLB · 最多 25 MiB"}
-                </span>
+                <BilingualStrongText copy={assetReviewFileControlCopy.model} />
+                {asset.files.model ? (
+                  <span>
+                    GLB · {formatFileSize(asset.files.model.sizeBytes)}
+                  </span>
+                ) : (
+                  <BilingualInterfaceText
+                    copy={assetReviewFileControlCopy.modelRequirements}
+                  />
+                )}
               </div>
               <button
                 className="button button--secondary"
                 type="button"
                 disabled={!canEdit || uploadingKind !== null}
+                title={bilingualTitle(
+                  assetReviewFileControlCopy.modelUploadTitle.zhHant,
+                  assetReviewFileControlCopy.modelUploadTitle.english,
+                )}
                 onClick={() => modelInputRef.current?.click()}
               >
                 <Upload aria-hidden="true" />
-                {uploadingKind === "model"
-                  ? "上載中…"
-                  : asset.files.model
-                    ? "取代 GLB"
-                    : "上載 GLB"}
+                <BilingualActionLabel copy={modelFileActionLabel} />
               </button>
             </div>
             <small>
-              取代任何檔案會重設核准清單及已核實尺寸，避免沿用舊版本判斷。
+              <BilingualInterfaceText
+                copy={assetReviewFileControlCopy.replacementWarning}
+              />
             </small>
           </div>
 
@@ -1293,66 +1599,106 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Sparkles aria-hidden="true" />
               <div>
-                <strong>生成工作</strong>
-                <span>只顯示中立狀態，不公開供應商或私人物件資料</span>
+                <strong className="review-bilingual-copy">
+                  <span>{generationInspectorCopy.heading.zhHant}</span>
+                  <span lang="en">
+                    {generationInspectorCopy.heading.english}
+                  </span>
+                </strong>
+                <BilingualInterfaceText
+                  copy={generationInspectorCopy.description}
+                />
               </div>
             </div>
             <dl className="technical-list">
               <div>
-                <dt>執行模式</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.executionMode}
+                  />
+                </dt>
                 <dd>
-                  {generationState.capability.mode === "simulation"
-                    ? "零成本模擬"
-                    : "未啟用"}
+                  <BilingualInterfaceText copy={generationModeLabel} />
                 </dd>
               </div>
               <div>
-                <dt>最新狀態</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.latestStatus}
+                  />
+                </dt>
                 <dd>
-                  {latestGenerationJob
-                    ? generationStatusLabel(latestGenerationJob)
-                    : "沒有工作"}
+                  <BilingualInterfaceText copy={generationStatusLabel} />
                 </dd>
               </div>
               <div>
-                <dt>Credit</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.credit}
+                  />
+                </dt>
                 <dd className="mono">
-                  {generationState.capability.credits.availableUnits} 可用 ·{" "}
-                  {generationState.capability.credits.reservedUnits} 保留
+                  <BilingualInterfaceText copy={generationCreditLabel} />
                 </dd>
               </div>
               <div>
-                <dt>累計</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.cumulativeCredit}
+                  />
+                </dt>
                 <dd className="mono">
-                  {generationState.capability.credits.settledUnits} 結算 ·{" "}
-                  {generationState.capability.credits.releasedUnits} 釋放
+                  <BilingualInterfaceText copy={generationCreditHistoryLabel} />
                 </dd>
               </div>
               <div>
-                <dt>權益狀態</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.entitlementStatus}
+                  />
+                </dt>
                 <dd>
-                  {latestGenerationJob?.entitlementStatus
-                    ? generationEntitlementLabels[
-                        latestGenerationJob.entitlementStatus
-                      ]
-                    : "—"}
+                  <BilingualInterfaceText copy={generationEntitlementLabel} />
                 </dd>
               </div>
               <div>
-                <dt>模擬成本單位</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.simulationCostUnits}
+                  />
+                </dt>
                 <dd className="mono">
-                  {latestGenerationJob?.providerCostUnits ?? "—"}
+                  {latestGenerationJob?.providerCostUnits === null ||
+                  latestGenerationJob?.providerCostUnits === undefined ? (
+                    <BilingualInterfaceText
+                      copy={generationInspectorCopy.noCostRecorded}
+                    />
+                  ) : (
+                    latestGenerationJob.providerCostUnits
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>GLB 驗證</dt>
+                <dt>
+                  <BilingualInterfaceText
+                    copy={generationInspectorCopy.glbValidation}
+                  />
+                </dt>
                 <dd className="mono">
-                  {latestGenerationJob?.validationCode ?? "—"}
+                  {latestGenerationJob?.validationCode ? (
+                    latestGenerationJob.validationCode
+                  ) : (
+                    <BilingualInterfaceText
+                      copy={generationInspectorCopy.notValidated}
+                    />
+                  )}
                 </dd>
               </div>
             </dl>
             <small>
-              模擬輸出仍是草稿，格式驗證通過後亦須重新核對身份、方向、尺寸、樞軸及使用權。
+              <BilingualInterfaceText
+                copy={generationInspectorCopy.explanation}
+              />
             </small>
           </div>
 
@@ -1360,14 +1706,18 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Scan aria-hidden="true" />
               <div>
-                <strong>核實尺寸</strong>
-                <span>只接受經人手核對的數值</span>
+                <BilingualStrongText
+                  copy={assetReviewEvidenceCopy.dimensionsHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewEvidenceCopy.dimensionsGuidance}
+                />
               </div>
             </div>
             <div className="dimension-grid">
-              {dimensions.map(({ key, label }) => (
+              {assetReviewDimensionItems.map(({ key, copy }) => (
                 <label key={key}>
-                  <span>{label}</span>
+                  <BilingualInterfaceText copy={copy} />
                   <span>
                     <input
                       value={form.dimensions[key]}
@@ -1392,21 +1742,28 @@ export function AssetReviewPage() {
             <div className="review-panel-heading">
               <Check aria-hidden="true" />
               <div>
-                <strong>核准清單</strong>
-                <span>
-                  已完成 {form.checks.size} / {checklist.length} 項
-                </span>
+                <BilingualStrongText
+                  copy={assetReviewEvidenceCopy.checklistHeading}
+                />
+                <BilingualInterfaceText
+                  copy={assetReviewChecklistProgressCopy(
+                    form.checks.size,
+                    assetReviewChecks.length,
+                  )}
+                />
               </div>
             </div>
-            {checklist.map((item) => (
-              <label key={item.id}>
+            {assetReviewChecks.map((check) => (
+              <label key={check}>
                 <input
                   type="checkbox"
-                  checked={form.checks.has(item.id)}
+                  checked={form.checks.has(check)}
                   disabled={!canEdit || submitting}
-                  onChange={() => toggleCheck(item.id)}
+                  onChange={() => toggleCheck(check)}
                 />
-                <span>{item.label}</span>
+                <BilingualInterfaceText
+                  copy={assetReviewChecklistCopy[check]}
+                />
               </label>
             ))}
           </div>
@@ -1416,42 +1773,25 @@ export function AssetReviewPage() {
       <footer className="review-actions">
         <div>
           <button
-            className="button button--danger"
+            className={`button button--danger${rejectArmed ? " is-armed" : ""}`}
             type="button"
             disabled={!canDecide || submitting}
-            onClick={() => void submitReview("reject")}
+            aria-pressed={rejectArmed}
+            title={rejectActionTitle}
+            onClick={requestReject}
           >
             <X aria-hidden="true" />
-            拒絕
+            <BilingualActionLabel copy={rejectActionLabel} />
           </button>
           <button
             className="button"
             type="button"
             disabled={!canRequestGeneration}
-            title={
-              generationState.capability.mode !== "simulation"
-                ? "Production kill switch 維持關閉"
-                : !canDecide
-                  ? "只有 owner 或 admin 可建立生成工作"
-                  : asset.files.source === null
-                    ? "先上載私人來源圖片"
-                    : generationState.capability.credits.availableUnits < 1
-                      ? "沒有可保留的本機測試 credit"
-                      : generationActive
-                        ? "已有進行中或等待人工決定的生成工作"
-                        : !asset.sourceRightsConfirmed ||
-                            reviewHasUnsavedChanges
-                          ? "先儲存來源圖片使用權確認及其他審核變更"
-                          : "建立零成本合成 GLB 草稿，不呼叫外部供應商"
-            }
+            title={generationActionTitle}
             onClick={() => void requestGeneration()}
           >
             <RefreshCw aria-hidden="true" />
-            {generationSubmitting
-              ? "建立中…"
-              : generationActive
-                ? "模擬工作進行中"
-                : "建立模擬 GLB 草稿"}
+            <BilingualActionLabel copy={generationActionLabel} />
           </button>
         </div>
         <div>
@@ -1465,7 +1805,7 @@ export function AssetReviewPage() {
                 })
               }
             >
-              在 Builder 檢查
+              <BilingualActionLabel copy={reviewActionCopy.builder} />
               <ArrowRight aria-hidden="true" />
             </button>
           ) : (
@@ -1477,21 +1817,17 @@ export function AssetReviewPage() {
                 onClick={() => void submitReview("save_draft")}
               >
                 <Save aria-hidden="true" />
-                {submitting ? "儲存中…" : "儲存草稿"}
+                <BilingualActionLabel copy={saveActionLabel} />
               </button>
               <button
                 className="button button--primary"
                 type="button"
                 disabled={!approvalReady || !canDecide || submitting}
-                title={
-                  asset.files.model
-                    ? "所有清單及尺寸完成後可核准"
-                    : "上載並檢查 GLB 模型後才可核准"
-                }
+                title={approveActionTitle}
                 onClick={() => void submitReview("approve")}
               >
                 <Check aria-hidden="true" />
-                核准素材
+                <BilingualActionLabel copy={approveActionLabel} />
               </button>
             </>
           )}

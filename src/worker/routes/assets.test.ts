@@ -4,9 +4,12 @@ import {
   assetReviewChecks,
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
+import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
+import { sha256Hex } from "../lib/digest";
 import {
+  assetDetailResponse,
   assetReviewMutationResponse,
   assetReviewQueueResponse,
   resolveReviewTransition,
@@ -22,6 +25,9 @@ type FakeStatement = {
   }>;
   first: () => Promise<Record<string, unknown> | null>;
 };
+
+const modelBytes = createSyntheticDraftGlb();
+const modelSha256 = await sha256Hex(modelBytes);
 
 const assetRow = {
   asset_id: "asset-fixture",
@@ -44,9 +50,24 @@ const assetRow = {
   source_sha256: "a".repeat(64),
   model_object_key: "private/model-fixture",
   model_content_type: "model/gltf-binary",
-  model_size_bytes: 256,
-  model_sha256: "b".repeat(64),
+  model_size_bytes: modelBytes.byteLength,
+  model_sha256: modelSha256,
 };
+
+const privateAssets = {
+  async get() {
+    return {
+      size: modelBytes.byteLength,
+      httpMetadata: { contentType: "model/gltf-binary" },
+      async arrayBuffer() {
+        return modelBytes.buffer.slice(
+          modelBytes.byteOffset,
+          modelBytes.byteOffset + modelBytes.byteLength,
+        );
+      },
+    };
+  },
+} as unknown as R2Bucket;
 
 function context(role: WorkspaceRole = "owner"): RequestContext {
   return {
@@ -150,6 +171,56 @@ describe("asset review business rules", () => {
 });
 
 describe("asset review routes", () => {
+  it("returns safe asset detail from a workspace-bound lookup", async () => {
+    const { db, prepared } = fakeDatabase();
+    const request = new Request("https://app.example/api/assets/item", {
+      headers: { "x-rigstage-asset-id": "asset-fixture" },
+    });
+
+    const response = await assetDetailResponse(request, db, context("viewer"));
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(prepared[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
+    expect(text).not.toContain("private/source-fixture");
+    expect(text).not.toContain("source_sha256");
+    expect(text).not.toContain("workspace-fixture");
+  });
+
+  it("treats an asset outside the resolved workspace as not found", async () => {
+    const { db, prepared } = fakeDatabase({ rows: [] });
+    const request = new Request("https://app.example/api/assets/item", {
+      headers: { "x-rigstage-asset-id": "asset-foreign" },
+    });
+
+    await expect(
+      assetDetailResponse(request, db, context("viewer")),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(prepared[0]?.values).toEqual(["workspace-fixture", "asset-foreign"]);
+  });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed asset target before detail database work: %s",
+    async (assetId) => {
+      const { db, prepared } = fakeDatabase();
+      const headers = new Headers();
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const request = new Request("https://app.example/api/assets/item", {
+        headers,
+      });
+
+      await expect(
+        assetDetailResponse(request, db, context("viewer")),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(prepared).toHaveLength(0);
+    },
+  );
+
   it("returns only the verified workspace review queue", async () => {
     const { db, prepared } = fakeDatabase({
       rows: [{ ...assetRow, status: "in_review", quality: "draft" }],
@@ -165,7 +236,10 @@ describe("asset review routes", () => {
           version: 1,
           files: {
             source: { contentType: "image/png", sizeBytes: 128 },
-            model: { contentType: "model/gltf-binary", sizeBytes: 256 },
+            model: {
+              contentType: "model/gltf-binary",
+              sizeBytes: modelBytes.byteLength,
+            },
           },
         },
       ],
@@ -174,22 +248,98 @@ describe("asset review routes", () => {
     expect(prepared[0]?.values).toEqual(["workspace-fixture"]);
   });
 
+  it("rejects viewer review mutations before reading or private work", async () => {
+    const { batches, db, prepared } = fakeDatabase();
+    let privateReads = 0;
+    const privateAssetsSpy = {
+      async get() {
+        privateReads += 1;
+        return null;
+      },
+    } as unknown as R2Bucket;
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{malformed",
+    });
+
+    await expect(
+      assetReviewMutationResponse(
+        request,
+        db,
+        privateAssetsSpy,
+        context("viewer"),
+        "request-viewer-denied",
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "ROLE_FORBIDDEN",
+      message: expect.stringMatching(/你目前.+Your current workspace role/u),
+    });
+    expect(request.bodyUsed).toBe(false);
+    expect(prepared).toHaveLength(0);
+    expect(batches).toHaveLength(0);
+    expect(privateReads).toBe(0);
+  });
+
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed review target before body, D1 or R2 work: %s",
+    async (assetId) => {
+      const { batches, db, prepared } = fakeDatabase();
+      let privateReads = 0;
+      const privateAssetsSpy = {
+        async get() {
+          privateReads += 1;
+          return null;
+        },
+      } as unknown as R2Bucket;
+      const headers = new Headers({ "content-type": "application/json" });
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      const request = new Request(
+        "https://app.example/api/assets/item/review",
+        {
+          method: "PATCH",
+          headers,
+          body: "{malformed",
+        },
+      );
+
+      await expect(
+        assetReviewMutationResponse(
+          request,
+          db,
+          privateAssetsSpy,
+          context("staff"),
+          "request-target-denied",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(prepared).toHaveLength(0);
+      expect(batches).toHaveLength(0);
+      expect(privateReads).toBe(0);
+    },
+  );
+
   it("updates the asset, review history and audit log in one workspace-bound batch", async () => {
     const { batches, db } = fakeDatabase();
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     const response = await assetReviewMutationResponse(
       request,
       db,
+      privateAssets,
       context(),
-      "asset-fixture",
       "request-fixture",
     );
 
@@ -211,21 +361,21 @@ describe("asset review routes", () => {
     const { db } = fakeDatabase({
       rows: [{ ...assetRow, model_object_key: null }],
     });
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
       },
-    );
+      body: JSON.stringify(reviewInput()),
+    });
 
     await expect(
       assetReviewMutationResponse(
         request,
         db,
+        privateAssets,
         context(),
-        "asset-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({
@@ -234,23 +384,51 @@ describe("asset review routes", () => {
     });
   });
 
-  it("rejects a stale review version without appending state transitions", async () => {
-    const { batchChanges, db } = fakeDatabase({ changes: 0 });
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/review",
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(reviewInput()),
+  it("does not collapse an R2 lookup failure into a missing-model conflict", async () => {
+    const { batches, db } = fakeDatabase();
+    const unavailableAssets = {
+      async get() {
+        throw new Error("Synthetic R2 lookup unavailable.");
       },
-    );
+    } as unknown as R2Bucket;
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
+      },
+      body: JSON.stringify(reviewInput()),
+    });
 
     await expect(
       assetReviewMutationResponse(
         request,
         db,
+        unavailableAssets,
         context(),
-        "asset-fixture",
+        "request-fixture",
+      ),
+    ).rejects.toThrowError("Synthetic R2 lookup unavailable.");
+    expect(batches).toHaveLength(0);
+  });
+
+  it("rejects a stale review version without appending state transitions", async () => {
+    const { batchChanges, db } = fakeDatabase({ changes: 0 });
+    const request = new Request("https://app.example/api/assets/item/review", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-rigstage-asset-id": "asset-fixture",
+      },
+      body: JSON.stringify(reviewInput()),
+    });
+
+    await expect(
+      assetReviewMutationResponse(
+        request,
+        db,
+        privateAssets,
+        context(),
         "request-fixture",
       ),
     ).rejects.toMatchObject({

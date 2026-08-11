@@ -26,16 +26,22 @@ export const generationEntitlementStatusSchema = z.enum([
   "released",
 ]);
 
+export const generationDiagnosticCodeSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Z][A-Z0-9_]*$/u);
+
 export const generationJobSchema = z.object({
   id: z.string().min(1),
   assetId: z.string().min(1),
   status: generationJobStatusSchema,
   kind: z.literal("simulation"),
   outputReady: z.boolean(),
-  failureCode: z.string().min(1).nullable(),
+  failureCode: generationDiagnosticCodeSchema.nullable(),
   entitlementStatus: generationEntitlementStatusSchema.nullable(),
   providerCostUnits: z.number().int().nonnegative().nullable(),
-  validationCode: z.string().min(1).nullable(),
+  validationCode: generationDiagnosticCodeSchema.nullable(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
 });

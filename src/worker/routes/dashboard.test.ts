@@ -109,17 +109,24 @@ describe("dashboard route", () => {
         {
           kind: "asset_review",
           title: "Fixture Reviewed Part",
+          detailEnglish: "3D asset is under review",
           statusZhHant: "審核中",
+          statusEnglish: "Under review",
+          href: "/asset-review",
+          targetAssetId: "asset-fixture",
         },
         {
           kind: "build_ready",
           title: "測試組裝",
+          detailEnglish: "9 components · Safe to export",
           statusZhHant: "可匯出",
+          statusEnglish: "Export ready",
         },
       ],
     });
     expect(text).not.toContain("workspace-fixture");
     expect(text).not.toContain("fixture@example.com");
+    expect(text).not.toContain("?asset=");
     expect(calls.every((call) => call.values[0] === "workspace-fixture")).toBe(
       true,
     );

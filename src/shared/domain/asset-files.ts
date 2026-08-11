@@ -1,6 +1,14 @@
 import { z } from "zod";
 
-import { GlbValidationError, validateGlbStructure } from "./glb-validation";
+import {
+  GlbValidationError,
+  rigStageGlbSafetyPolicy,
+  validateGlbSafety,
+} from "./glb-validation";
+import {
+  ImageStructureError,
+  validateImageStructure,
+} from "./image-validation";
 
 export const assetFileKindSchema = z.enum(["source", "model"]);
 export const assetSourceContentTypeSchema = z.enum([
@@ -12,7 +20,7 @@ export const assetModelContentType = "model/gltf-binary" as const;
 
 export const assetFileLimits = {
   source: 10 * 1024 * 1024,
-  model: 25 * 1024 * 1024,
+  model: rigStageGlbSafetyPolicy.maxBytes,
 } as const;
 
 export type AssetFileKind = z.infer<typeof assetFileKindSchema>;
@@ -30,42 +38,41 @@ export class AssetFileValidationError extends Error {
   }
 }
 
-function bytesEqual(
-  bytes: Uint8Array,
-  offset: number,
-  expected: readonly number[],
-): boolean {
-  return expected.every((value, index) => bytes[offset + index] === value);
-}
-
 function inferImageContentType(
   bytes: Uint8Array,
 ): AssetSourceContentType | null {
-  if (
-    bytes.length >= 8 &&
-    bytesEqual(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  ) {
-    return "image/png";
+  try {
+    return validateImageStructure(bytes);
+  } catch (error) {
+    if (error instanceof ImageStructureError) {
+      return null;
+    }
+    throw error;
   }
-  if (bytes.length >= 3 && bytesEqual(bytes, 0, [0xff, 0xd8, 0xff])) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 12 &&
-    bytesEqual(bytes, 0, [0x52, 0x49, 0x46, 0x46]) &&
-    bytesEqual(bytes, 8, [0x57, 0x45, 0x42, 0x50])
-  ) {
-    return "image/webp";
-  }
-  return null;
 }
 
 function validateGlb(bytes: Uint8Array): void {
   try {
-    validateGlbStructure(bytes);
+    validateGlbSafety(bytes, rigStageGlbSafetyPolicy);
   } catch (error) {
     if (error instanceof GlbValidationError) {
-      throw new AssetFileValidationError(error.message, error.code);
+      const publicMessage: Record<GlbValidationError["code"], string> = {
+        GLB_DIMENSIONS_EXCEEDED:
+          "GLB 幾何尺寸超出安全限制。 / The GLB geometry exceeds the safe dimension limit.",
+        GLB_EXTERNAL_URI:
+          "GLB 必須自包含，不可引用外部檔案。 / The GLB must be self-contained and cannot reference external files.",
+        GLB_HEADER_INVALID:
+          "GLB 檔案格式無效。 / The GLB file format is invalid.",
+        GLB_LENGTH_MISMATCH:
+          "GLB 檔案不完整或長度資料不一致。 / The GLB is incomplete or its length metadata does not match.",
+        GLB_POLYGON_LIMIT_EXCEEDED:
+          "GLB 三角形數量超出安全限制。 / The GLB triangle count exceeds the safe limit.",
+        GLB_STRUCTURE_INVALID:
+          "GLB 結構無效或不受支援。 / The GLB structure is invalid or unsupported.",
+        GLB_TEXTURE_LIMIT_EXCEEDED:
+          "GLB 貼圖數量或大小超出安全限制。 / The GLB texture count or size exceeds the safe limit.",
+      };
+      throw new AssetFileValidationError(publicMessage[error.code], error.code);
     }
     throw error;
   }
@@ -94,8 +101,8 @@ export function validateAssetFileBytes(
   if (bytes.byteLength === 0 || bytes.byteLength > assetFileLimits[kind]) {
     throw new AssetFileValidationError(
       kind === "source"
-        ? "來源圖片必須小於或等於 10 MiB。"
-        : "GLB 模型必須小於或等於 25 MiB。",
+        ? "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller."
+        : "GLB 模型必須小於或等於 25 MiB。 / The GLB model must be 25 MiB or smaller.",
     );
   }
 
@@ -106,7 +113,7 @@ export function validateAssetFileBytes(
       declaredContentType.toLowerCase() !== inferredContentType
     ) {
       throw new AssetFileValidationError(
-        "來源圖片的格式或檔頭無效；只接受 JPEG、PNG 或 WebP。",
+        "來源圖片必須是完整、靜態且符合安全尺寸的 JPEG、PNG 或 WebP。 / The source image must be a complete, static JPEG, PNG, or WebP within the safe dimensions.",
       );
     }
     return inferredContentType;
@@ -116,7 +123,9 @@ export function validateAssetFileBytes(
     declaredContentType.toLowerCase() !== assetModelContentType &&
     declaredContentType.toLowerCase() !== "application/octet-stream"
   ) {
-    throw new AssetFileValidationError("模型必須使用 GLB 格式。");
+    throw new AssetFileValidationError(
+      "模型必須使用 GLB 格式。 / The model must use the GLB format.",
+    );
   }
   validateGlb(bytes);
   return assetModelContentType;

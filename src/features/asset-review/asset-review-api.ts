@@ -17,6 +17,11 @@ import {
   type GenerationJobStartInput,
 } from "../../shared/domain/generation-jobs";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import {
+  assetFileKindHeader,
+  assetTargetHeader,
+} from "../../shared/lib/asset-target";
+import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
 const apiErrorSchema = z.object({
   error: z.object({
@@ -29,11 +34,45 @@ export class AssetReviewApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message = code,
+    message = "暫時無法完成素材審核操作。 / Unable to complete the asset review operation right now.",
   ) {
     super(message);
     this.name = "AssetReviewApiError";
   }
+}
+
+type GenerationRequestLeaseInput = {
+  assetId: string;
+  expectedVersion: number;
+  workspaceId: string;
+};
+
+export type GenerationRequestLease = GenerationRequestLeaseInput & {
+  idempotencyKey: string;
+};
+
+export function acquireGenerationRequestLease(
+  current: GenerationRequestLease | null,
+  input: GenerationRequestLeaseInput,
+  createKey: () => string = () => crypto.randomUUID(),
+): GenerationRequestLease {
+  if (
+    current?.workspaceId === input.workspaceId &&
+    current.assetId === input.assetId &&
+    current.expectedVersion === input.expectedVersion
+  ) {
+    return current;
+  }
+
+  return { ...input, idempotencyKey: createKey() };
+}
+
+export function shouldRetainGenerationRequestLease(error: unknown): boolean {
+  if (!(error instanceof AssetReviewApiError)) {
+    return true;
+  }
+
+  return error.status >= 500 && error.code !== "GENERATION_START_FAILED";
 }
 
 async function apiError(response: Response): Promise<AssetReviewApiError> {
@@ -76,14 +115,13 @@ export async function fetchAssetReview(
   workspaceId: string,
   assetId: string,
 ): Promise<AssetReviewItem> {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -97,15 +135,13 @@ export async function updateAssetReview(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/review`,
-    {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(mutation),
-    },
-  );
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/review", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(mutation),
+  });
 
   if (!response.ok) {
     throw await apiError(response);
@@ -125,15 +161,13 @@ export async function createAssetFromSource(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", uploadContentType("source", file));
-  const response = await apiFetch(
-    `/api/catalogue/${encodeURIComponent(partId)}/assets/source`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers,
-      body: file,
-    },
-  );
+  headers.set(cataloguePartTargetHeader, partId);
+  const response = await apiFetch("/api/catalogue/part/source", {
+    method: "POST",
+    credentials: "same-origin",
+    headers,
+    body: file,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -149,16 +183,15 @@ export async function uploadAssetFile(
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", uploadContentType(kind, file));
+  headers.set(assetFileKindHeader, kind);
+  headers.set(assetTargetHeader, assetId);
   headers.set("x-rigstage-expected-version", String(expectedVersion));
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/files/${kind}`,
-    {
-      method: "PUT",
-      credentials: "same-origin",
-      headers,
-      body: file,
-    },
-  );
+  const response = await apiFetch("/api/assets/item/file", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers,
+    body: file,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -171,14 +204,14 @@ export async function fetchAssetFileBlob(
   assetId: string,
   kind: AssetFileKind,
 ): Promise<Blob> {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/files/${kind}`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetFileKindHeader, kind);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/file", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -190,14 +223,13 @@ export async function fetchGenerationJobs(
   workspaceId: string,
   assetId: string,
 ) {
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
-    {
-      credentials: "same-origin",
-      headers: workspaceHeaders(workspaceId),
-      signal,
-    },
-  );
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/generation-jobs", {
+    credentials: "same-origin",
+    headers,
+    signal,
+  });
   if (!response.ok) {
     throw await apiError(response);
   }
@@ -208,19 +240,18 @@ export async function startGenerationJob(
   workspaceId: string,
   assetId: string,
   input: GenerationJobStartInput,
+  idempotencyKey: string,
 ): Promise<GenerationJob> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", "application/json");
-  headers.set("idempotency-key", crypto.randomUUID());
-  const response = await apiFetch(
-    `/api/assets/${encodeURIComponent(assetId)}/generation-jobs`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(input),
-    },
-  );
+  headers.set("idempotency-key", idempotencyKey);
+  headers.set(assetTargetHeader, assetId);
+  const response = await apiFetch("/api/assets/item/generation-jobs", {
+    method: "POST",
+    credentials: "same-origin",
+    headers,
+    body: JSON.stringify(input),
+  });
   if (!response.ok) {
     throw await apiError(response);
   }

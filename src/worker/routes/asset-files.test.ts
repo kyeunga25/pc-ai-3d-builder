@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
+import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import type { RequestContext } from "../auth/workspace";
+import { sha256Hex } from "../lib/digest";
 import { createD1Stub } from "../test/d1-stub";
 import {
   assetFileResponse,
@@ -28,22 +32,12 @@ function context(role: WorkspaceRole = "owner"): RequestContext {
   };
 }
 
-function minimalGlb(): Uint8Array {
-  const rawJson = new TextEncoder().encode(
-    JSON.stringify({ asset: { version: "2.0" }, scenes: [{}], scene: 0 }),
-  );
-  const paddedLength = Math.ceil(rawJson.byteLength / 4) * 4;
-  const bytes = new Uint8Array(20 + paddedLength);
-  bytes.set([0x67, 0x6c, 0x54, 0x46]);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(4, 2, true);
-  view.setUint32(8, bytes.byteLength, true);
-  view.setUint32(12, paddedLength, true);
-  view.setUint32(16, 0x4e4f534a, true);
-  bytes.fill(0x20, 20);
-  bytes.set(rawJson, 20);
-  return bytes;
-}
+const minimalSource = createSyntheticSourcePng();
+const minimalSourceSha256 = await sha256Hex(minimalSource);
+const minimalSourceDigest = await crypto.subtle.digest(
+  "SHA-256",
+  minimalSource,
+);
 
 function assetRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -63,8 +57,8 @@ function assetRow(overrides: Record<string, unknown> = {}) {
     review_version: 0,
     source_object_key: "private/source-fixture",
     source_content_type: "image/png",
-    source_size_bytes: 8,
-    source_sha256: "a".repeat(64),
+    source_size_bytes: minimalSource.byteLength,
+    source_sha256: minimalSourceSha256,
     model_object_key: null,
     model_content_type: null,
     model_size_bytes: null,
@@ -73,24 +67,55 @@ function assetRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createR2Stub(initial: Array<{ key: string; bytes: Uint8Array }> = []) {
-  const objects = new Map(initial.map(({ key, bytes }) => [key, bytes]));
+function createR2Stub(
+  initial: Array<{
+    key: string;
+    bytes: Uint8Array;
+    contentType?: string;
+    sha256?: ArrayBuffer;
+  }> = [],
+) {
+  const objects = new Map(
+    initial.map(({ key, bytes, contentType, sha256 }) => [
+      key,
+      { bytes, contentType, sha256 },
+    ]),
+  );
   const puts: string[] = [];
+  const putChecksums: Array<R2PutOptions["sha256"]> = [];
+  const materializedReads: string[] = [];
   const deletes: string[] = [];
   const bucket = {
-    async put(key: string, value: Uint8Array) {
+    async put(key: string, value: Uint8Array, options?: R2PutOptions) {
       puts.push(key);
-      objects.set(key, value);
+      putChecksums.push(options?.sha256);
+      const metadata = options?.httpMetadata;
+      objects.set(key, {
+        bytes: value,
+        contentType:
+          metadata instanceof Headers
+            ? (metadata.get("content-type") ?? undefined)
+            : metadata?.contentType,
+        sha256: undefined,
+      });
       return { key };
     },
     async get(key: string) {
-      const bytes = objects.get(key);
-      if (!bytes) {
+      const object = objects.get(key);
+      if (!object) {
         return null;
       }
       return {
-        body: new Response(bytes.buffer as ArrayBuffer).body,
-        size: bytes.byteLength,
+        body: new Response(object.bytes.buffer as ArrayBuffer).body,
+        arrayBuffer: async () => {
+          materializedReads.push(key);
+          return object.bytes.slice().buffer;
+        },
+        checksums: object.sha256 ? { sha256: object.sha256 } : {},
+        size: object.bytes.byteLength,
+        httpMetadata: object.contentType
+          ? { contentType: object.contentType }
+          : undefined,
       };
     },
     async delete(key: string) {
@@ -98,7 +123,7 @@ function createR2Stub(initial: Array<{ key: string; bytes: Uint8Array }> = []) {
       objects.delete(key);
     },
   } as unknown as R2Bucket;
-  return { bucket, deletes, objects, puts };
+  return { bucket, deletes, materializedReads, objects, putChecksums, puts };
 }
 
 describe("private asset routes", () => {
@@ -106,15 +131,16 @@ describe("private asset routes", () => {
     const { calls, db } = createD1Stub({
       firstResults: [{ id: "part-fixture" }, null, assetRow()],
     });
-    const { bucket, puts } = createR2Stub();
-    const source = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]);
+    const { bucket, putChecksums, puts } = createR2Stub();
+    const source = minimalSource;
     const request = new Request(
-      "https://app.example/api/catalogue/part-fixture/assets/source",
+      "https://app.example/api/catalogue/part/source",
       {
         method: "POST",
-        headers: { "content-type": "image/png" },
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
         body: source.buffer as ArrayBuffer,
       },
     );
@@ -124,7 +150,6 @@ describe("private asset routes", () => {
       db,
       bucket,
       context("staff"),
-      "part-fixture",
       "request-fixture",
     );
 
@@ -132,11 +157,15 @@ describe("private asset routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       id: "asset-fixture",
       files: {
-        source: { contentType: "image/png", sizeBytes: 8 },
+        source: {
+          contentType: "image/png",
+          sizeBytes: minimalSource.byteLength,
+        },
         model: null,
       },
     });
     expect(puts).toHaveLength(1);
+    expect(putChecksums[0]).toEqual(new Uint8Array(minimalSourceDigest));
     const auditCall = calls.find((call) =>
       call.sql.includes("asset.file.source.create"),
     );
@@ -148,10 +177,13 @@ describe("private asset routes", () => {
     const { calls, db } = createD1Stub();
     const { bucket, puts } = createR2Stub();
     const request = new Request(
-      "https://app.example/api/catalogue/part-fixture/assets/source",
+      "https://app.example/api/catalogue/part/source",
       {
         method: "POST",
-        headers: { "content-type": "image/png" },
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
         body: new Uint8Array([0x89]).buffer as ArrayBuffer,
       },
     );
@@ -162,7 +194,6 @@ describe("private asset routes", () => {
         db,
         bucket,
         context("viewer"),
-        "part-fixture",
         "request-fixture",
       ),
     ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN" });
@@ -170,8 +201,81 @@ describe("private asset routes", () => {
     expect(puts).toHaveLength(0);
   });
 
+  it.each([null, "../../escape"])(
+    "rejects a missing or malformed catalogue target before body, D1 or R2 work: %s",
+    async (partId) => {
+      const { calls, db } = createD1Stub();
+      const { bucket, puts } = createR2Stub();
+      const headers = new Headers({ "content-type": "image/png" });
+      if (partId !== null) {
+        headers.set("x-rigstage-catalogue-part-id", partId);
+      }
+      const request = new Request(
+        "https://app.example/api/catalogue/part/source",
+        {
+          method: "POST",
+          headers,
+          body: minimalSource.buffer as ArrayBuffer,
+        },
+      );
+
+      await expect(
+        createAssetSourceResponse(
+          request,
+          db,
+          bucket,
+          context("staff"),
+          "request-target-fixture",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "CATALOGUE_PART_NOT_FOUND",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(puts).toHaveLength(0);
+    },
+  );
+
+  it("rejects a signature-only source before private storage or mutation", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [{ id: "part-fixture" }, null],
+    });
+    const { bucket, puts } = createR2Stub();
+    const request = new Request(
+      "https://app.example/api/catalogue/part/source",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-catalogue-part-id": "part-fixture",
+        },
+        body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+          .buffer as ArrayBuffer,
+      },
+    );
+
+    await expect(
+      createAssetSourceResponse(
+        request,
+        db,
+        bucket,
+        context("staff"),
+        "request-invalid-source",
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "VALIDATION_ERROR",
+      message: expect.stringMatching(/完整.*complete/iu),
+    });
+    expect(puts).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
   it("uploads a GLB with an optimistic version and removes the replaced object", async () => {
-    const glb = minimalGlb();
+    const glb = createSyntheticDraftGlb();
     const updated = assetRow({
       review_version: 1,
       model_object_key: "private/new-model",
@@ -188,25 +292,22 @@ describe("private asset routes", () => {
     const { bucket, deletes, puts } = createR2Stub([
       { key: "private/old-model", bytes: glb },
     ]);
-    const request = new Request(
-      "https://app.example/api/assets/asset-fixture/files/model",
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "model/gltf-binary",
-          "x-rigstage-expected-version": "0",
-        },
-        body: glb.buffer as ArrayBuffer,
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "PUT",
+      headers: {
+        "content-type": "model/gltf-binary",
+        "x-rigstage-asset-file-kind": "model",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-expected-version": "0",
       },
-    );
+      body: glb.buffer as ArrayBuffer,
+    });
 
     const response = await assetFileUploadResponse(
       request,
       db,
       bucket,
       context(),
-      "asset-fixture",
-      "model",
       "request-fixture",
     );
 
@@ -228,29 +329,319 @@ describe("private asset routes", () => {
     ).toContain("changes() = 1");
   });
 
-  it("streams a private file only after a workspace-scoped asset lookup", async () => {
-    const source = new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  it("rejects a viewer replacement before target, body, D1 or R2 work", async () => {
+    const { calls, db } = createD1Stub();
+    const { bucket, puts } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "PUT",
+      headers: { "content-type": "image/png" },
+      body: new Uint8Array([0x89]).buffer as ArrayBuffer,
+    });
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context("viewer"),
+        "request-viewer-file",
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "ROLE_FORBIDDEN",
+      message: expect.stringMatching(/無權上載.+cannot upload/iu),
+    });
+    expect(request.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(puts).toHaveLength(0);
+  });
+
+  it.each([
+    { assetId: null, kind: "source" },
+    { assetId: "../../escape", kind: "source" },
+    { assetId: "asset-fixture", kind: null },
+    { assetId: "asset-fixture", kind: "thumbnail" },
+  ])(
+    "rejects a malformed upload target before body, D1 or R2: $assetId/$kind",
+    async ({ assetId, kind }) => {
+      const { calls, db } = createD1Stub();
+      const { bucket, puts } = createR2Stub();
+      const headers = new Headers({ "content-type": "image/png" });
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      if (kind !== null) headers.set("x-rigstage-asset-file-kind", kind);
+      const request = new Request("https://app.example/api/assets/item/file", {
+        method: "PUT",
+        headers,
+        body: new Uint8Array([0x89]).buffer as ArrayBuffer,
+      });
+
+      await expect(
+        assetFileUploadResponse(
+          request,
+          db,
+          bucket,
+          context("staff"),
+          "request-target-file",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_NOT_FOUND",
+        message: "找不到所要求的素材。 / The requested asset was not found.",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(puts).toHaveLength(0);
+    },
+  );
+
+  it("rejects an oversized replacement before private storage or mutation", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [assetRow()] });
+    const { bucket, deletes, puts } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "PUT",
+      headers: {
+        "content-length": String(assetFileLimits.source + 1),
+        "content-type": "image/png",
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-expected-version": "0",
+      },
+      body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+        .buffer as ArrayBuffer,
+    });
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context("staff"),
+        "request-oversized",
+      ),
+    ).rejects.toMatchObject({ status: 413, code: "PAYLOAD_TOO_LARGE" });
+    expect(puts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("locks an approved asset before reading or storing its replacement", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [assetRow({ status: "approved", quality: "approved" })],
+    });
+    const { bucket, deletes, puts } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "PUT",
+      headers: {
+        "content-length": String(assetFileLimits.source + 1),
+        "content-type": "image/png",
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-expected-version": "0",
+      },
+      body: new Uint8Array([0x89]).buffer as ArrayBuffer,
+    });
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context(),
+        "request-approved",
+      ),
+    ).rejects.toMatchObject({ status: 409, code: "ASSET_LOCKED" });
+    expect(puts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("removes only the new object when an optimistic update loses a race", async () => {
+    const source = minimalSource;
+    const current = assetRow({ source_object_key: "private/old-source" });
+    const { db } = createD1Stub({
+      batchChanges: 0,
+      firstResults: [current, current],
+    });
+    const { bucket, deletes, objects, puts } = createR2Stub([
+      { key: "private/old-source", bytes: source },
     ]);
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "PUT",
+      headers: {
+        "content-type": "image/png",
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-expected-version": "0",
+      },
+      body: source.buffer as ArrayBuffer,
+    });
+
+    await expect(
+      assetFileUploadResponse(
+        request,
+        db,
+        bucket,
+        context("admin"),
+        "request-race",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_VERSION_CONFLICT",
+    });
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).not.toBe("private/old-source");
+    expect(deletes).toEqual([puts[0]]);
+    expect(objects.has("private/old-source")).toBe(true);
+    expect(objects.has(puts[0]!)).toBe(false);
+  });
+
+  it("streams a private file only after a workspace-scoped asset lookup", async () => {
+    const source = minimalSource;
     const { calls, db } = createD1Stub({
       firstResults: [assetRow()],
     });
-    const { bucket } = createR2Stub([
-      { key: "private/source-fixture", bytes: source },
+    const { bucket, materializedReads } = createR2Stub([
+      {
+        key: "private/source-fixture",
+        bytes: source,
+        contentType: "image/png",
+        sha256: minimalSourceDigest,
+      },
     ]);
 
+    const request = new Request("https://app.example/api/assets/item/file", {
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+      },
+    });
     const response = await assetFileResponse(
+      request,
       db,
       bucket,
       context("viewer"),
-      "asset-fixture",
-      "source",
     );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect((await response.arrayBuffer()).byteLength).toBe(8);
+    expect(response.headers.get("content-disposition")).toBe(
+      'inline; filename="source.png"',
+    );
+    expect(JSON.stringify([...response.headers])).not.toContain(
+      "private/source-fixture",
+    );
+    expect((await response.arrayBuffer()).byteLength).toBe(
+      minimalSource.byteLength,
+    );
+    expect(materializedReads).toEqual([]);
     expect(calls[0]?.values).toEqual(["workspace-fixture", "asset-fixture"]);
+  });
+
+  it.each([
+    { assetId: null, kind: "source" },
+    { assetId: "../../escape", kind: "source" },
+    { assetId: "asset-fixture", kind: null },
+    { assetId: "asset-fixture", kind: "thumbnail" },
+  ])(
+    "rejects a malformed read target before D1 or R2: $assetId/$kind",
+    async ({ assetId, kind }) => {
+      const { calls, db } = createD1Stub();
+      const { bucket, materializedReads } = createR2Stub();
+      const headers = new Headers();
+      if (assetId !== null) headers.set("x-rigstage-asset-id", assetId);
+      if (kind !== null) headers.set("x-rigstage-asset-file-kind", kind);
+      const request = new Request("https://app.example/api/assets/item/file", {
+        headers,
+      });
+
+      await expect(
+        assetFileResponse(request, db, bucket, context("viewer")),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "ASSET_FILE_NOT_FOUND",
+      });
+      expect(calls).toHaveLength(0);
+      expect(materializedReads).toHaveLength(0);
+    },
+  );
+
+  it.each([
+    {
+      label: "source size",
+      kind: "source",
+      row: assetRow(),
+      stored: {
+        key: "private/source-fixture",
+        bytes: new Uint8Array(7),
+        contentType: "image/png",
+      },
+    },
+    {
+      label: "source checksum",
+      kind: "source",
+      row: assetRow(),
+      stored: {
+        key: "private/source-fixture",
+        bytes: minimalSource,
+        contentType: "image/png",
+        sha256: new Uint8Array(32).fill(0xff).buffer,
+      },
+    },
+    {
+      label: "model content type",
+      kind: "model",
+      row: assetRow({
+        model_object_key: "private/model-fixture",
+        model_content_type: "model/gltf-binary",
+        model_size_bytes: 8,
+        model_sha256: "b".repeat(64),
+      }),
+      stored: {
+        key: "private/model-fixture",
+        bytes: new Uint8Array(8),
+        contentType: "application/octet-stream",
+      },
+    },
+  ])("rejects a private $label mismatch", async ({ kind, row, stored }) => {
+    const { calls, db } = createD1Stub({ firstResults: [row] });
+    const { bucket } = createR2Stub([stored]);
+    const request = new Request("https://app.example/api/assets/item/file", {
+      headers: {
+        "x-rigstage-asset-file-kind": kind,
+        "x-rigstage-asset-id": "asset-fixture",
+      },
+    });
+
+    await expect(
+      assetFileResponse(request, db, bucket, context("viewer")),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("keeps an R2 read failure as an operational error", async () => {
+    const storageError = new Error("synthetic R2 read failure");
+    const { db } = createD1Stub({ firstResults: [assetRow()] });
+    const bucket = {
+      async get() {
+        throw storageError;
+      },
+    } as unknown as R2Bucket;
+    const request = new Request("https://app.example/api/assets/item/file", {
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+      },
+    });
+
+    await expect(
+      assetFileResponse(request, db, bucket, context("viewer")),
+    ).rejects.toBe(storageError);
   });
 });

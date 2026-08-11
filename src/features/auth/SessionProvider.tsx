@@ -3,21 +3,22 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useState,
 } from "react";
 
-import {
-  sessionResponseSchema,
-  type SessionResponse,
-} from "../../shared/domain/session";
-import { apiFetch } from "../../shared/lib/api-fetch";
+import { sessionResponseSchema } from "../../shared/domain/session";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import {
   SessionContext,
   type SessionContextValue,
   type SessionError,
-  type SessionState,
 } from "./session-context";
+import { fetchSession, selectWorkspaceSession } from "./session-api";
+import {
+  createSessionControllerState,
+  sessionControllerReducer,
+} from "./session-state";
 
 const mockSession = sessionResponseSchema.parse({
   user: {
@@ -45,36 +46,6 @@ const mockSession = sessionResponseSchema.parse({
   ],
 });
 
-async function fetchSession(
-  signal: AbortSignal,
-  workspaceId: string | null,
-): Promise<SessionResponse> {
-  const headers = new Headers({ accept: "application/json" });
-
-  if (workspaceId) {
-    headers.set("x-rigstage-workspace-id", workspaceId);
-  }
-
-  const response = await apiFetch("/api/session", {
-    credentials: "same-origin",
-    headers,
-    signal,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { code?: unknown };
-    } | null;
-    const code =
-      typeof body?.error?.code === "string"
-        ? body.error.code
-        : "SESSION_UNAVAILABLE";
-    throw { status: response.status, code } satisfies SessionError;
-  }
-
-  return sessionResponseSchema.parse(await response.json());
-}
-
 function isSessionError(value: unknown): value is SessionError {
   return (
     typeof value === "object" &&
@@ -86,74 +57,126 @@ function isSessionError(value: unknown): value is SessionError {
   );
 }
 
+type SessionRequest =
+  | { kind: "load"; requestId: number }
+  | {
+      kind: "workspace-selection";
+      requestId: number;
+      targetWorkspaceId: string;
+    };
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const isLocalPreview = import.meta.env.DEV || isPublicDemoPath();
-  const [reloadToken, setReloadToken] = useState(0);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
-    null,
+  const [controller, dispatch] = useReducer(
+    sessionControllerReducer,
+    createSessionControllerState(
+      isLocalPreview
+        ? { status: "authenticated", session: mockSession, error: null }
+        : { status: "loading", session: null, error: null },
+    ),
   );
-  const [state, setState] = useState<SessionState>(() =>
-    isLocalPreview
-      ? { status: "authenticated", session: mockSession, error: null }
-      : { status: "loading", session: null, error: null },
-  );
+  const [request, setRequest] = useState<SessionRequest>({
+    kind: "load",
+    requestId: 0,
+  });
   const reload = useCallback(() => {
     if (isLocalPreview) {
-      setState({ status: "authenticated", session: mockSession, error: null });
+      dispatch({ type: "session-load-succeeded", session: mockSession });
       return;
     }
 
-    setState({ status: "loading", session: null, error: null });
-    setSelectedWorkspaceId(null);
-    setReloadToken((token) => token + 1);
+    dispatch({ type: "session-load-started" });
+    setRequest((current) => ({
+      kind: "load",
+      requestId: current.requestId + 1,
+    }));
   }, [isLocalPreview]);
   const selectWorkspace = useCallback(
     (workspaceId: string) => {
-      if (isLocalPreview) {
+      if (
+        isLocalPreview ||
+        controller.sessionState.status !== "authenticated" ||
+        controller.workspaceSelection.status === "switching" ||
+        workspaceId === controller.sessionState.session.currentWorkspace.id
+      ) {
         return;
       }
 
-      setState({ status: "loading", session: null, error: null });
-      setSelectedWorkspaceId(workspaceId);
+      dispatch({
+        type: "workspace-selection-started",
+        targetWorkspaceId: workspaceId,
+      });
+      setRequest((current) => ({
+        kind: "workspace-selection",
+        requestId: current.requestId + 1,
+        targetWorkspaceId: workspaceId,
+      }));
     },
-    [isLocalPreview],
+    [controller, isLocalPreview],
   );
+  const dismissWorkspaceSelectionError = useCallback(() => {
+    dispatch({ type: "workspace-selection-dismissed" });
+  }, []);
 
   useEffect(() => {
     if (isLocalPreview) {
       return;
     }
 
-    const controller = new AbortController();
+    const abortController = new AbortController();
 
-    void fetchSession(controller.signal, selectedWorkspaceId)
+    const sessionRequest =
+      request.kind === "workspace-selection"
+        ? selectWorkspaceSession(
+            abortController.signal,
+            request.targetWorkspaceId,
+          )
+        : fetchSession(abortController.signal);
+
+    void sessionRequest
       .then((session) => {
-        setState({ status: "authenticated", session, error: null });
+        if (abortController.signal.aborted) {
+          return;
+        }
+        dispatch({
+          type:
+            request.kind === "workspace-selection"
+              ? "workspace-selection-succeeded"
+              : "session-load-succeeded",
+          session,
+        });
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) {
+        if (abortController.signal.aborted) {
           return;
         }
 
         const sessionError = isSessionError(error)
           ? error
           : { status: 0, code: "SESSION_UNAVAILABLE" };
-        setState({
-          status:
-            sessionError.status === 401 || sessionError.status === 403
-              ? "denied"
-              : "error",
-          session: null,
-          error: sessionError,
-        });
+        dispatch(
+          request.kind === "workspace-selection"
+            ? {
+                type: "workspace-selection-failed",
+                targetWorkspaceId: request.targetWorkspaceId,
+                error: sessionError,
+              }
+            : { type: "session-load-failed", error: sessionError },
+        );
       });
 
-    return () => controller.abort();
-  }, [isLocalPreview, reloadToken, selectedWorkspaceId]);
+    return () => abortController.abort();
+  }, [isLocalPreview, request]);
 
   const value = useMemo<SessionContextValue>(
-    () => ({ ...state, reload, selectWorkspace }),
-    [reload, selectWorkspace, state],
+    () => ({
+      ...controller.sessionState,
+      workspaceSelection: controller.workspaceSelection,
+      dismissWorkspaceSelectionError,
+      reload,
+      selectWorkspace,
+    }),
+    [controller, dismissWorkspaceSelectionError, reload, selectWorkspace],
   );
 
   return (

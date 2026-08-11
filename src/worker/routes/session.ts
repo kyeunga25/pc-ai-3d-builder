@@ -1,4 +1,7 @@
-import type { RequestContext } from "../auth/workspace";
+import {
+  persistWorkspaceSelection,
+  type RequestContext,
+} from "../auth/workspace";
 
 const sessionHeaders = { "cache-control": "no-store" } as const;
 
@@ -14,4 +17,13 @@ export function workspacesResponse(context: RequestContext): Response {
     },
     { headers: sessionHeaders },
   );
+}
+
+export async function workspaceSelectionResponse(
+  db: D1Database,
+  context: RequestContext,
+  accessSubject: string,
+): Promise<Response> {
+  await persistWorkspaceSelection(db, context, accessSubject);
+  return sessionResponse(context);
 }
