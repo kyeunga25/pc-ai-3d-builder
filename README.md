@@ -6,7 +6,12 @@ RigStage 是以香港繁體中文為主的電腦商戶 3D 組裝工作台。v1.1
 
 公開版本庫只描述可核對的程式行為、邏輯元件及自部署介面，不包含任何實際 hostname、Cloudflare account／resource identifier、Access policy 值、token、production 資料、私人資產或營運拓撲。由於可取得原始碼的人仍可閱讀程式及 migration，若連邏輯架構本身也屬機密，應使用私人版本庫及獨立的私人營運文檔。
 
-最新公開版本：`v1.1.0`。
+目前 source version：`v1.1.0`；最新 GitHub release：`v1.0.1`。Source、release、
+CI 及 production 狀態須分開核對。
+
+| 可用性 / Availability | 成熟度 / Maturity | 證據 / Evidence |
+| --- | --- | --- |
+| 邀請制工作區 / Invite-only workspace | 可用的人工審批 MVP；真實 AI provider 預設停用 / Human-review MVP; real AI provider disabled | [入口網站 / Overview](https://rigstage.k-y.cc) · [架構 / Architecture](docs/ARCHITECTURE.md) · [安全政策 / Security](SECURITY.md) · [版權 / Copyright](COPYRIGHT.md) |
 
 ## English summary
 
@@ -105,7 +110,7 @@ npm run local:ai:debug
 
 ## 自行部署（摘要）
 
-自部署會建立一套完全獨立的 Cloudflare 資源，不會複製 RigStage 的正式資料、用戶、Access policy 或部署座標。開始前請先確認你有權使用此原始碼；本版本庫目前未附帶授權條款，公開可讀不等於獲授權複製、修改或商用。
+自部署會建立一套完全獨立的 Cloudflare 資源，不會複製 RigStage 的正式資料、用戶、Access policy 或部署座標。開始前請先確認你有權使用此原始碼；本版本庫目前未授予開源授權，詳見 [`COPYRIGHT.md`](COPYRIGHT.md)。取得存取權不等於獲授權複製、修改或商用。
 
 1. 準備 Node.js 22.22 或以上版本、npm、Git、Cloudflare 帳戶，以及可設定 Cloudflare Access 的 hostname。
 2. Fork 或取得獲授權的 source copy，在新的工作目錄執行 `npm ci`，再完成下列品質檢查。
