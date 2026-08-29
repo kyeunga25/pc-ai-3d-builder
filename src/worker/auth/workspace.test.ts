@@ -138,7 +138,8 @@ describe("workspace scope resolution", () => {
       ),
     ).rejects.toMatchObject({ status: 403, code: "INVITE_REQUIRED" });
 
-    expect(queries[0]).toContain("WHERE status = 'active'");
+    expect(queries[0]).toContain("status = 'active' AND access_subject =");
+    expect(queries[0]).toContain("status IN ('active', 'invited')");
     expect(queries).toHaveLength(1);
     expect(writes).toHaveLength(0);
   });
@@ -167,6 +168,7 @@ describe("workspace scope resolution", () => {
     expect(queries[1]).toContain("wm.status = 'active'");
     expect(queries[1]).toContain("w.status = 'active'");
     expect(writes).toHaveLength(1);
+    expect(writes[0]?.sql).toContain("status = 'active'");
     expect(writes[0]?.values).toEqual([
       "access-pilot",
       "ws_beta",

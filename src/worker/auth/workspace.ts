@@ -103,11 +103,12 @@ export async function resolveRequestContext(
     .prepare(
       `SELECT id, email, access_subject, display_name, last_workspace_id
        FROM users
-       WHERE status = 'active'
-         AND (
-           access_subject = ?
-           OR (access_subject IS NULL AND lower(email) = ?)
-         )
+       WHERE (status = 'active' AND access_subject = ?)
+          OR (
+            status IN ('active', 'invited')
+            AND access_subject IS NULL
+            AND lower(email) = ?
+          )
        ORDER BY CASE WHEN access_subject = ? THEN 0 ELSE 1 END
        LIMIT 1`,
     )
@@ -149,9 +150,10 @@ export async function resolveRequestContext(
     const bindingResult = await db
       .prepare(
         `UPDATE users
-         SET access_subject = ?, last_workspace_id = ?,
+         SET access_subject = ?, status = 'active', last_workspace_id = ?,
              last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND access_subject IS NULL AND status = 'active'
+         WHERE id = ? AND access_subject IS NULL
+           AND status IN ('active', 'invited')
            AND EXISTS (
              SELECT 1
              FROM workspace_memberships AS wm

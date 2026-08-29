@@ -44,6 +44,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 
 ## Local development milestone
 
+- [x] Protected owner/admin workspace-member directory with bounded listing, D1 invitations, role changes, two-step suspension, optimistic versions and a database last-owner guard.
 - [x] Workspace-scoped, non-monetary generation capability accounts with reserve, settle and release transitions.
 - [x] One customer capability unit and a one-unit provider-cost ceiling per local synthetic job, without price, currency, purchase or payment semantics.
 - [x] Immutable provider-attempt records and stable provider idempotency references for duplicate, late, conflicting and out-of-order results.
@@ -57,7 +58,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 
 ## Explicit boundaries
 
-Local catalogue records, prices, stock, review assets, runtime simulation output and the builder fallback scene are synthetic UI fixtures. Production dashboard, catalogue, private-file, review, generation-job and build routes use workspace-scoped D1 and R2 records, but the repository contains no merchant records or generated models. Compatibility, selected approved-model preview and portable export are active. The synthetic adapter tests orchestration only and remains disabled in tracked production configuration. Capability credits are safety accounting only: they are not money, purchased usage or payment evidence. External provider generation, Workers AI automation, payment processing and multi-model 3D scene composition are neither v1.1 capabilities nor delivered by the local-development milestone.
+Local member identities, catalogue records, prices, stock, review assets, runtime simulation output and the builder fallback scene are synthetic UI fixtures. Production member, dashboard, catalogue, private-file, review, generation-job and build routes use workspace-scoped protected records, but the repository contains no merchant records, real identities or generated models. A D1 invitation does not update Cloudflare Access policy; exact-email Access admission remains a separate deployment-admin step. Compatibility, selected approved-model preview and portable export are active. The synthetic adapter tests orchestration only and remains disabled in tracked production configuration. Capability credits are safety accounting only: they are not money, purchased usage or payment evidence. External provider generation, Workers AI automation, payment processing and multi-model 3D scene composition are neither v1.1 capabilities nor delivered by the local-development milestone.
 
 ## Release checks
 

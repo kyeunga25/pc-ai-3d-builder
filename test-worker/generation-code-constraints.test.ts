@@ -78,7 +78,7 @@ describe("generation diagnostic code D1 constraints", () => {
       "SELECT value FROM rigstage_metadata WHERE key = 'schema_phase'",
     ).first<{ value: string }>();
 
-    expect(phase?.value).toBe("15");
+    expect(phase?.value).toBe("16");
   });
 
   it("rejects unsafe job, event and provider-attempt codes on insert and update", async () => {

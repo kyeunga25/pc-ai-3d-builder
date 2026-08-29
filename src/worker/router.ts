@@ -49,6 +49,11 @@ import {
   workspaceSelectionResponse,
   workspacesResponse,
 } from "./routes/session";
+import {
+  workspaceMemberInviteResponse,
+  workspaceMemberListResponse,
+  workspaceMemberUpdateResponse,
+} from "./routes/workspace-members";
 
 function apiNotFound(requestId: string): Response {
   return apiErrorResponse(
@@ -132,6 +137,17 @@ export async function routeRequest(
 
     if (url.pathname === "/api/dashboard") {
       return dashboardResponse(env.DB, context);
+    }
+
+    if (url.pathname === "/api/workspace/members") {
+      if (request.method === "GET") {
+        return workspaceMemberListResponse(env.DB, context);
+      }
+      return workspaceMemberInviteResponse(request, env.DB, context, requestId);
+    }
+
+    if (url.pathname === "/api/workspace/member") {
+      return workspaceMemberUpdateResponse(request, env.DB, context, requestId);
     }
 
     if (url.pathname === "/api/catalogue") {

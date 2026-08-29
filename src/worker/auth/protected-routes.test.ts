@@ -13,6 +13,7 @@ describe("protected workspace routes", () => {
   it.each([
     "/dashboard",
     "/dashboard/activity",
+    "/dashboard/members",
     "/catalogue",
     "/catalogue/part/example",
     "/asset-review",

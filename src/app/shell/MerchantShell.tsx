@@ -5,6 +5,7 @@ import {
   Gauge,
   LogOut,
   TriangleAlert,
+  UsersRound,
   Wrench,
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
@@ -23,10 +24,21 @@ import { isPublicDemoPath } from "../../shared/lib/demo-mode";
 import "./merchant-shell.css";
 
 const navigation = [
-  { to: "/dashboard", label: "儀表板", icon: Gauge },
-  { to: "/catalogue", label: "產品目錄", icon: Boxes },
-  { to: "/asset-review", label: "3D 素材審核", icon: Cuboid },
-  { to: "/builder", label: "電腦組裝", icon: Wrench },
+  { to: "/dashboard", label: "儀表板", icon: Gauge, managerOnly: false },
+  {
+    to: "/dashboard/members",
+    label: "成員管理",
+    icon: UsersRound,
+    managerOnly: true,
+  },
+  { to: "/catalogue", label: "產品目錄", icon: Boxes, managerOnly: false },
+  {
+    to: "/asset-review",
+    label: "3D 素材審核",
+    icon: Cuboid,
+    managerOnly: false,
+  },
+  { to: "/builder", label: "電腦組裝", icon: Wrench, managerOnly: false },
 ];
 
 const roleLabels: Record<WorkspaceRole, string> = {
@@ -109,18 +121,31 @@ export function MerchantShell() {
       <aside className="merchant-nav" aria-label="商戶導覽列">
         <div className="merchant-nav__title">商戶控制台</div>
         <nav>
-          {navigation.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `merchant-nav__link${isActive ? " is-active" : ""}`
-              }
-            >
-              <Icon aria-hidden="true" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+          {navigation
+            .filter(
+              ({ managerOnly }) =>
+                !managerOnly ||
+                currentWorkspace.role === "owner" ||
+                currentWorkspace.role === "admin",
+            )
+            .map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/dashboard"}
+                aria-label={
+                  to === "/dashboard/members"
+                    ? "成員管理 / Member management"
+                    : undefined
+                }
+                className={({ isActive }) =>
+                  `merchant-nav__link${isActive ? " is-active" : ""}`
+                }
+              >
+                <Icon aria-hidden="true" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
         </nav>
         <div className="merchant-nav__footer">
           <span>目前工作空間</span>

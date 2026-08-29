@@ -9,6 +9,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Cloudflare Access identity verification.
 - D1 workspace membership, catalogue, asset-review history, persistent build and audit schema.
 - Workspace-scoped dashboard, catalogue, asset-review and build APIs with bounded reads and mutation bodies.
+- Owner/admin workspace-member directory, D1 invitation, role update and two-step suspension with optimistic versions and a database last-owner guard.
 - Catalogue create, optimistic update, logical archive and transactional CSV import.
 - Private R2 source-image and GLB storage with protected Worker reads.
 - Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
@@ -20,6 +21,8 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 
 - Every protected server record is scoped to a verified workspace membership.
 - An Access subject may bind to one invited user only.
+- A D1 invitation never grants Cloudflare Access; deployment administrators maintain the exact-email Access Allow list separately.
+- Member management rejects self-management and role escalation, requires the current membership version, and cannot remove the final active owner.
 - Provider keys and Cloudflare deployment identifiers never reach the browser or Git.
 - Original images, generated models and render outputs remain private.
 - Browser responses never expose R2 object keys, checksums or permanent object URLs.
