@@ -109,7 +109,9 @@ WHERE id = (
 );
 
 UPDATE workspace_memberships
-SET role = 'owner', status = 'active', updated_at = CURRENT_TIMESTAMP
+SET role = 'owner', status = 'active',
+    record_version = record_version + 1,
+    updated_at = CURRENT_TIMESTAMP
 WHERE user_id = (SELECT id FROM users WHERE lower(email) = lower(${email}))
   AND workspace_id = (
     SELECT wm.workspace_id
@@ -121,7 +123,8 @@ WHERE user_id = (SELECT id FROM users WHERE lower(email) = lower(${email}))
       AND w.status = 'active'
     ORDER BY wm.created_at, wm.workspace_id
     LIMIT 1
-  );
+  )
+  AND (role <> 'owner' OR status <> 'active');
 
 INSERT INTO workspaces (id, slug, name, locale, currency, status)
 SELECT ${workspace}, ${slug}, 'RigStage Owner Beta', 'zh-Hant-HK', 'HKD', 'active'
@@ -155,6 +158,7 @@ WHERE w.id = ${workspace}
 ON CONFLICT(workspace_id, user_id) DO UPDATE SET
   role = 'owner',
   status = 'active',
+  record_version = workspace_memberships.record_version + 1,
   updated_at = CURRENT_TIMESTAMP;
 
 UPDATE users

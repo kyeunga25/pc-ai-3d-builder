@@ -28,7 +28,10 @@ const betaWorkspace = {
   role: "admin" as const,
 };
 
-function renderShell(workspaceSelection: WorkspaceSelectionState): string {
+function renderShell(
+  workspaceSelection: WorkspaceSelectionState,
+  role: "owner" | "staff" = "owner",
+): string {
   const value: SessionContextValue = {
     status: "authenticated",
     session: {
@@ -37,8 +40,8 @@ function renderShell(workspaceSelection: WorkspaceSelectionState): string {
         email: "shell-fixture@example.invalid",
         displayName: "Shell Fixture",
       },
-      currentWorkspace: alphaWorkspace,
-      workspaces: [alphaWorkspace, betaWorkspace],
+      currentWorkspace: { ...alphaWorkspace, role },
+      workspaces: [{ ...alphaWorkspace, role }, betaWorkspace],
     },
     error: null,
     workspaceSelection,
@@ -92,5 +95,17 @@ describe("MerchantShell workspace selection", () => {
     expect(markup).toContain("Switching to Beta Fixture");
     expect(markup).toMatch(/<select[^>]*disabled=""/u);
     expect(markup).not.toContain('role="alert"');
+  });
+
+  it("shows member management only to workspace managers", () => {
+    expect(
+      renderShell({ status: "idle", targetWorkspaceId: null, error: null }),
+    ).toContain('href="/dashboard/members"');
+    expect(
+      renderShell(
+        { status: "idle", targetWorkspaceId: null, error: null },
+        "staff",
+      ),
+    ).not.toContain('href="/dashboard/members"');
   });
 });

@@ -12,7 +12,7 @@
 - 首次登入只可把一個 Access subject 綁定至一個邀請。
 - JWT、cookie、電郵、實際資源名稱及平台識別資料不得進入 log 或 Git。
 
-Cloudflare Access 支援以 self-hosted application path 保護指定路徑。正式套用前，逐一確認以上工作台及 API 的 parent／deep route 均受邀請政策保護，`/` 與所需靜態資源只包含公開內容。Allow policy 只使用 owner 的精確 `Emails` selector；不得使用 `Everyone`、整個 email domain、廣泛 Bypass 或僅以 One-time PIN login method 作授權條件。
+Cloudflare Access 支援以 self-hosted application path 保護指定路徑。正式套用前，逐一確認以上工作台及 API 的 parent／deep route 均受邀請政策保護，`/` 與所需靜態資源只包含公開內容。Allow policy 只使用已明確邀請身份的精確 `Emails` selector；不得使用 `Everyone`、整個 email domain、廣泛 Bypass 或僅以 One-time PIN login method 作授權條件。
 
 `/api/health` 是唯一公開 API 例外。若 `/api` 與 `/api/*` 的 Access application 會涵蓋它，只可建立一個更精確、文件化的 `/api/health` public exception；不得擴大至其他 API path。Worker 的 health handler只回傳固定 service/status/request ID，不讀取 D1、身份或部署資料。
 
@@ -27,7 +27,7 @@ npx wrangler secret put TEAM_DOMAIN --config <ignored-config>
 npx wrangler secret put POLICY_AUD --config <ignored-config>
 ```
 
-`POLICY_AUD` 接受一個 Access application audience；若管理介面或部署程序必須把同一個私人產品邊界拆成多個 application，則以逗號分隔最多 16 個不重複 audience。Worker 會把它們當作明確 allowlist 交給 JWT 驗證器，空白項目、重複值、超額或過長值均 fail closed。每個 application 仍須使用相同的精確 owner policy；不要把實際 audience 寫入 Git、log 或 issue。
+`POLICY_AUD` 接受一個 Access application audience；若管理介面或部署程序必須把同一個私人產品邊界拆成多個 application，則以逗號分隔最多 16 個不重複 audience。Worker 會把它們當作明確 allowlist 交給 JWT 驗證器，空白項目、重複值、超額或過長值均 fail closed。每個 application 仍須使用相同的精確邀請電郵 Allow policy；不要把實際 audience 寫入 Git、log 或 issue。
 
 版本庫內的 `.env.example` 只有空值或文件用 placeholder。Workers Builds 使用 `npm run deploy:ci`，從平台提供的 Worker 名稱 override 及 Cloudflare build secrets 產生 `.wrangler/deploy.jsonc`；該檔案不會被 Git 追蹤。其他 CI 環境須以私密 build value 提供 `RIGSTAGE_WORKER_NAME`。
 
@@ -50,7 +50,7 @@ Cloudflare Workers Builds 連接 GitHub `main` 分支：
 npx wrangler d1 migrations apply DB --remote --config <ignored-config>
 ```
 
-邀請、workspace 及 membership 應透過受控的私人 onboarding 程序建立。不要把真實 ID、資源名稱、電郵或 SQL seed 提交到 Git。
+第一位 owner、workspace 及 membership 應透過受控的私人 onboarding 程序建立。之後 owner/admin 可在 `/dashboard/members` 建立 D1 邀請及管理成員資格；這個畫面不會修改 Access policy。部署管理員必須另行把同一電郵加入精確 Access Allow 名單，並在移除存取時同步撤回 Access Allow 與停用 D1 membership。不要把真實 ID、資源名稱、電郵或 SQL seed 提交到 Git。
 
 Repository 提供的通用工具只接受私密 environment input，不接受 identity command argument，也不輸出身份、SQL 或部署識別資料：
 
@@ -65,6 +65,7 @@ npm run owner:onboard
 ## 本地測試
 
 - `npm run dev` 使用合成 session，只供介面測試。
+- 本機 `/dashboard/members` 只使用清楚標示的合成成員資料，不會修改 Access 或遠端 D1。
 - Worker 測試覆蓋 JWT、未獲邀、workspace tampering、身份綁定競態及限流。
 - Migration 應先套用到空白臨時資料庫，再執行 `PRAGMA foreign_key_check`。
 - 不要在 production code 加入本地 bypass header。

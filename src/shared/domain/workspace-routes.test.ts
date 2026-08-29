@@ -13,6 +13,7 @@ describe("workspace routes", () => {
   it.each([
     "/dashboard",
     "/dashboard/activity",
+    "/dashboard/members",
     "/catalogue",
     "/catalogue/part/example",
     "/asset-review?asset=synthetic",
@@ -67,6 +68,7 @@ describe("workspace routes", () => {
 
   it.each([
     ["/dashboard/activity?member=private_user#recent", "/dashboard"],
+    ["/dashboard/members?member=private_user", "/dashboard"],
     ["/catalogue/part/private_part", "/catalogue"],
     [
       "/asset-review/draft/private_asset?workspace=private_workspace",

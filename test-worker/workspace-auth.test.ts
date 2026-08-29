@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+import type { WorkspaceRole } from "../src/shared/domain/session";
 import type { AccessIdentity } from "../src/worker/auth/access";
 import {
   persistWorkspaceSelection,
@@ -31,19 +32,23 @@ function identity(value: IdentityFixture): AccessIdentity {
   };
 }
 
-async function seedIdentity(value: IdentityFixture): Promise<void> {
+async function seedIdentity(
+  value: IdentityFixture,
+  userStatus: "active" | "invited" = "active",
+  role: WorkspaceRole = "owner",
+): Promise<void> {
   await env.DB.batch([
     env.DB.prepare(
       "INSERT INTO workspaces (id, slug, name) VALUES (?1, ?2, ?3)",
     ).bind(value.workspaceId, value.workspaceId, "Workspace Auth Fixture"),
     env.DB.prepare(
-      `INSERT INTO users (id, email, display_name)
-       VALUES (?1, ?2, ?3)`,
-    ).bind(value.userId, value.email, "Workspace Auth Fixture"),
+      `INSERT INTO users (id, email, display_name, status)
+       VALUES (?1, ?2, ?3, ?4)`,
+    ).bind(value.userId, value.email, "Workspace Auth Fixture", userStatus),
     env.DB.prepare(
       `INSERT INTO workspace_memberships (workspace_id, user_id, role)
-       VALUES (?1, ?2, 'owner')`,
-    ).bind(value.workspaceId, value.userId),
+       VALUES (?1, ?2, ?3)`,
+    ).bind(value.workspaceId, value.userId, role),
   ]);
 }
 
@@ -79,7 +84,7 @@ function databaseWithBeforeUserUpdate(
 describe("workspace identity runtime binding", () => {
   it("does not bind after membership revocation and recovers after reactivation", async () => {
     const target = fixture("membership-revocation");
-    await seedIdentity(target);
+    await seedIdentity(target, "invited", "staff");
     const racingDb = databaseWithBeforeUserUpdate(
       "SET access_subject =",
       async () => {
@@ -101,7 +106,7 @@ describe("workspace identity runtime binding", () => {
     });
     expect(
       await env.DB.prepare(
-        `SELECT access_subject, last_workspace_id, last_seen_at
+        `SELECT status, access_subject, last_workspace_id, last_seen_at
          FROM users WHERE id = ?1`,
       )
         .bind(target.userId)
@@ -110,6 +115,7 @@ describe("workspace identity runtime binding", () => {
       access_subject: null,
       last_workspace_id: null,
       last_seen_at: null,
+      status: "invited",
     });
 
     await env.DB.prepare(
@@ -122,11 +128,11 @@ describe("workspace identity runtime binding", () => {
       resolveRequestContext(env.DB, identity(target), target.workspaceId),
     ).resolves.toMatchObject({
       user: { id: target.userId },
-      currentWorkspace: { id: target.workspaceId, role: "owner" },
+      currentWorkspace: { id: target.workspaceId, role: "staff" },
     });
     expect(
       await env.DB.prepare(
-        `SELECT access_subject, last_workspace_id,
+        `SELECT status, access_subject, last_workspace_id,
                 last_seen_at IS NOT NULL AS has_last_seen
          FROM users WHERE id = ?1`,
       )
@@ -136,6 +142,7 @@ describe("workspace identity runtime binding", () => {
       access_subject: target.subject,
       last_workspace_id: target.workspaceId,
       has_last_seen: 1,
+      status: "active",
     });
   });
 

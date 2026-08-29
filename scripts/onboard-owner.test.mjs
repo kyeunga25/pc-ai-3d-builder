@@ -35,6 +35,7 @@ test("builds idempotent active owner onboarding SQL", () => {
   const sql = buildOwnerOnboardingSql(syntheticInput);
   assert.match(sql, /ON CONFLICT\(email\) DO UPDATE/u);
   assert.match(sql, /role = 'owner'/u);
+  assert.match(sql, /record_version = record_version \+ 1/u);
   assert.match(sql, /wm\.status = 'active'/u);
   assert.match(sql, /w\.status = 'active'/u);
   assert.match(sql, /AS onboarded/u);
@@ -87,10 +88,26 @@ test("executes idempotently across the complete D1 schema", async () => {
         creditUnits: 2,
       }),
     );
+    assert.throws(
+      () =>
+        database.exec("UPDATE workspace_memberships SET status = 'suspended'"),
+      /WORKSPACE_LAST_OWNER/u,
+    );
+    database.exec(`
+      INSERT INTO users (id, email, display_name, status)
+      VALUES ('user_synthetic_backup', 'backup@example.invalid',
+              'Synthetic Backup Owner', 'active');
+      INSERT INTO workspace_memberships (workspace_id, user_id, role, status)
+      VALUES ('workspace_synthetic', 'user_synthetic_backup',
+              'owner', 'active');
+      UPDATE workspace_memberships
+      SET status = 'suspended'
+      WHERE workspace_id = 'workspace_synthetic'
+        AND user_id = 'user_synthetic';
+    `);
     database.exec(`
       UPDATE users SET status = 'suspended'
       WHERE email = 'owner@example.invalid';
-      UPDATE workspace_memberships SET status = 'suspended';
       UPDATE workspaces SET status = 'suspended';
     `);
     database.exec(
@@ -105,6 +122,7 @@ test("executes idempotently across the complete D1 schema", async () => {
         creditUnits: 999,
       }),
     );
+    database.exec("DELETE FROM users WHERE id = 'user_synthetic_backup'");
 
     const result = database
       .prepare(
@@ -113,6 +131,7 @@ test("executes idempotently across the complete D1 schema", async () => {
           u.status AS user_status,
           wm.role,
           wm.status AS membership_status,
+          wm.record_version AS membership_version,
           w.status AS workspace_status,
           (SELECT COUNT(*) FROM users) AS user_count,
           (SELECT COUNT(*) FROM workspaces) AS workspace_count,
@@ -134,6 +153,7 @@ test("executes idempotently across the complete D1 schema", async () => {
         user_status: "active",
         role: "owner",
         membership_status: "active",
+        membership_version: 1,
         workspace_status: "active",
         user_count: 1,
         workspace_count: 1,

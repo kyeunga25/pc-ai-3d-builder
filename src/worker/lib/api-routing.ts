@@ -16,6 +16,14 @@ const routePolicies = new Map<string, ApiRoutePolicy>([
   ["/api/workspaces", { access: "protected", methods: ["GET"], allow: "GET" }],
   ["/api/dashboard", { access: "protected", methods: ["GET"], allow: "GET" }],
   [
+    "/api/workspace/members",
+    { access: "protected", methods: ["GET", "POST"], allow: "GET, POST" },
+  ],
+  [
+    "/api/workspace/member",
+    { access: "protected", methods: ["PATCH"], allow: "PATCH" },
+  ],
+  [
     "/api/catalogue",
     { access: "protected", methods: ["GET", "POST"], allow: "GET, POST" },
   ],
