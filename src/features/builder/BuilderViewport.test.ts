@@ -11,27 +11,32 @@ import { BuilderViewport } from "./BuilderViewport";
 const approvedPart: CatalogPart = catalogParts.find(
   (part) => part.assetStatus === "approved" && part.assetId !== null,
 )!;
+const selectedParts = catalogParts.filter((part) =>
+  ["case", "motherboard", "cpu", "gpu", "memory"].includes(part.category),
+);
 
 function renderViewport({
+  selectedCategory = "cooling",
   selectedPart = null,
+  buildParts = selectedPart ? [selectedPart] : [],
   isLocalPreview = true,
-  localApprovedAssetId = null,
 }: {
+  selectedCategory?: "case" | "cooling" | "summary";
   selectedPart?: CatalogPart | null;
+  buildParts?: CatalogPart[];
   isLocalPreview?: boolean;
-  localApprovedAssetId?: string | null;
 } = {}): string {
   return renderToStaticMarkup(
     createElement(BuilderViewport, {
-      selectedCategory: "cooling",
+      selectedCategory,
       camera: "等角",
       setCamera() {},
       displayMode: "著色",
       setDisplayMode() {},
       selectedPart,
+      selectedParts: buildParts,
       workspaceId: "workspace-viewport-fixture",
       isLocalPreview,
-      localApprovedAssetId,
     }),
   );
 }
@@ -57,7 +62,7 @@ describe("BuilderViewport", () => {
     expect(markup).toContain("Editing: Cooling");
     expect(markup).toContain("Static fallback preview");
     expect(markup).toContain("Visual material is not compatibility evidence");
-    expect(markup).toContain("Scene v1 · +Y up · Unit: metre");
+    expect(markup).toContain("Scene v2 · +Y up · Unit: metre");
     expect(markup).toContain('lang="en"');
   });
 
@@ -65,10 +70,11 @@ describe("BuilderViewport", () => {
     const productionMarkup = renderViewport({
       selectedPart: approvedPart,
       isLocalPreview: false,
+      selectedCategory: "case",
     });
     const localMarkup = renderViewport({
       selectedPart: approvedPart,
-      localApprovedAssetId: approvedPart.assetId,
+      selectedCategory: "case",
     });
 
     expect(productionMarkup).toContain(
@@ -83,11 +89,37 @@ describe("BuilderViewport", () => {
   });
 
   it("labels local private-file fallback and bounded stock state bilingually", () => {
-    const markup = renderViewport({ selectedPart: approvedPart });
+    const markup = renderViewport({
+      selectedCategory: "case",
+      selectedPart: { ...approvedPart, assetId: null },
+    });
 
     expect(markup).toContain("Local preview does not read a private GLB");
     expect(markup).toContain("Current category component");
     expect(markup).toContain("Selectable catalogue record");
+  });
+
+  it("describes the bounded multi-model summary scene without private identifiers", () => {
+    const productionMarkup = renderViewport({
+      buildParts: selectedParts,
+      isLocalPreview: false,
+      selectedCategory: "summary",
+    });
+    const localMarkup = renderViewport({
+      buildParts: selectedParts,
+      selectedCategory: "summary",
+    });
+
+    expect(productionMarkup).toContain(
+      "Loading 4 approved private GLBs in parallel through the authorized API",
+    );
+    expect(localMarkup).toContain("Preparing 4 approved local synthetic GLBs");
+    expect(productionMarkup).toContain("Separated review layout");
+    expect(productionMarkup).not.toContain("workspace-viewport-fixture");
+    for (const part of selectedParts) {
+      expect(productionMarkup).not.toContain(part.id);
+      if (part.assetId) expect(productionMarkup).not.toContain(part.assetId);
+    }
   });
 
   it("lets bilingual viewport status use content height and wrap", async () => {
@@ -102,6 +134,9 @@ describe("BuilderViewport", () => {
     );
     expect(styles).toMatch(
       /\.builder-viewport-copy\s*\{[^}]*overflow-wrap:\s*anywhere;/u,
+    );
+    expect(styles).toMatch(
+      /@media \(max-width: 520px\)[\s\S]*?\.builder-private-model figcaption\s*\{[^}]*border:\s*0;[^}]*padding:\s*0;[^}]*clip-path:\s*inset\(50%\);/u,
     );
   });
 });

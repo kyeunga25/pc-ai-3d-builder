@@ -37,7 +37,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 素材審核佇列、固定詳情／審核 API、草稿保存、角色限制、樂觀鎖及原子 audit 記錄；私人 asset ID 只經受保護標頭傳送，不進詳情或審核 URL／body。頁首指引、草稿／待審／核准／拒絕狀態、來源種類、品質、版本及佇列數量均由完整型別映射以繁中優先、英文輔助顯示，英文項目數亦正確處理單複數；窄畫面狀態徽章可換行而不顯示內部素材 ID。保存、核准、拒絕、檔案上載、精確檔案移除及模擬生成狀態均以雙語及相符的提示、成功、警告或錯誤語意顯示；六項核准清單、三個人手核實尺寸、核對提示及完成計數亦使用由 domain 規則約束的雙語文案。網絡中斷後不會假定寫入或工作未發生，而會要求先重新載入。拒絕採用同一素材版本內的兩步確認，先說明可能釋放保留 credit、但不會刪除私人檔案，第二次按下才送出審核 mutation；切換素材或進行其他表單操作會解除確認。
 - 從產品目錄固定端點建立私人素材草稿，part ID 不進 URL 或檔案 body；每項素材可分別保存正面、背面、左側及三分之四角度四張私人來源圖片，每張最多 10 MiB。瀏覽器先核對 `.jpg`／`.jpeg`／`.png`／`.webp` 檔名、MIME 與實際 bytes；空白或通用 MIME 只可在安全副檔名及內容一致時標準化，私人檔名不會送到 Worker。Worker 再獨立核對 canonical MIME、完整容器邊界、PNG chunk CRC／JPEG marker／WebP RIFF 結構，以及每邊最多 8,192 px、總像素最多 24 MP 的瀏覽器安全上限；APNG 及 animated WebP 會在私人儲存前拒絕。縮圖列可選擇視角、顯示授權 API 載入／缺少狀態，並只取代或移除所選視角；正面圖是日後生成流程的唯一 canonical input，其餘視角只供人工審核，不會自動交給 AI 或推斷相容性。要求、操作、私人預覽、圖片使用權及 Access 邊界均以繁中優先、英文輔助顯示。
 - 透過固定檔案 API 與受保護的 asset／file-kind／source-view 標頭，上載最多 25 MiB 的自包含 glTF 2.0 GLB；瀏覽器會先核對 `.glb`、MIME 與完整 bytes，並把空白或通用 MIME 安全標準化為 `model/gltf-binary`。手動上載及模擬生成共用 buffer／accessor、三角形、node graph、尺寸、貼圖數量與貼圖 bytes 安全閘，並在核准前讀回重驗。經授權讀取後在審核室及 Builder 以 Three.js 人手預覽，私人 asset ID 不進檔案 URL 或 body。GLB 要求及操作狀態同樣提供雙語文案；審核 viewport 的四個鏡頭預設、合適視野／線框工具、鏡頭讀數、模型有無／載入／解碼失敗狀態及「視覺素材不構成相容性證明」亦以繁中優先、英文輔助顯示。取代或移除所選視角／GLB 都會重設核准清單、來源權利確認及已核實尺寸；移除必須對同一 workspace、素材版本、檔案種類及視角按兩次確認，其他私人檔案不受影響並繼續保持私人。
-- Builder viewport 的四個鏡頭、三個顯示模式、工具、場景讀數、類別、四種庫存狀態、已選組件摘要及 footer 亦完整雙語化。它明確區分經授權載入的私人 GLB、本機已核准 synthetic GLB、本地不讀取私人檔案的後備及沒有已核准模型的後備；載入失敗只顯示通用私隱安全文案，不顯示 workspace／asset ID 或解析細節。雙語 footer 以內容高度換行，並持續說明視覺素材不構成相容性證據。
+- Builder viewport 的四個鏡頭、三個顯示模式、工具、場景讀數、類別、四種庫存狀態、已選組件摘要及 footer 亦完整雙語化。類別檢視載入一個已核准模型；總覽會依固定類別次序，以單一 Three.js canvas 平行載入最多九個已核准私人 GLB，局部失敗仍保留成功模型，並在切換組裝或離開頁面時取消未完成讀取及撤銷所有短期 object URL。本機示範使用逐組件 synthetic GLB，不讀取私人檔案。分離式 review grid 會正規化顯示大小，只供人手檢查，不代表實際安裝位置、比例或相容性；失敗文案亦不顯示 workspace／asset ID 或解析細節。
 - R2 物件維持私人；API 不回傳永久物件 URL、object key 或 checksum。瀏覽器的短期 Blob URL 綁定目前檔案要求的 abort signal，切換 workspace／素材或卸載畫面便冪等撤銷，遲到的已取消回應不會建立新 URL。回滾、取代及明確移除只清理單一精確 key，首次暫時失敗會重試一次；持續失敗會保留不再由目前素材讀取路徑使用的私人 orphan，而不推翻已提交的 D1 狀態。
 - 素材審核導向固定使用 `/asset-review`；指定素材只以 workspace 綁定的頁面記憶體交接，載入後即清除，不寫入 URL、history state 或持久儲存，畫面亦不顯示內部素材 ID。
 - 每個 workspace 可建立及保存組裝草稿，每個草稿最多九個類別；私人 build ID 只經固定 API 的受保護標頭傳送，不寫入 URL 或請求 body；更新使用樂觀版本及原子 D1 batch，封存採用兩步確認及邏輯狀態轉換。建立、切換、儲存、封存及私隱安全匯出的即時狀態均提供繁中／英文及相符的成功、提示、警告或錯誤語意；單語技術錯誤不會直接顯示。Builder 檢查器的三個分頁、空白狀態、已知規格欄位、規格核實狀態、相容性嚴重程度、證據標籤及 3D 素材狀態／品質／使用條件亦完整雙語化；未知自訂欄位會保留原鍵並標示為自訂，不猜測含義或顯示私人素材 ID。
@@ -55,7 +55,7 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。
 - 相容性只依賴結構化規格，不會從視覺模型推斷。
 
-本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。公開主頁只介紹產品及提供登入導向，不會載入 session、商戶記錄或私人素材。Production 工作台可在角色及 workspace 限制下讀寫 D1 目錄、審核、生成工作及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.1 是可用的邀請制人工審批 MVP；runtime synthetic GLB 只驗證安全管線，真實 3D 供應商生成、Workers AI 自動化及多模型裝配場景不在此版本承諾內。
+本地開發介面的產品、價格、庫存、素材及 3D 場景均為合成示範資料，不應用作真實報價或工程判斷。公開主頁只介紹產品及提供登入導向，不會載入 session、商戶記錄或私人素材。Production 工作台可在角色及 workspace 限制下讀寫 D1 目錄、審核、生成工作及組裝資料，以私人 R2 儲存經驗證的來源圖片及 GLB，並在已核准素材存在時於 Builder 讀取所選組件模型；版本庫不含任何真實商戶記錄。v1.1 是可用的邀請制人工審批 MVP；runtime synthetic GLB 只驗證安全管線，真實 3D 供應商生成、Workers AI 自動化，以及具機械約束或真實安裝位置的裝配場景不在此版本承諾內。
 
 主頁的工作區畫面均從本地合成示範介面擷取，用作準確展示 Dashboard、產品目錄、私人素材審核及 Builder；不包含真實商戶資料、私人素材或 production data，亦不構成報價、工程規格或相容性證據。
 
@@ -178,7 +178,7 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - Viewer 只可讀取；staff 只可保存草稿；owner 或 admin 才可核准或拒絕素材。前端拒絕確認只減少誤按，伺服器仍獨立執行角色、workspace、素材版本及狀態檢查。
 - 限流在任何 protected D1 工作前，把已驗證 Access subject 轉成版本化、domain-separated SHA-256 opaque key；raw subject、JWT 及電郵均不會傳入 Rate Limiting binding 或 request log。
 - 原始圖片、模型及渲染輸出必須維持私人存取。
-- Builder 只讀取已核准素材的私人 GLB，並在選擇切換或頁面卸載時撤銷瀏覽器 object URL。
+- Builder 只讀取已核准素材的私人 GLB；總覽每次最多載入九個，並在組裝／選擇切換或頁面卸載時取消未完成讀取及撤銷全部瀏覽器 object URL。
 - 生成工作先原子保留一個非貨幣 credit，提交 D1 job／entitlement／event／audit，再啟動 Workflow；輸入版本、使用權、成本上限、輸出格式及 checksum 任一失敗都不會建立可核准素材，保留 credit 只會釋放一次。
 - 模擬輸出會重設所有人工審核證據；production kill switch 關閉時不會建立工作或呼叫外部服務。
 

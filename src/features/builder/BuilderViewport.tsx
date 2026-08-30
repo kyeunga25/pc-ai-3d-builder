@@ -10,18 +10,21 @@ import {
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 
-import { fetchAssetFileBlob } from "../asset-review/asset-review-api";
-import { assetModelContentType } from "../../shared/domain/asset-files";
 import type { CatalogPart } from "../../shared/domain/schemas";
-import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { formatHkd } from "../../shared/i18n/locale";
-import { createAbortBoundObjectUrl } from "../../shared/lib/private-object-url";
+import {
+  loadBuilderModelResources,
+  selectBuilderModelCandidates,
+  type BuilderModelResource,
+} from "./builder-model-scene";
 import {
   bilingualViewportTitle,
   builderCameraPresets,
@@ -32,9 +35,13 @@ import {
   builderViewportDisplayReadoutCopy,
   builderViewportEditingCopy,
   builderViewportFooterPreviewCopy,
+  builderViewportLayoutBoundaryCopy,
   builderViewportModelCaptionCopy,
   builderViewportPlaceholderCopy,
+  builderViewportSceneDetailsCopy,
+  builderViewportSelectionLabelCopy,
   builderViewportStockCopy,
+  builderViewportSummarySelectionCopy,
   type BuilderCameraPreset,
   type BuilderDisplayMode,
   type BuilderStepId,
@@ -66,9 +73,9 @@ export function BuilderViewport({
   displayMode,
   setDisplayMode,
   selectedPart,
+  selectedParts,
   workspaceId,
   isLocalPreview,
-  localApprovedAssetId,
 }: {
   selectedCategory: BuilderStepId;
   camera: BuilderCameraPreset;
@@ -76,106 +83,105 @@ export function BuilderViewport({
   displayMode: BuilderDisplayMode;
   setDisplayMode: Dispatch<SetStateAction<BuilderDisplayMode>>;
   selectedPart: CatalogPart | null;
+  selectedParts: readonly CatalogPart[];
   workspaceId: string;
   isLocalPreview: boolean;
-  localApprovedAssetId: string | null;
 }) {
-  const isLocalSyntheticModel =
-    isLocalPreview &&
-    selectedPart?.assetId === localApprovedAssetId &&
-    selectedPart.assetStatus === "approved";
-  const modelKey =
-    selectedPart?.assetId && selectedPart.assetStatus === "approved"
-      ? isLocalSyntheticModel
-        ? `local:${selectedPart.assetId}`
-        : !isLocalPreview
-          ? `${workspaceId}:${selectedPart.assetId}`
-          : null
-      : null;
+  const isSummary = selectedCategory === "summary";
+  const modelCandidates = useMemo(
+    () =>
+      selectBuilderModelCandidates({
+        isLocalPreview,
+        selectedCategory,
+        selectedParts,
+      }),
+    [isLocalPreview, selectedCategory, selectedParts],
+  );
+  const modelKey = useMemo(
+    () =>
+      `${workspaceId}:${selectedCategory}:${modelCandidates
+        .map(
+          (candidate) =>
+            `${candidate.category}:${candidate.assetId}:${candidate.source}`,
+        )
+        .join("|")}`,
+    [modelCandidates, selectedCategory, workspaceId],
+  );
   const [modelResource, setModelResource] = useState<{
     key: string;
-    state: "error" | "ready";
-    url: string | null;
+    failedCount: number;
+    models: readonly BuilderModelResource[];
+  } | null>(null);
+  const [previewResult, setPreviewResult] = useState<{
+    key: string;
+    failedCount: number;
+    loadedCount: number;
   } | null>(null);
   const [resetToken, setResetToken] = useState(0);
   const currentModelResource =
     modelResource?.key === modelKey ? modelResource : null;
-  const modelUrl =
-    currentModelResource?.state === "ready" ? currentModelResource.url : null;
-  const modelState = modelKey
-    ? (currentModelResource?.state ?? "loading")
-    : "none";
+  const modelResources = currentModelResource?.models ?? [];
+  const modelUrl = modelResources[0]?.url ?? null;
+  const hasModelResource = modelResources.length > 0;
+  const currentPreviewResult =
+    previewResult?.key === modelKey ? previewResult : null;
+  const renderedModelCount = currentPreviewResult?.loadedCount ?? 0;
+  const hasRenderedModel = renderedModelCount > 0;
+  const previewLoading = hasModelResource && !currentPreviewResult;
+  const failedModelCount =
+    (currentModelResource?.failedCount ?? 0) +
+    (currentPreviewResult?.failedCount ?? 0);
+  const modelState =
+    modelCandidates.length === 0
+      ? "none"
+      : !currentModelResource
+        ? "loading"
+        : hasModelResource
+          ? "ready"
+          : "error";
+  const isLocalSyntheticModel =
+    modelCandidates.length > 0 &&
+    modelCandidates.every(
+      (candidate) => candidate.source === "local-synthetic",
+    );
 
   useEffect(() => {
-    if (!modelKey || !selectedPart?.assetId) {
+    if (modelCandidates.length === 0) {
       return;
     }
-
-    if (isLocalSyntheticModel) {
-      let createdUrl: string | null = null;
-      let cancelled = false;
-      void Promise.resolve().then(() => {
-        if (cancelled) {
-          return;
-        }
-
-        const bytes = createSyntheticDraftGlb();
-        createdUrl = URL.createObjectURL(
-          new Blob(
-            [
-              bytes.buffer.slice(
-                bytes.byteOffset,
-                bytes.byteOffset + bytes.byteLength,
-              ) as ArrayBuffer,
-            ],
-            { type: assetModelContentType },
-          ),
-        );
-        setModelResource({ key: modelKey, state: "ready", url: createdUrl });
-      });
-
-      return () => {
-        cancelled = true;
-        if (createdUrl) {
-          URL.revokeObjectURL(createdUrl);
-        }
-      };
-    }
-
     const controller = new AbortController();
-    let privateUrl: ReturnType<typeof createAbortBoundObjectUrl> = null;
-    void fetchAssetFileBlob(
-      controller.signal,
+    let loaded: Awaited<ReturnType<typeof loadBuilderModelResources>> | null =
+      null;
+    void loadBuilderModelResources({
+      candidates: modelCandidates,
+      signal: controller.signal,
       workspaceId,
-      selectedPart.assetId,
-      "model",
-    )
-      .then((blob) => {
-        privateUrl = createAbortBoundObjectUrl(blob, controller.signal);
-        if (!privateUrl) {
-          return;
-        }
+    }).then((resources) => {
+      loaded = resources;
+      if (!controller.signal.aborted) {
         setModelResource({
           key: modelKey,
-          state: "ready",
-          url: privateUrl.url,
+          failedCount: resources.failedCount,
+          models: resources.models,
         });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setModelResource({
-            key: modelKey,
-            state: "error",
-            url: null,
-          });
-        }
-      });
+      }
+    });
 
     return () => {
       controller.abort();
-      privateUrl?.revoke();
+      loaded?.release();
     };
-  }, [isLocalSyntheticModel, modelKey, selectedPart?.assetId, workspaceId]);
+  }, [modelCandidates, modelKey, workspaceId]);
+
+  const recordPreviewResult = useCallback(
+    (result: {
+      readonly failedCount: number;
+      readonly loadedCount: number;
+    }) => {
+      setPreviewResult({ key: modelKey, ...result });
+    },
+    [modelKey],
+  );
 
   const renderMode =
     displayMode === "線框"
@@ -184,9 +190,11 @@ export function BuilderViewport({
         ? "static"
         : "shaded";
   const placeholderCopy = builderViewportPlaceholderCopy({
+    candidateCount: modelCandidates.length,
     hasApprovedAsset: selectedPart?.assetStatus === "approved",
     isLocalPreview,
     isLocalSyntheticModel,
+    isSummary,
     modelState: modelState === "ready" ? "none" : modelState,
   });
 
@@ -213,7 +221,7 @@ export function BuilderViewport({
               key={preset}
               type="button"
               aria-pressed={camera === preset}
-              disabled={!modelUrl}
+              disabled={!hasRenderedModel}
               onClick={() => setCamera(preset)}
             >
               <ViewportCopy copy={builderViewportCameraCopy[preset]} />
@@ -225,7 +233,7 @@ export function BuilderViewport({
           <ViewportCopy copy={builderViewportCopy.displayLabel} />
           <select
             value={displayMode}
-            disabled={!modelUrl}
+            disabled={!hasRenderedModel}
             onChange={(event) =>
               setDisplayMode(event.target.value as BuilderDisplayMode)
             }
@@ -247,7 +255,7 @@ export function BuilderViewport({
           className="viewport-icon-button"
           type="button"
           aria-label={bilingualViewportTitle(builderViewportCopy.fitView)}
-          disabled={!modelUrl}
+          disabled={!hasRenderedModel}
           onClick={() => {
             setCamera("等角");
             setResetToken((token) => token + 1);
@@ -261,7 +269,7 @@ export function BuilderViewport({
         <div className="builder-stage__grid" aria-hidden="true" />
         <div className="builder-stage__glow" aria-hidden="true" />
 
-        {modelUrl ? (
+        {hasModelResource ? (
           <figure className="builder-private-model">
             <Suspense
               fallback={
@@ -272,16 +280,35 @@ export function BuilderViewport({
                 </span>
               }
             >
-              <AssetModelPreview
-                cameraPreset={camera}
-                renderMode={renderMode}
-                resetToken={resetToken}
-                url={modelUrl}
-              />
+              {isSummary ? (
+                <AssetModelPreview
+                  cameraPreset={camera}
+                  layout="review-grid"
+                  models={modelResources}
+                  onLoadResult={recordPreviewResult}
+                  renderMode={renderMode}
+                  resetToken={resetToken}
+                />
+              ) : (
+                <AssetModelPreview
+                  cameraPreset={camera}
+                  onLoadResult={recordPreviewResult}
+                  renderMode={renderMode}
+                  resetToken={resetToken}
+                  url={modelUrl ?? undefined}
+                />
+              )}
             </Suspense>
             <figcaption>
               <ViewportCopy
-                copy={builderViewportModelCaptionCopy(isLocalSyntheticModel)}
+                copy={builderViewportModelCaptionCopy({
+                  candidateCount: modelCandidates.length,
+                  failedCount: failedModelCount,
+                  isLocalSyntheticModel,
+                  isSummary,
+                  isLoading: previewLoading,
+                  loadedCount: renderedModelCount,
+                })}
               />
             </figcaption>
           </figure>
@@ -335,10 +362,16 @@ export function BuilderViewport({
             <Box aria-hidden="true" />
           </div>
           <div>
-            <ViewportCopy copy={builderViewportCopy.currentCategoryComponent} />
+            <ViewportCopy copy={builderViewportSelectionLabelCopy(isSummary)} />
             <strong>
               {selectedPart ? (
                 `${selectedPart.manufacturer} ${selectedPart.model}`
+              ) : isSummary ? (
+                <ViewportCopy
+                  copy={builderViewportSummarySelectionCopy(
+                    modelCandidates.length,
+                  )}
+                />
               ) : (
                 <ViewportCopy copy={builderViewportCopy.noSelection} />
               )}
@@ -370,17 +403,20 @@ export function BuilderViewport({
         <span>
           <Image aria-hidden="true" />
           <ViewportCopy
-            copy={builderViewportFooterPreviewCopy(
-              modelUrl !== null,
+            copy={builderViewportFooterPreviewCopy({
+              hasModel: hasModelResource,
               isLocalSyntheticModel,
-            )}
+              isSummary,
+              isLoading: previewLoading,
+              loadedCount: renderedModelCount,
+            })}
           />
         </span>
         <span>
-          <ViewportCopy copy={builderViewportCopy.evidenceBoundary} />
+          <ViewportCopy copy={builderViewportLayoutBoundaryCopy(isSummary)} />
         </span>
         <span className="mono">
-          <ViewportCopy copy={builderViewportCopy.sceneDetails} />
+          <ViewportCopy copy={builderViewportSceneDetailsCopy(isSummary)} />
         </span>
       </div>
     </section>

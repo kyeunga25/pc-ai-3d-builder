@@ -25,4 +25,21 @@ describe("AssetModelPreview", () => {
     expect(markup).toContain("Decoding private GLB");
     expect(markup).toContain('lang="en"');
   });
+
+  it("accepts a bounded multi-model review layout without rendering resource keys", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AssetModelPreview, {
+        cameraPreset: "等角",
+        layout: "review-grid",
+        models: [
+          { key: "case-private-key", url: "blob:case-model" },
+          { key: "gpu-private-key", url: "blob:gpu-model" },
+        ],
+      }),
+    );
+
+    expect(markup).toContain("正在解碼私人 GLB");
+    expect(markup).not.toContain("case-private-key");
+    expect(markup).not.toContain("gpu-private-key");
+  });
 });

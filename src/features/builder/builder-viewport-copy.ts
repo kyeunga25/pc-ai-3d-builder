@@ -13,10 +13,29 @@ export type BuilderDisplayMode = "著色" | "線框" | "靜態預覽";
 export type BuilderStepId = ComponentCategory | "summary";
 
 type BuilderPlaceholderState = {
+  readonly candidateCount: number;
   readonly hasApprovedAsset: boolean;
   readonly isLocalPreview: boolean;
   readonly isLocalSyntheticModel: boolean;
+  readonly isSummary: boolean;
   readonly modelState: "error" | "loading" | "none";
+};
+
+type BuilderModelCaptionState = {
+  readonly candidateCount: number;
+  readonly failedCount: number;
+  readonly isLocalSyntheticModel: boolean;
+  readonly isSummary: boolean;
+  readonly isLoading: boolean;
+  readonly loadedCount: number;
+};
+
+type BuilderFooterPreviewState = {
+  readonly hasModel: boolean;
+  readonly isLocalSyntheticModel: boolean;
+  readonly isSummary: boolean;
+  readonly isLoading: boolean;
+  readonly loadedCount: number;
 };
 
 function bilingualViewportCopy(
@@ -99,8 +118,8 @@ export const builderViewportCopy = {
   ),
   noSelection: bilingualViewportCopy("尚未選擇", "No component selected"),
   sceneDetails: bilingualViewportCopy(
-    "場景 v1 · +Y 向上 · 單位：米",
-    "Scene v1 · +Y up · Unit: metre",
+    "場景 v2 · +Y 向上 · 單位：米",
+    "Scene v2 · +Y up · Unit: metre",
   ),
   viewportLabel: bilingualViewportCopy(
     "3D 組件預覽視窗",
@@ -135,9 +154,58 @@ export function builderViewportEditingCopy(
   );
 }
 
-export function builderViewportModelCaptionCopy(
-  isLocalSyntheticModel: boolean,
+export function builderViewportSelectionLabelCopy(
+  isSummary: boolean,
 ): BuilderViewportCopy {
+  return isSummary
+    ? bilingualViewportCopy("檢視場景組件", "Review-scene components")
+    : builderViewportCopy.currentCategoryComponent;
+}
+
+export function builderViewportSummarySelectionCopy(
+  selectedCount: number,
+): BuilderViewportCopy {
+  return bilingualViewportCopy(
+    `${selectedCount} 個已核准模型`,
+    `${selectedCount} approved ${selectedCount === 1 ? "model" : "models"}`,
+  );
+}
+
+export function builderViewportModelCaptionCopy({
+  candidateCount,
+  failedCount,
+  isLocalSyntheticModel,
+  isSummary,
+  isLoading,
+  loadedCount,
+}: BuilderModelCaptionState): BuilderViewportCopy {
+  if (isLoading) {
+    return isSummary
+      ? bilingualViewportCopy(
+          `正在解碼 ${candidateCount} 個已核准 GLB…`,
+          `Decoding ${candidateCount} approved GLBs…`,
+        )
+      : bilingualViewportCopy(
+          "正在解碼已核准 GLB…",
+          "Decoding the approved GLB…",
+        );
+  }
+  if (isSummary) {
+    const sourceZhHant = isLocalSyntheticModel ? "本機合成 GLB" : "私人 GLB";
+    const sourceEnglish = isLocalSyntheticModel
+      ? "local synthetic GLBs"
+      : "private GLBs";
+    if (failedCount > 0) {
+      return bilingualViewportCopy(
+        `已顯示 ${loadedCount}/${candidateCount} 個已核准${sourceZhHant}；${failedCount} 個未能載入。分離式檢視不代表實際安裝比例或位置。`,
+        `Showing ${loadedCount} of ${candidateCount} approved ${sourceEnglish}; ${failedCount} could not be loaded. The separated review layout does not represent installation scale or position.`,
+      );
+    }
+    return bilingualViewportCopy(
+      `已顯示 ${loadedCount} 個已核准${sourceZhHant}；分離式檢視不代表實際安裝比例或位置。`,
+      `${loadedCount} approved ${sourceEnglish} shown. The separated review layout does not represent installation scale or position.`,
+    );
+  }
   return isLocalSyntheticModel
     ? bilingualViewportCopy(
         "已核准本機合成 GLB · 不含真實供應商輸出",
@@ -150,11 +218,36 @@ export function builderViewportModelCaptionCopy(
 }
 
 export function builderViewportPlaceholderCopy({
+  candidateCount,
   hasApprovedAsset,
   isLocalPreview,
   isLocalSyntheticModel,
+  isSummary,
   modelState,
 }: BuilderPlaceholderState): BuilderViewportCopy {
+  if (isSummary) {
+    if (modelState === "loading") {
+      return isLocalSyntheticModel
+        ? bilingualViewportCopy(
+            `正在準備 ${candidateCount} 個已核准本機合成 GLB…`,
+            `Preparing ${candidateCount} approved local synthetic GLBs…`,
+          )
+        : bilingualViewportCopy(
+            `正在透過授權 API 並行載入 ${candidateCount} 個已核准私人 GLB…`,
+            `Loading ${candidateCount} approved private GLBs in parallel through the authorized API…`,
+          );
+    }
+    if (modelState === "error") {
+      return bilingualViewportCopy(
+        "無法載入這個組裝的已核准 GLB；檔案仍保持私人，現正顯示靜態後備。",
+        "Unable to load the approved GLBs for this build. The files remain private; a static fallback is shown.",
+      );
+    }
+    return bilingualViewportCopy(
+      "目前選擇沒有可用的已核准 GLB；總覽顯示靜態幾何後備。",
+      "No selected component has an available approved GLB; the summary shows a static geometry fallback.",
+    );
+  }
   if (modelState === "loading") {
     return isLocalSyntheticModel
       ? bilingualViewportCopy(
@@ -184,12 +277,32 @@ export function builderViewportPlaceholderCopy({
   );
 }
 
-export function builderViewportFooterPreviewCopy(
-  hasModel: boolean,
-  isLocalSyntheticModel: boolean,
-): BuilderViewportCopy {
+export function builderViewportFooterPreviewCopy({
+  hasModel,
+  isLocalSyntheticModel,
+  isSummary,
+  isLoading,
+  loadedCount,
+}: BuilderFooterPreviewState): BuilderViewportCopy {
   if (!hasModel) {
     return bilingualViewportCopy("提供靜態後備預覽", "Static fallback preview");
+  }
+  if (isLoading) {
+    return bilingualViewportCopy(
+      "正在解碼已核准組件預覽",
+      "Decoding approved component previews",
+    );
+  }
+  if (isSummary) {
+    return isLocalSyntheticModel
+      ? bilingualViewportCopy(
+          `${loadedCount} 項本機合成的已核准組件預覽`,
+          `${loadedCount} approved local synthetic component previews`,
+        )
+      : bilingualViewportCopy(
+          `${loadedCount} 項受保護的已核准組件預覽`,
+          `${loadedCount} protected approved component previews`,
+        );
   }
   return isLocalSyntheticModel
     ? bilingualViewportCopy(
@@ -200,4 +313,26 @@ export function builderViewportFooterPreviewCopy(
         "受保護的已核准組件預覽",
         "Protected approved component preview",
       );
+}
+
+export function builderViewportLayoutBoundaryCopy(
+  isSummary: boolean,
+): BuilderViewportCopy {
+  return isSummary
+    ? bilingualViewportCopy(
+        "分離式檢視佈局不代表實際安裝位置、比例或相容性",
+        "Separated review layout does not represent installation position, scale or compatibility",
+      )
+    : builderViewportCopy.evidenceBoundary;
+}
+
+export function builderViewportSceneDetailsCopy(
+  isSummary: boolean,
+): BuilderViewportCopy {
+  return isSummary
+    ? bilingualViewportCopy(
+        "場景 v2 · 分離式檢視佈局 · +Y 向上 · 顯示比例已標準化",
+        "Scene v2 · separated review layout · +Y up · normalized display scale",
+      )
+    : builderViewportCopy.sceneDetails;
 }

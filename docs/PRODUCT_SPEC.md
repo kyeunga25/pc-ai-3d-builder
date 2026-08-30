@@ -36,8 +36,8 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Traditional-Chinese-first bilingual Builder inspector for all tabs, empty guidance, known specification fields, verification states, finding severity and evidence, plus exhaustive asset-status and quality labels. Unknown custom fields retain their bounded source key without semantic guessing, and no private asset ID is shown.
 - Traditional-Chinese-first bilingual Builder component rail for all nine categories and summary, state precedence, candidate and selection counts, four stock states, empty guidance and the explicit-save boundary. Viewers remain unable to choose candidates, and private part or asset IDs are not displayed.
 - Traditional-Chinese-first bilingual Builder status bar for compatibility, selected-component count, workspace total, Save and Export. Error, unknown, warning and success keep fail-closed precedence and semantic icons; count grammar, wrapping, compact accessible names and privacy-bounded export guidance are explicit.
-- Protected preview of the selected component's approved GLB in the builder.
-- Traditional-Chinese-first bilingual Builder viewport controls, camera/mode readouts, selected-component summary, stock and category states, private/local/fallback model states and a wrapping evidence-boundary footer. Loading failures remain generic and expose no private identifier or parser detail.
+- Protected preview of the current category's approved GLB and a bounded summary review scene for up to nine approved selected-component GLBs in canonical category order. Private reads start in parallel, partial failure preserves successfully decoded models, and every request/object URL is cancelled or revoked when scene scope changes.
+- Traditional-Chinese-first bilingual Builder viewport controls, camera/mode readouts, selected-component summary, stock and category states, private/local/fallback model states and a wrapping evidence-boundary footer. The summary uses one canvas and a separated, display-normalized review grid; it does not claim installation position, physical scale or compatibility. Loading failures remain generic and expose no private identifier or parser detail.
 - Portable JSON export that fails closed and excludes identity, operational and private-asset fields.
 - Clear draft, review and approved labels for visual assets.
 - Human approval remains mandatory before generated material is treated as usable.
@@ -57,7 +57,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Prices, inventory and components shown in local development are fictional.
 - No public marketplace, payment flow or customer-data collection is enabled.
 - The runtime synthetic adapter validates orchestration only; it is not AI or a professional 3D-generation capability.
-- External provider generation and multi-model 3D scene composition are optional future integrations, not v1.1 product capabilities.
+- External provider generation and mechanically constrained multi-model assembly composition are optional future integrations, not v1.1 product capabilities. The implemented multi-model summary is a visual review grid only.
 - No checkout, invoice, subscription, payment webhook or payment ledger is enabled. The public payment interface remains disconnected and disabled.
 
 ## Data handling
