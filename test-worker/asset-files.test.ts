@@ -8,7 +8,9 @@ import {
 } from "../src/shared/domain/synthetic-image";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { sha256Hex } from "../src/worker/lib/digest";
+import { assetGenerationCreditReleasedHeader } from "../src/shared/lib/asset-target";
 import {
+  assetFileRemoveResponse,
   assetFileResponse,
   assetFileUploadResponse,
 } from "../src/worker/routes/asset-files";
@@ -104,6 +106,21 @@ function fileReadRequest(
     headers: {
       "x-rigstage-asset-file-kind": "source",
       "x-rigstage-asset-id": assetId,
+      "x-rigstage-asset-source-view": sourceView,
+    },
+  });
+}
+
+function removalRequest(
+  expectedVersion: number,
+  sourceView: "back" | "front" | "left" | "three-quarter" = "front",
+): Request {
+  return new Request("https://local.invalid/api/assets/item/file", {
+    method: "DELETE",
+    headers: {
+      "x-rigstage-asset-file-kind": "source",
+      "x-rigstage-asset-id": assetId,
+      "x-rigstage-expected-version": String(expectedVersion),
       "x-rigstage-asset-source-view": sourceView,
     },
   });
@@ -538,6 +555,144 @@ describe("private asset file workspace isolation", () => {
       ),
     ).toBe(true);
     expect(JSON.stringify(auditRows.results)).not.toContain("workspaces/");
+
+    await expect(
+      assetFileRemoveResponse(
+        removalRequest(3, "back"),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(requesterFixture),
+        "request-source-back-foreign-remove",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(
+      await env.PRIVATE_ASSETS.head(replacedBack?.object_key ?? ""),
+    ).not.toBeNull();
+
+    const removedBackResponse = await assetFileRemoveResponse(
+      removalRequest(3, "back"),
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      "request-source-back-remove",
+    );
+    expect(removedBackResponse.status).toBe(200);
+    expect(
+      removedBackResponse.headers.get(assetGenerationCreditReleasedHeader),
+    ).toBe("false");
+    await expect(removedBackResponse.json()).resolves.toMatchObject({
+      id: assetId,
+      version: 4,
+      sourceRightsConfirmed: false,
+      completedChecks: [],
+      files: {
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: replacementBytes.byteLength,
+          },
+          back: null,
+        },
+      },
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count
+         FROM product_asset_source_files
+         WHERE workspace_id = ?1 AND asset_id = ?2 AND source_view = 'back'`,
+      )
+        .bind(protectedFixture.workspaceId, assetId)
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(
+      await env.PRIVATE_ASSETS.head(replacedBack?.object_key ?? ""),
+    ).toBeNull();
+    expect(await env.PRIVATE_ASSETS.head(currentFrontObjectKey)).not.toBeNull();
+    await expect(
+      assetFileRemoveResponse(
+        removalRequest(3, "back"),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        "request-source-back-remove-stale",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "ASSET_VERSION_CONFLICT",
+    });
+
+    const removalAuditRows = await env.DB.prepare(
+      `SELECT action, metadata_json
+       FROM audit_events
+       WHERE workspace_id = ?1 AND target_id = ?2
+         AND action = 'asset.file.source.remove'`,
+    )
+      .bind(protectedFixture.workspaceId, assetId)
+      .all<{ action: string; metadata_json: string }>();
+    expect(removalAuditRows.results).toHaveLength(1);
+    expect(JSON.parse(removalAuditRows.results[0]!.metadata_json)).toEqual({
+      kind: "source",
+      sourceView: "back",
+      sizeBytes: sourceBytes.byteLength,
+      reviewVersion: 4,
+    });
+    expect(JSON.stringify(removalAuditRows.results)).not.toContain(
+      "workspaces/",
+    );
+
+    const removalRacingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE catalog_parts SET status = 'archived'
+         WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, protectedFixture.partId)
+        .run();
+    });
+    await expect(
+      assetFileRemoveResponse(
+        removalRequest(4),
+        removalRacingDb,
+        env.PRIVATE_ASSETS,
+        context(protectedFixture),
+        "request-source-front-remove-race",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+    expect(await env.PRIVATE_ASSETS.head(currentFrontObjectKey)).not.toBeNull();
+    expect(
+      await env.DB.prepare(
+        `SELECT review_version, source_object_key
+         FROM product_assets WHERE workspace_id = ?1 AND id = ?2`,
+      )
+        .bind(protectedFixture.workspaceId, assetId)
+        .first(),
+    ).toEqual({
+      review_version: 4,
+      source_object_key: currentFrontObjectKey,
+    });
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'active'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedFixture.workspaceId, protectedFixture.partId)
+      .run();
+    const removedFrontResponse = await assetFileRemoveResponse(
+      removalRequest(4),
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      "request-source-front-remove",
+    );
+    expect(removedFrontResponse.status).toBe(200);
+    expect(
+      removedFrontResponse.headers.get(assetGenerationCreditReleasedHeader),
+    ).toBe("false");
+    await expect(removedFrontResponse.json()).resolves.toMatchObject({
+      id: assetId,
+      version: 5,
+      files: { sources: { front: null, back: null } },
+    });
+    expect(await env.PRIVATE_ASSETS.head(currentFrontObjectKey)).toBeNull();
 
     await expect(
       env.DB.prepare(

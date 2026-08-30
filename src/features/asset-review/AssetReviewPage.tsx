@@ -12,6 +12,7 @@ import {
   Save,
   Scan,
   Sparkles,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -65,6 +66,7 @@ import {
   fetchAssetReview,
   fetchAssetReviewQueue,
   fetchGenerationJobs,
+  removeAssetFile,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
   type GenerationRequestLease,
@@ -81,6 +83,8 @@ import {
 import {
   assetReviewFileActionCopy,
   assetReviewFileControlCopy,
+  assetReviewFileRemoveActionCopy,
+  nextAssetReviewFileRemoveIntent,
 } from "./asset-review-file-copy";
 import {
   assetReviewGenerationCreditHistoryCopy,
@@ -100,6 +104,7 @@ import {
 } from "./asset-review-metadata-copy";
 import {
   assetReviewErrorNotice,
+  assetReviewFileRemovedNotice,
   assetReviewGenerationFailureNotice,
   assetReviewQueueNotice,
   assetReviewRejectActionLabel,
@@ -289,6 +294,7 @@ export function AssetReviewPage() {
   const [uploadingKind, setUploadingKind] = useState<AssetFileKind | null>(
     null,
   );
+  const [removingKind, setRemovingKind] = useState<AssetFileKind | null>(null);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
   const localObjectUrlsRef = useRef(
@@ -301,6 +307,7 @@ export function AssetReviewPage() {
   >(null);
   const submitting = submittingAction !== null;
   const [rejectArmedKey, setRejectArmedKey] = useState<string | null>(null);
+  const [removeArmedKey, setRemoveArmedKey] = useState<string | null>(null);
   const [reviewNotice, setReviewNotice] = useState<AssetReviewNotice>(() =>
     isLocalPreview
       ? localNavigationState?.localAsset?.sourceKind === "uploaded"
@@ -323,6 +330,7 @@ export function AssetReviewPage() {
       items: [],
     }));
   const [generationSubmitting, setGenerationSubmitting] = useState(false);
+  const fileOperationPending = uploadingKind !== null || removingKind !== null;
   const appliedGenerationJobRef = useRef<string | null>(null);
   const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
 
@@ -359,6 +367,8 @@ export function AssetReviewPage() {
       .then((items) => {
         setQueueCount(items.length);
         setSelectedSourceView("front");
+        setRejectArmedKey(null);
+        setRemoveArmedKey(null);
         setForm(items[0] ? createReviewForm(items[0]) : null);
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
@@ -527,6 +537,8 @@ export function AssetReviewPage() {
           );
           if (!controller.signal.aborted) {
             appliedGenerationJobRef.current = latest.id;
+            setRejectArmedKey(null);
+            setRemoveArmedKey(null);
             setForm(createReviewForm(updated));
             setReviewNotice(assetReviewStatusCopy.generatedDraftValidated);
           }
@@ -553,6 +565,8 @@ export function AssetReviewPage() {
   const retryQueue = () => {
     setLoadState("loading");
     setForm(null);
+    setRejectArmedKey(null);
+    setRemoveArmedKey(null);
     setLoadedWorkspaceId(null);
     setReloadToken((token) => token + 1);
   };
@@ -598,7 +612,11 @@ export function AssetReviewPage() {
 
   const { asset } = form;
   const currentRejectKey = `${currentWorkspace.id}:${assetKey(asset)}`;
+  const currentSourceRemoveKey = `${currentWorkspace.id}:${assetKey(asset)}:source:${selectedSourceView}`;
+  const currentModelRemoveKey = `${currentWorkspace.id}:${assetKey(asset)}:model`;
   const rejectArmed = rejectArmedKey === currentRejectKey;
+  const sourceRemoveArmed = removeArmedKey === currentSourceRemoveKey;
+  const modelRemoveArmed = removeArmedKey === currentModelRemoveKey;
   const badge = assetReviewStatusPresentation[asset.status];
   const queueSuffix = assetReviewQueueSuffixCopy(
     targetAssetId !== null,
@@ -664,6 +682,8 @@ export function AssetReviewPage() {
     generationState.capability.mode === "simulation" &&
     generationState.capability.credits.availableUnits >= 1 &&
     !generationActive &&
+    !fileOperationPending &&
+    !submitting &&
     !generationSubmitting;
   const generationActionLabel = generationSubmitting
     ? reviewActionCopy.creating
@@ -688,10 +708,20 @@ export function AssetReviewPage() {
     uploadingKind === "source",
   );
   const selectedSourceFile = asset.files.sources[selectedSourceView];
+  const sourceFileRemoveActionLabel = assetReviewFileRemoveActionCopy(
+    "source",
+    sourceRemoveArmed,
+    removingKind === "source",
+  );
   const modelFileActionLabel = assetReviewFileActionCopy(
     "model",
     asset.files.model !== null,
     uploadingKind === "model",
+  );
+  const modelFileRemoveActionLabel = assetReviewFileRemoveActionCopy(
+    "model",
+    modelRemoveArmed,
+    removingKind === "model",
   );
   const generationActionTitle =
     generationState.capability.mode !== "simulation"
@@ -747,6 +777,19 @@ export function AssetReviewPage() {
         "Rejection updates the review status",
       );
 
+  const clearConfirmationIntents = () => {
+    setRejectArmedKey(null);
+    setRemoveArmedKey(null);
+  };
+
+  const cancelConfirmationIntents = () => {
+    const hadConfirmation = rejectArmedKey !== null || removeArmedKey !== null;
+    clearConfirmationIntents();
+    if (hadConfirmation) {
+      setReviewNotice(assetReviewStatusCopy.confirmationCanceled);
+    }
+  };
+
   const transitionLocalReservedGeneration = (
     transition: "released" | "settled",
     failureCode: string | null = null,
@@ -801,10 +844,17 @@ export function AssetReviewPage() {
 
   const createLocalSyntheticSource = () => {
     const currentForm = form;
-    if (!isLocalPreview || !currentForm || !canEdit || uploadingKind) {
+    if (
+      !isLocalPreview ||
+      !currentForm ||
+      !canEdit ||
+      fileOperationPending ||
+      submitting ||
+      generationSubmitting
+    ) {
       return;
     }
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
     const bytes = createSyntheticSourcePng();
     const contentType = validateAssetFileBytes("source", "image/png", bytes);
     const objectUrl = URL.createObjectURL(
@@ -869,10 +919,15 @@ export function AssetReviewPage() {
   };
 
   const toggleCheck = (check: AssetReviewCheck) => {
-    if (!canEdit) {
+    if (
+      !canEdit ||
+      fileOperationPending ||
+      submitting ||
+      generationSubmitting
+    ) {
       return;
     }
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
 
     setForm((current) => {
       if (!current) {
@@ -891,10 +946,15 @@ export function AssetReviewPage() {
   };
 
   const updateDimension = (key: AssetReviewDimensionKey, value: string) => {
-    if (!canEdit) {
+    if (
+      !canEdit ||
+      fileOperationPending ||
+      submitting ||
+      generationSubmitting
+    ) {
       return;
     }
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
 
     setForm((current) =>
       current
@@ -914,13 +974,20 @@ export function AssetReviewPage() {
     const inputElement = event.currentTarget;
     const file = inputElement.files?.[0];
     const currentForm = form;
-    if (!file || !currentForm || !canEdit || uploadingKind) {
+    if (
+      !file ||
+      !currentForm ||
+      !canEdit ||
+      fileOperationPending ||
+      submitting ||
+      generationSubmitting
+    ) {
       inputElement.value = "";
       return;
     }
     const sourceView = selectedSourceView;
 
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
     setUploadingKind(kind);
     setReviewNotice(
       kind === "source"
@@ -1032,12 +1099,135 @@ export function AssetReviewPage() {
     }
   };
 
+  const requestFileRemoval = async (kind: AssetFileKind) => {
+    const currentForm = form;
+    const sourceView = selectedSourceView;
+    const selectedFile =
+      kind === "source"
+        ? currentForm?.asset.files.sources[sourceView]
+        : currentForm?.asset.files.model;
+    if (
+      !currentForm ||
+      !selectedFile ||
+      !canEdit ||
+      fileOperationPending ||
+      submitting ||
+      generationSubmitting
+    ) {
+      return;
+    }
+
+    const removalKey =
+      kind === "source"
+        ? `${currentWorkspace.id}:${assetKey(currentForm.asset)}:source:${sourceView}`
+        : `${currentWorkspace.id}:${assetKey(currentForm.asset)}:model`;
+    const intent = nextAssetReviewFileRemoveIntent(removeArmedKey, removalKey);
+    setRejectArmedKey(null);
+    setRemoveArmedKey(intent.nextArmedKey);
+    if (!intent.shouldSubmit) {
+      setReviewNotice(
+        kind === "source"
+          ? assetReviewStatusCopy.confirmSourceRemoval
+          : assetReviewStatusCopy.confirmModelRemoval,
+      );
+      return;
+    }
+
+    const hadReservedGeneration = generationState.items.some(
+      (job) =>
+        job.assetId === currentForm.asset.id &&
+        job.entitlementStatus === "reserved",
+    );
+    setRemovingKind(kind);
+    setReviewNotice(
+      kind === "source"
+        ? assetReviewStatusCopy.removingSource
+        : assetReviewStatusCopy.removingModel,
+    );
+    try {
+      let updated: AssetReviewItem;
+      let reservedGenerationReleased = false;
+      if (isLocalPreview) {
+        if (hadReservedGeneration) {
+          transitionLocalReservedGeneration(
+            "released",
+            "GENERATION_DRAFT_SUPERSEDED",
+          );
+          reservedGenerationReleased = true;
+        }
+        updated = {
+          ...currentForm.asset,
+          status: "draft",
+          quality: "unreviewed",
+          sourceKind: "uploaded",
+          completedChecks: [],
+          sourceRightsConfirmed: false,
+          dimensionsMm: { width: null, height: null, depth: null },
+          files:
+            kind === "source"
+              ? {
+                  ...currentForm.asset.files,
+                  sources: {
+                    ...currentForm.asset.files.sources,
+                    [sourceView]: null,
+                  },
+                }
+              : { ...currentForm.asset.files, model: null },
+          version: currentForm.asset.version + 1,
+        };
+        setFileUrls((current) => {
+          const sameAsset = current.assetKey === assetKey(currentForm.asset);
+          const sources = sameAsset ? current.sources : emptyAssetSourceUrls();
+          const model = sameAsset ? current.model : null;
+          const removed = kind === "source" ? sources[sourceView] : model;
+          if (removed && localObjectUrlsRef.current.has(removed)) {
+            URL.revokeObjectURL(removed);
+            localObjectUrlsRef.current.delete(removed);
+          }
+          return {
+            assetKey: assetKey(updated),
+            model: kind === "model" ? null : model,
+            sources:
+              kind === "source" ? { ...sources, [sourceView]: null } : sources,
+          };
+        });
+      } else {
+        const result = await removeAssetFile(
+          currentWorkspace.id,
+          currentForm.asset.id,
+          kind,
+          currentForm.asset.version,
+          sourceView,
+        );
+        updated = result.asset;
+        reservedGenerationReleased = result.reservedGenerationReleased;
+      }
+
+      setForm(createReviewForm(updated));
+      setReviewNotice(
+        assetReviewFileRemovedNotice(kind, reservedGenerationReleased),
+      );
+    } catch (error) {
+      const notice =
+        error instanceof AssetReviewApiError &&
+        error.code === "ASSET_VERSION_CONFLICT"
+          ? assetReviewStatusCopy.versionConflict
+          : assetReviewErrorNotice(
+              error,
+              kind === "source" ? "source-remove" : "model-remove",
+            );
+      setReviewNotice(notice);
+    } finally {
+      setRemovingKind(null);
+    }
+  };
+
   const requestGeneration = async () => {
     const currentForm = form;
     if (!currentForm || !canRequestGeneration) {
       return;
     }
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
     setGenerationSubmitting(true);
     setReviewNotice(assetReviewStatusCopy.creatingGeneration);
     try {
@@ -1155,10 +1345,15 @@ export function AssetReviewPage() {
 
   const submitReview = async (action: AssetReviewMutation["action"]) => {
     const currentForm = form;
-    if (!currentForm || submitting) {
+    if (
+      !currentForm ||
+      submitting ||
+      fileOperationPending ||
+      generationSubmitting
+    ) {
       return;
     }
-    setRejectArmedKey(null);
+    clearConfirmationIntents();
     const hadReservedGeneration = generationState.items.some(
       (job) =>
         job.assetId === currentForm.asset.id &&
@@ -1245,13 +1440,19 @@ export function AssetReviewPage() {
   };
 
   const requestReject = () => {
-    if (!canDecide || submitting) {
+    if (
+      !canDecide ||
+      submitting ||
+      fileOperationPending ||
+      generationSubmitting
+    ) {
       return;
     }
     const intent = nextAssetReviewRejectIntent(
       rejectArmedKey,
       currentRejectKey,
     );
+    setRemoveArmedKey(null);
     setRejectArmedKey(intent.nextArmedKey);
     if (!intent.shouldSubmit) {
       setReviewNotice(assetReviewStatusCopy.confirmReject);
@@ -1267,7 +1468,9 @@ export function AssetReviewPage() {
         hidden
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        disabled={!canEdit || uploadingKind !== null}
+        disabled={
+          !canEdit || fileOperationPending || submitting || generationSubmitting
+        }
         onChange={(event) => void handleFileSelection("source", event)}
       />
       <input
@@ -1275,7 +1478,9 @@ export function AssetReviewPage() {
         hidden
         type="file"
         accept=".glb,model/gltf-binary,application/octet-stream"
-        disabled={!canEdit || uploadingKind !== null}
+        disabled={
+          !canEdit || fileOperationPending || submitting || generationSubmitting
+        }
         onChange={(event) => void handleFileSelection("model", event)}
       />
       <header className="asset-review-header">
@@ -1341,8 +1546,13 @@ export function AssetReviewPage() {
                 aria-label={bilingualTitle(frameCopy.zhHant, frameCopy.english)}
                 aria-controls="asset-source-file-control"
                 aria-pressed={selectedSourceView === view}
-                disabled={uploadingKind !== null}
-                onClick={() => setSelectedSourceView(view)}
+                disabled={
+                  fileOperationPending || submitting || generationSubmitting
+                }
+                onClick={() => {
+                  cancelConfirmationIntents();
+                  setSelectedSourceView(view);
+                }}
               >
                 {hasPrivateImage && sourceUrl ? (
                   <img
@@ -1598,7 +1808,12 @@ export function AssetReviewPage() {
                   <button
                     className="button button--secondary"
                     type="button"
-                    disabled={!canEdit || uploadingKind !== null}
+                    disabled={
+                      !canEdit ||
+                      fileOperationPending ||
+                      submitting ||
+                      generationSubmitting
+                    }
                     title={bilingualTitle(
                       assetReviewFileControlCopy.syntheticImageTitle.zhHant,
                       assetReviewFileControlCopy.syntheticImageTitle.english,
@@ -1614,16 +1829,45 @@ export function AssetReviewPage() {
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={!canEdit || uploadingKind !== null}
+                  disabled={
+                    !canEdit ||
+                    fileOperationPending ||
+                    submitting ||
+                    generationSubmitting
+                  }
                   title={bilingualTitle(
                     assetReviewFileControlCopy.sourceUploadTitle.zhHant,
                     assetReviewFileControlCopy.sourceUploadTitle.english,
                   )}
-                  onClick={() => sourceInputRef.current?.click()}
+                  onClick={() => {
+                    cancelConfirmationIntents();
+                    sourceInputRef.current?.click();
+                  }}
                 >
                   <Upload aria-hidden="true" />
                   <BilingualActionLabel copy={sourceFileActionLabel} />
                 </button>
+                {selectedSourceFile ? (
+                  <button
+                    className={`button button--danger${sourceRemoveArmed ? " is-armed" : ""}`}
+                    type="button"
+                    disabled={
+                      !canEdit ||
+                      fileOperationPending ||
+                      submitting ||
+                      generationSubmitting
+                    }
+                    aria-pressed={sourceRemoveArmed}
+                    title={bilingualTitle(
+                      assetReviewFileControlCopy.sourceRemoveTitle.zhHant,
+                      assetReviewFileControlCopy.sourceRemoveTitle.english,
+                    )}
+                    onClick={() => void requestFileRemoval("source")}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    <BilingualActionLabel copy={sourceFileRemoveActionLabel} />
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="asset-file-control">
@@ -1639,19 +1883,50 @@ export function AssetReviewPage() {
                   />
                 )}
               </div>
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={!canEdit || uploadingKind !== null}
-                title={bilingualTitle(
-                  assetReviewFileControlCopy.modelUploadTitle.zhHant,
-                  assetReviewFileControlCopy.modelUploadTitle.english,
-                )}
-                onClick={() => modelInputRef.current?.click()}
-              >
-                <Upload aria-hidden="true" />
-                <BilingualActionLabel copy={modelFileActionLabel} />
-              </button>
+              <div className="asset-file-control__actions">
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={
+                    !canEdit ||
+                    fileOperationPending ||
+                    submitting ||
+                    generationSubmitting
+                  }
+                  title={bilingualTitle(
+                    assetReviewFileControlCopy.modelUploadTitle.zhHant,
+                    assetReviewFileControlCopy.modelUploadTitle.english,
+                  )}
+                  onClick={() => {
+                    cancelConfirmationIntents();
+                    modelInputRef.current?.click();
+                  }}
+                >
+                  <Upload aria-hidden="true" />
+                  <BilingualActionLabel copy={modelFileActionLabel} />
+                </button>
+                {asset.files.model ? (
+                  <button
+                    className={`button button--danger${modelRemoveArmed ? " is-armed" : ""}`}
+                    type="button"
+                    disabled={
+                      !canEdit ||
+                      fileOperationPending ||
+                      submitting ||
+                      generationSubmitting
+                    }
+                    aria-pressed={modelRemoveArmed}
+                    title={bilingualTitle(
+                      assetReviewFileControlCopy.modelRemoveTitle.zhHant,
+                      assetReviewFileControlCopy.modelRemoveTitle.english,
+                    )}
+                    onClick={() => void requestFileRemoval("model")}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    <BilingualActionLabel copy={modelFileRemoveActionLabel} />
+                  </button>
+                ) : null}
+              </div>
             </div>
             <small>
               <BilingualInterfaceText
@@ -1787,7 +2062,12 @@ export function AssetReviewPage() {
                     <input
                       value={form.dimensions[key]}
                       inputMode="decimal"
-                      disabled={!canEdit || submitting}
+                      disabled={
+                        !canEdit ||
+                        submitting ||
+                        fileOperationPending ||
+                        generationSubmitting
+                      }
                       aria-invalid={
                         form.dimensions[key].trim().length > 0 &&
                         parseDimension(form.dimensions[key]) === null
@@ -1823,7 +2103,12 @@ export function AssetReviewPage() {
                 <input
                   type="checkbox"
                   checked={form.checks.has(check)}
-                  disabled={!canEdit || submitting}
+                  disabled={
+                    !canEdit ||
+                    submitting ||
+                    fileOperationPending ||
+                    generationSubmitting
+                  }
                   onChange={() => toggleCheck(check)}
                 />
                 <BilingualInterfaceText
@@ -1840,7 +2125,12 @@ export function AssetReviewPage() {
           <button
             className={`button button--danger${rejectArmed ? " is-armed" : ""}`}
             type="button"
-            disabled={!canDecide || submitting}
+            disabled={
+              !canDecide ||
+              submitting ||
+              fileOperationPending ||
+              generationSubmitting
+            }
             aria-pressed={rejectArmed}
             title={rejectActionTitle}
             onClick={requestReject}
@@ -1878,7 +2168,12 @@ export function AssetReviewPage() {
               <button
                 className="button button--secondary"
                 type="button"
-                disabled={!canEdit || submitting}
+                disabled={
+                  !canEdit ||
+                  submitting ||
+                  fileOperationPending ||
+                  generationSubmitting
+                }
                 onClick={() => void submitReview("save_draft")}
               >
                 <Save aria-hidden="true" />
@@ -1887,7 +2182,13 @@ export function AssetReviewPage() {
               <button
                 className="button button--primary"
                 type="button"
-                disabled={!approvalReady || !canDecide || submitting}
+                disabled={
+                  !approvalReady ||
+                  !canDecide ||
+                  submitting ||
+                  fileOperationPending ||
+                  generationSubmitting
+                }
                 title={approveActionTitle}
                 onClick={() => void submitReview("approve")}
               >

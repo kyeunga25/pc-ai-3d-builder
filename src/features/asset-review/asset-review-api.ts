@@ -20,6 +20,7 @@ import {
 import { apiFetch } from "../../shared/lib/api-fetch";
 import {
   assetFileKindHeader,
+  assetGenerationCreditReleasedHeader,
   assetSourceViewHeader,
   assetTargetHeader,
 } from "../../shared/lib/asset-target";
@@ -200,6 +201,43 @@ export async function uploadAssetFile(
     throw await apiError(response);
   }
   return assetReviewItemSchema.parse(await response.json());
+}
+
+export async function removeAssetFile(
+  workspaceId: string,
+  assetId: string,
+  kind: AssetFileKind,
+  expectedVersion: number,
+  sourceView: AssetSourceView = "front",
+): Promise<{
+  asset: AssetReviewItem;
+  reservedGenerationReleased: boolean;
+}> {
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetFileKindHeader, kind);
+  if (kind === "source") headers.set(assetSourceViewHeader, sourceView);
+  headers.set(assetTargetHeader, assetId);
+  headers.set("x-rigstage-expected-version", String(expectedVersion));
+  const response = await apiFetch("/api/assets/item/file", {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers,
+  });
+  if (!response.ok) {
+    throw await apiError(response);
+  }
+  const released = response.headers.get(assetGenerationCreditReleasedHeader);
+  if (released !== "true" && released !== "false") {
+    throw new AssetReviewApiError(
+      502,
+      "INVALID_RESPONSE",
+      "無法確認保留 credit 是否已處理；請重新載入素材及生成狀態。 / Unable to confirm whether reserved credit was handled. Reload the asset and generation status.",
+    );
+  }
+  return {
+    asset: assetReviewItemSchema.parse(await response.json()),
+    reservedGenerationReleased: released === "true",
+  };
 }
 
 export async function fetchAssetFileBlob(

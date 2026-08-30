@@ -2,7 +2,7 @@
 
 The current public release accepts four private static source views (`front`, `back`, `left`, `three-quarter`) and one self-contained GLB per visual-asset record. Production validates each file's declared MIME type, binary signature, encoded size and effective browser resource budget before storing an opaque R2 object key in workspace-scoped D1 metadata. Source images are limited to 8,192 px per edge and 24 MP; APNG and animated WebP are rejected. Canonical `front` remains the only generation input, while the other three views are manual-review evidence only. Manual and generated GLBs share strict buffer, accessor, node-graph, dimension, triangle and texture limits. Authorized reads stream the selected object through the Worker without exposing its key, checksum or a permanent URL.
 
-The browser creates separate short-lived blob URLs for every available source view and the current model, revokes them when workspace or asset scope changes, and lazy-loads Three.js only when a GLB is available. The source filmstrip selects exactly one upload/read view without exposing an asset ID. Camera presets, fit-to-view, shaded, wireframe and static controls support manual visual inspection. After approval, the builder may retrieve the currently selected component through the same protected route; changing the selection revokes the previous object URL. A GLB remains a draft until an owner or admin completes every checklist item and supplies human-verified dimensions.
+The browser creates separate short-lived blob URLs for every available source view and the current model, revokes them when workspace or asset scope changes, and lazy-loads Three.js only when a GLB is available. The source filmstrip selects exactly one upload, read or removal view without exposing an asset ID. Removing a stored view or model requires a second activation for the unchanged workspace, asset version, kind and view; selecting another view or operation disarms it. Camera presets, fit-to-view, shaded, wireframe and static controls support manual visual inspection. After approval, the builder may retrieve the currently selected component through the same protected route; changing the selection revokes the previous object URL. A GLB remains a draft until an owner or admin completes every checklist item and supplies human-verified dimensions.
 
 Review mutations use a fixed checklist, bounded human-verified dimensions, role checks and an expected version. Asset state, review history and the minimal audit event are committed together. Approval remains a visual-asset decision only and never establishes compatibility.
 
@@ -11,7 +11,8 @@ The active upload and review boundary preserves these rules:
 - Confirm the caller's active workspace before creating or reading an object.
 - Keep originals, generated models and render outputs private.
 - Validate declared content type, file signature and bounded size.
-- Keep source views enumerated, replace only the selected view, and reset all approval evidence after any file replacement.
+- Keep source views enumerated, replace or remove only the selected view, and reset all approval evidence after either operation.
+- Commit removal metadata and any reserved-credit release before deleting the one recorded R2 key; a rejected or raced mutation deletes nothing.
 - Store provenance and a checksum without logging private object locations.
 - Keep provider keys and provider responses on the server.
 - Treat generated geometry as a draft until explicit human approval.

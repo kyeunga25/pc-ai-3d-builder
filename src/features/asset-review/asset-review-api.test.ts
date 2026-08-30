@@ -7,6 +7,7 @@ import {
   createAssetFromSource,
   fetchAssetFileBlob,
   fetchGenerationJobs,
+  removeAssetFile,
   fetchAssetReview,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
@@ -342,5 +343,79 @@ describe("private asset file target API", () => {
         new Headers(init.headers).has("x-rigstage-asset-source-view"),
       ).toBe(false);
     }
+  });
+
+  it("removes a selected source view without putting the asset ID in URL or body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json(reviewAsset, {
+        headers: { "x-rigstage-generation-credit-released": "true" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await removeAssetFile(
+      "workspace-fixture",
+      "asset-private-fixture",
+      "source",
+      4,
+      "back",
+    );
+
+    expect(result).toEqual({
+      asset: reviewAsset,
+      reservedGenerationReleased: true,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/file");
+    expect(url).not.toContain("asset-private-fixture");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
+    expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
+    expect(headers.get("x-rigstage-asset-source-view")).toBe("back");
+    expect(headers.get("x-rigstage-expected-version")).toBe("4");
+  });
+
+  it("omits the source-view header when removing a model", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json(reviewAsset, {
+        headers: { "x-rigstage-generation-credit-released": "false" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await removeAssetFile(
+      "workspace-fixture",
+      "asset-private-fixture",
+      "model",
+      4,
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).has("x-rigstage-asset-source-view")).toBe(
+      false,
+    );
+  });
+
+  it("fails closed when a successful removal omits its credit outcome", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json(reviewAsset)),
+    );
+
+    await expect(
+      removeAssetFile(
+        "workspace-fixture",
+        "asset-private-fixture",
+        "source",
+        4,
+      ),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "INVALID_RESPONSE",
+      message: expect.stringContaining("Unable to confirm"),
+    });
   });
 });

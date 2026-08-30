@@ -16,9 +16,11 @@ export type AssetReviewNotice = BilingualCopy & {
 type AssetReviewFailureOperation =
   | "approve"
   | "generation"
+  | "model-remove"
   | "model-upload"
   | "reject"
   | "save"
+  | "source-remove"
   | "source-upload";
 
 type ReviewAction = "approve" | "reject" | "save_draft";
@@ -52,6 +54,10 @@ const failureCopy = {
     "無法確認 GLB 是否已上載；請重新載入素材狀態後再安全重試。",
     "Unable to confirm whether the GLB was uploaded; reload the asset status before retrying safely.",
   ),
+  "model-remove": bilingualCopy(
+    "無法確認私人 GLB 是否已移除；請重新載入素材狀態後再安全重試。",
+    "Unable to confirm whether the private GLB was removed; reload the asset status before retrying safely.",
+  ),
   reject: bilingualCopy(
     "無法確認素材是否已拒絕；請重新載入素材狀態後再安全重試。",
     "Unable to confirm whether the asset was rejected; reload the asset status before retrying safely.",
@@ -63,6 +69,10 @@ const failureCopy = {
   "source-upload": bilingualCopy(
     "無法確認來源圖片是否已上載；請重新載入素材狀態後再安全重試。",
     "Unable to confirm whether the source image was uploaded; reload the asset status before retrying safely.",
+  ),
+  "source-remove": bilingualCopy(
+    "無法確認所選來源圖片是否已移除；請重新載入素材狀態後再安全重試。",
+    "Unable to confirm whether the selected source image was removed; reload the asset status before retrying safely.",
   ),
 } as const satisfies Record<AssetReviewFailureOperation, BilingualCopy>;
 
@@ -122,6 +132,21 @@ export const assetReviewStatusCopy = {
     "Press Confirm rejection again to mark this asset as rejected and possibly release reserved credit; private files will not be deleted.",
     "warning",
   ),
+  confirmSourceRemoval: assetReviewNotice(
+    "再次按下「確認移除圖片」才會刪除所選私人來源視角、重設核准證據，並可能釋放保留 credit；其他私人檔案不受影響。",
+    "Press Confirm image removal again to delete the selected private source view, reset approval evidence, and possibly release reserved credit. Other private files are unchanged.",
+    "warning",
+  ),
+  confirmModelRemoval: assetReviewNotice(
+    "再次按下「確認移除 GLB」才會刪除私人模型、重設核准證據，並可能釋放保留 credit；所有來源圖片不受影響。",
+    "Press Confirm GLB removal again to delete the private model, reset approval evidence, and possibly release reserved credit. All source images are unchanged.",
+    "warning",
+  ),
+  confirmationCanceled: assetReviewNotice(
+    "確認已取消；未送出移除檔案或拒絕操作",
+    "Confirmation canceled. No file-removal or rejection request was submitted.",
+    "info",
+  ),
   uploadingSource: assetReviewNotice(
     "正在驗證及上載來源圖片…",
     "Validating and uploading the source image…",
@@ -130,6 +155,16 @@ export const assetReviewStatusCopy = {
   uploadingModel: assetReviewNotice(
     "正在驗證及上載 GLB…",
     "Validating and uploading the GLB…",
+    "info",
+  ),
+  removingSource: assetReviewNotice(
+    "正在移除所選私人來源圖片…",
+    "Removing the selected private source image…",
+    "info",
+  ),
+  removingModel: assetReviewNotice(
+    "正在移除私人 GLB…",
+    "Removing the private GLB…",
     "info",
   ),
   sourceUploaded: assetReviewNotice(
@@ -177,6 +212,11 @@ export const assetReviewStatusCopy = {
     failureCopy["model-upload"].english,
     "error",
   ),
+  modelRemoveFailed: assetReviewNotice(
+    failureCopy["model-remove"].zhHant,
+    failureCopy["model-remove"].english,
+    "error",
+  ),
   rejectFailed: assetReviewNotice(
     failureCopy.reject.zhHant,
     failureCopy.reject.english,
@@ -192,7 +232,33 @@ export const assetReviewStatusCopy = {
     failureCopy["source-upload"].english,
     "error",
   ),
+  sourceRemoveFailed: assetReviewNotice(
+    failureCopy["source-remove"].zhHant,
+    failureCopy["source-remove"].english,
+    "error",
+  ),
 } as const;
+
+export function assetReviewFileRemovedNotice(
+  kind: "model" | "source",
+  hadReservedGeneration: boolean,
+): AssetReviewNotice {
+  const creditZhHant = hadReservedGeneration ? "；已釋放保留 credit" : "";
+  const creditEnglish = hadReservedGeneration
+    ? " Reserved credit was released."
+    : "";
+  return kind === "source"
+    ? assetReviewNotice(
+        `所選私人來源圖片已移除${creditZhHant}；核准證據已重設`,
+        `The selected private source image was removed.${creditEnglish} Approval evidence was reset.`,
+        "success",
+      )
+    : assetReviewNotice(
+        `私人 GLB 已移除${creditZhHant}；核准證據已重設`,
+        `The private GLB was removed.${creditEnglish} Approval evidence was reset.`,
+        "success",
+      );
+}
 
 export function assetReviewRejectActionLabel(
   armed: boolean,

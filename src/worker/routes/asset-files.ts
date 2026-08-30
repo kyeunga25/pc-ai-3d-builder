@@ -10,6 +10,7 @@ import {
 import type { WorkspaceRole } from "../../shared/domain/session";
 import {
   assetFileKindHeader,
+  assetGenerationCreditReleasedHeader,
   assetSourceViewHeader,
   assetTargetHeader,
 } from "../../shared/lib/asset-target";
@@ -64,6 +65,20 @@ function writeRoleError(): ApiError {
 function assertWriteRole(role: WorkspaceRole): void {
   if (role === "viewer") {
     throw writeRoleError();
+  }
+}
+
+function removalRoleError(): ApiError {
+  return new ApiError(
+    403,
+    "ROLE_FORBIDDEN",
+    "你目前的工作空間角色無權移除私人素材檔案。 / Your current workspace role cannot remove private asset files.",
+  );
+}
+
+function assertRemovalRole(role: WorkspaceRole): void {
+  if (role === "viewer") {
+    throw removalRoleError();
   }
 }
 
@@ -206,6 +221,15 @@ function uploadAuditMetadata(
   return JSON.stringify({ kind, sourceView, sizeBytes, reviewVersion });
 }
 
+function removalAuditMetadata(
+  kind: AssetFileKind,
+  sizeBytes: number,
+  reviewVersion: number,
+  sourceView: AssetSourceView | null,
+): string {
+  return JSON.stringify({ kind, sourceView, sizeBytes, reviewVersion });
+}
+
 export async function createAssetSourceResponse(
   request: Request,
   db: D1Database,
@@ -341,16 +365,31 @@ function expectedVersion(request: Request): number {
   const rawVersion = request.headers.get("x-rigstage-expected-version");
   if (!rawVersion || !/^\d{1,10}$/u.test(rawVersion)) {
     throw validationError(
-      "素材上載必須包含有效的目前版本。 / The upload must include a valid current asset version.",
+      "素材檔案要求必須包含有效的目前版本。 / The asset-file request must include a valid current asset version.",
     );
   }
   const version = Number(rawVersion);
   if (!Number.isSafeInteger(version)) {
     throw validationError(
-      "素材上載版本無效。 / The asset upload version is invalid.",
+      "素材檔案要求的版本無效。 / The asset-file request version is invalid.",
     );
   }
   return version;
+}
+
+function selectedStoredFile(
+  current: AssetReviewRow,
+  kind: AssetFileKind,
+  sourceView: AssetSourceView | null,
+): StoredAssetFile {
+  return kind === "source" && sourceView
+    ? storedSourceFile(current, sourceView)
+    : {
+        contentType: current.model_content_type,
+        objectKey: current.model_object_key,
+        sha256: current.model_sha256,
+        sizeBytes: current.model_size_bytes,
+      };
 }
 
 export async function assetFileUploadResponse(
@@ -626,6 +665,236 @@ export async function assetFileUploadResponse(
   });
 }
 
+export async function assetFileRemoveResponse(
+  request: Request,
+  db: D1Database,
+  bucket: R2Bucket,
+  context: RequestContext,
+  requestId: string,
+): Promise<Response> {
+  assertRemovalRole(context.currentWorkspace.role);
+  const assetId = request.headers.get(assetTargetHeader);
+  const rawKind = request.headers.get(assetFileKindHeader);
+  const kindResult = assetFileKindSchema.safeParse(rawKind);
+  if (!assetId || !assetRecordIdPattern.test(assetId) || !kindResult.success) {
+    throw assetNotFound();
+  }
+  const kind = kindResult.data;
+  const sourceView = requestedSourceView(request, kind);
+  const currentVersion = expectedVersion(request);
+  const current = await findAsset(db, context.currentWorkspace.id, assetId);
+  if (!current) {
+    throw assetNotFound();
+  }
+  if (current.status === "approved") {
+    throw new ApiError(
+      409,
+      "ASSET_LOCKED",
+      "已核准素材不可直接移除檔案。 / A file cannot be removed directly from an approved asset.",
+    );
+  }
+  if (current.review_version !== currentVersion) {
+    throw assetVersionConflict();
+  }
+
+  const stored = selectedStoredFile(current, kind, sourceView);
+  if (
+    !stored.objectKey ||
+    !stored.contentType ||
+    stored.sizeBytes === null ||
+    stored.sizeBytes === undefined ||
+    !stored.sha256
+  ) {
+    throw assetFileNotFound();
+  }
+
+  const reservedGeneration =
+    current.source_kind === "generated"
+      ? await findReservedGenerationForAsset(
+          db,
+          context.currentWorkspace.id,
+          assetId,
+          current.model_object_key,
+        )
+      : null;
+  const nextVersion = currentVersion + 1;
+  const resetColumns = `source_kind = 'uploaded',
+                        status = 'draft',
+                        quality = 'unreviewed',
+                        completed_checks_json = '[]',
+                        source_rights_confirmed = 0,
+                        verified_width_mm = NULL,
+                        verified_height_mm = NULL,
+                        verified_depth_mm = NULL,
+                        review_version = review_version + 1,
+                        updated_by = ?1,
+                        approved_by = NULL,
+                        approved_at = NULL,
+                        rejected_at = NULL,
+                        updated_at = CURRENT_TIMESTAMP`;
+  const updateStatement =
+    kind === "source" && sourceView === "front"
+      ? db
+          .prepare(
+            `UPDATE product_assets
+             SET source_object_key = NULL,
+                 source_content_type = NULL,
+                 source_size_bytes = NULL,
+                 source_sha256 = NULL,
+                 ${resetColumns}
+             WHERE id = ?2
+               AND workspace_id = ?3
+               AND review_version = ?4
+               AND status <> 'approved'
+               AND source_object_key = ?5`,
+          )
+          .bind(
+            context.user.id,
+            assetId,
+            context.currentWorkspace.id,
+            currentVersion,
+            stored.objectKey,
+          )
+      : kind === "source" && sourceView
+        ? db
+            .prepare(
+              `UPDATE product_assets
+               SET ${resetColumns}
+               WHERE id = ?2
+                 AND workspace_id = ?3
+                 AND review_version = ?4
+                 AND status <> 'approved'
+                 AND EXISTS (
+                   SELECT 1
+                   FROM product_asset_source_files
+                   WHERE workspace_id = ?3
+                     AND asset_id = ?2
+                     AND source_view = ?5
+                     AND object_key = ?6
+                 )`,
+            )
+            .bind(
+              context.user.id,
+              assetId,
+              context.currentWorkspace.id,
+              currentVersion,
+              sourceView,
+              stored.objectKey,
+            )
+        : db
+            .prepare(
+              `UPDATE product_assets
+               SET model_object_key = NULL,
+                   model_content_type = NULL,
+                   model_size_bytes = NULL,
+                   model_sha256 = NULL,
+                   ${resetColumns}
+               WHERE id = ?2
+                 AND workspace_id = ?3
+                 AND review_version = ?4
+                 AND status <> 'approved'
+                 AND model_object_key = ?5`,
+            )
+            .bind(
+              context.user.id,
+              assetId,
+              context.currentWorkspace.id,
+              currentVersion,
+              stored.objectKey,
+            );
+  const additionalSourceDelete =
+    kind === "source" && sourceView && sourceView !== "front"
+      ? db
+          .prepare(
+            `DELETE FROM product_asset_source_files
+             WHERE workspace_id = ?1
+               AND asset_id = ?2
+               AND source_view = ?3
+               AND object_key = ?4
+               AND changes() = 1`,
+          )
+          .bind(
+            context.currentWorkspace.id,
+            assetId,
+            sourceView,
+            stored.objectKey,
+          )
+      : null;
+
+  let updateResult: D1Result<unknown> | undefined;
+  try {
+    const statements = [updateStatement];
+    if (additionalSourceDelete) {
+      statements.push(additionalSourceDelete);
+    }
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO audit_events (
+             id, workspace_id, user_id, action, target_type, target_id,
+             request_id, metadata_json
+           )
+           SELECT ?1, workspace_id, ?2, ?3, 'product_asset', id, ?4, ?5
+           FROM product_assets
+           WHERE id = ?6
+             AND workspace_id = ?7
+             AND review_version = ?8
+             AND changes() = 1`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          context.user.id,
+          `asset.file.${kind}.remove`,
+          requestId,
+          removalAuditMetadata(kind, stored.sizeBytes, nextVersion, sourceView),
+          assetId,
+          context.currentWorkspace.id,
+          nextVersion,
+        ),
+    );
+    if (reservedGeneration) {
+      statements.push(
+        ...generationSupersededAccountingStatements(db, {
+          workspaceId: context.currentWorkspace.id,
+          jobId: reservedGeneration.jobId,
+        }),
+      );
+    }
+    [updateResult] = await db.batch(statements);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("ASSET_CATALOGUE_INACTIVE")
+    ) {
+      throw assetNotFound();
+    }
+    throw error;
+  }
+
+  if (updateResult?.meta.changes !== 1) {
+    const existing = await findAsset(db, context.currentWorkspace.id, assetId);
+    if (!existing) {
+      throw assetNotFound();
+    }
+    throw assetVersionConflict();
+  }
+
+  await deletePrivateObjectQuietly(bucket, stored.objectKey);
+  const updated = await findAsset(db, context.currentWorkspace.id, assetId);
+  if (!updated) {
+    throw new Error("Updated asset could not be read after file removal.");
+  }
+
+  return Response.json(mapAssetReviewRow(updated), {
+    headers: {
+      "cache-control": "no-store",
+      [assetGenerationCreditReleasedHeader]: String(
+        reservedGeneration !== null,
+      ),
+    },
+  });
+}
+
 function fileExtension(kind: AssetFileKind, contentType: string): string {
   if (kind === "model") {
     return "glb";
@@ -658,15 +927,7 @@ export async function assetFileResponse(
     throw assetNotFound();
   }
 
-  const stored =
-    kind === "source" && sourceView
-      ? storedSourceFile(asset, sourceView)
-      : {
-          contentType: asset.model_content_type,
-          objectKey: asset.model_object_key,
-          sha256: asset.model_sha256,
-          sizeBytes: asset.model_size_bytes,
-        };
+  const stored = selectedStoredFile(asset, kind, sourceView);
   const { objectKey, contentType, sizeBytes, sha256 } = stored;
   if (
     !objectKey ||

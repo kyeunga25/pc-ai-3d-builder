@@ -76,7 +76,9 @@ export const workspaceActivityActionCopy = {
     "Asset draft and source image created",
   ),
   "asset.file.source.upload": copy("上載來源圖片", "Source image uploaded"),
+  "asset.file.source.remove": copy("移除來源圖片", "Source image removed"),
   "asset.file.model.upload": copy("上載私人 GLB", "Private GLB uploaded"),
+  "asset.file.model.remove": copy("移除私人 GLB", "Private GLB removed"),
   "asset.review.save_draft": copy(
     "儲存素材審核草稿",
     "Asset review draft saved",

@@ -25,7 +25,12 @@ const routePolicies = [
   ["/api/assets/review-queue", "protected", ["GET"], "GET"],
   ["/api/assets/item/review", "protected", ["PATCH"], "PATCH"],
   ["/api/assets/item", "protected", ["GET"], "GET"],
-  ["/api/assets/item/file", "protected", ["GET", "PUT"], "GET, PUT"],
+  [
+    "/api/assets/item/file",
+    "protected",
+    ["GET", "PUT", "DELETE"],
+    "GET, PUT, DELETE",
+  ],
   [
     "/api/assets/item/generation-jobs",
     "protected",
@@ -44,7 +49,7 @@ describe("API route policy", () => {
       for (const method of methods) {
         expect(isApiMethodAllowed(policy, method)).toBe(true);
       }
-      expect(isApiMethodAllowed(policy, "DELETE")).toBe(false);
+      expect(isApiMethodAllowed(policy, "OPTIONS")).toBe(false);
       expect(isApiMethodAllowed(policy, methods[0].toLowerCase())).toBe(false);
     },
   );

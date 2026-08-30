@@ -66,7 +66,11 @@ const routePolicies = new Map<string, ApiRoutePolicy>([
   ["/api/assets/item", { access: "protected", methods: ["GET"], allow: "GET" }],
   [
     "/api/assets/item/file",
-    { access: "protected", methods: ["GET", "PUT"], allow: "GET, PUT" },
+    {
+      access: "protected",
+      methods: ["GET", "PUT", "DELETE"],
+      allow: "GET, PUT, DELETE",
+    },
   ],
   [
     "/api/assets/item/generation-jobs",
