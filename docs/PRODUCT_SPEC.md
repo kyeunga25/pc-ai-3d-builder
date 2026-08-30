@@ -17,7 +17,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Validated CSV template download and transactional import of at most 50 catalogue records.
 - Traditional-Chinese-first bilingual Catalogue status and recovery copy for product writes, two-step archive, private asset-draft creation and CSV import, including semantic info/success/warning/error announcements and reload guidance after an ambiguous write result.
 - Draft saves for staff, with approval and rejection reserved for owner or admin roles.
-- Traditional-Chinese-first bilingual Asset Review progress, success, unsaved-warning and failure announcements for draft save, approval, rejection, private-file upload, exact private-file removal and simulated generation, including reload guidance when a response is lost after a possible write.
+- Traditional-Chinese-first bilingual Asset Review progress, success, unsaved-warning and failure announcements for draft save, approval, rejection, private-file upload, exact private-file removal, simulated generation and queued-job cancellation, including reload guidance when a response is lost after a possible write.
 - Domain-complete Traditional-Chinese-first bilingual labels for all six approval checks and three verified dimensions, human-verification guidance and a completion count with correct English singular/plural handling.
 - Exhaustive Traditional-Chinese-first bilingual Asset Review header and metadata labels for every draft/in-review/approved/rejected status, source kind and quality value, plus version and queue context with correct English singular/plural and no visible internal asset ID.
 - Two-step Asset Review rejection scoped to the current workspace and asset version, with a bilingual warning that reserved credit may be released but private files are not deleted; form, file, generation, workspace or version changes disarm confirmation before submission.
@@ -41,7 +41,8 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Clear draft, review and approved labels for visual assets.
 - Human approval remains mandatory before generated material is treated as usable.
 - Workspace-scoped, owner/admin-only generation requests with saved source-rights confirmation, optimistic asset versions and idempotency keys.
-- Durable queued, running, validating, review-ready and failed generation states with bounded job history.
+- Durable queued, running, validating, review-ready, failed and cancelled generation states with bounded job history.
+- Owner/admin-only two-step cancellation of one exact still-queued job through a bodyless fixed API. The reservation is released only if cancellation wins before Workflow claim; started work returns a conflict and is not presented as stopped.
 - Traditional-Chinese-first bilingual generation-inspector labels for every mode, job lifecycle and entitlement state, plus explicit non-monetary credit summaries and readable absent-value states without exposing provider or private-object details.
 - Shared-schema and D1 enforcement that public generation failure/validation codes contain only 1–128 uppercase ASCII letters, digits or underscores, preventing arbitrary internal text from entering the response or review interface.
 - Runtime synthetic GLB creation, private R2 storage, read-back validation and atomic review-version reset for local or explicitly controlled simulation testing.

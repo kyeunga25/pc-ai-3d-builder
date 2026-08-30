@@ -34,8 +34,8 @@ const routePolicies = [
   [
     "/api/assets/item/generation-jobs",
     "protected",
-    ["GET", "POST"],
-    "GET, POST",
+    ["GET", "POST", "DELETE"],
+    "GET, POST, DELETE",
   ],
 ] as const;
 

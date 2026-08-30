@@ -11,8 +11,12 @@ import type { RequestContext } from "../src/worker/auth/workspace";
 import { generationOutputRequirements } from "../src/worker/generation/provider";
 import { sha256Hex } from "../src/worker/lib/digest";
 import { assetReviewMutationResponse } from "../src/worker/routes/assets";
-import { generationJobStartResponse } from "../src/worker/routes/generation-jobs";
 import {
+  generationJobCancelResponse,
+  generationJobStartResponse,
+} from "../src/worker/routes/generation-jobs";
+import {
+  claimGenerationJob,
   markGenerationFailed,
   stageGeneratedDraft,
 } from "../src/worker/workflows/asset-generation";
@@ -77,6 +81,19 @@ function generationRequest(
       "x-rigstage-asset-id": fixture.assetId,
     },
     body: JSON.stringify({ expectedVersion }),
+  });
+}
+
+function generationCancelRequest(
+  fixture: GenerationFixture,
+  jobId: string,
+): Request {
+  return new Request("https://local.invalid/api/assets/item/generation-jobs", {
+    method: "DELETE",
+    headers: {
+      "x-rigstage-asset-id": fixture.assetId,
+      "x-rigstage-generation-job-id": jobId,
+    },
   });
 }
 
@@ -202,7 +219,274 @@ async function seedGenerationFixture(
   });
 }
 
+async function seedQueuedGenerationJob(
+  fixture: GenerationFixture,
+  jobId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE generation_credit_accounts
+       SET available_units = 1, reserved_units = 1
+       WHERE workspace_id = ?1`,
+    ).bind(fixture.workspaceId),
+    env.DB.prepare(
+      `INSERT INTO generation_jobs (
+         id, workspace_id, asset_id, requested_by, status, execution_mode,
+         idempotency_key, workflow_instance_id, requested_review_version,
+         input_sha256, max_cost_minor, max_provider_cost_units
+       ) VALUES (?1, ?2, ?3, ?4, 'queued', 'simulation', ?5, ?1, 2, ?6, 0, 1)`,
+    ).bind(
+      jobId,
+      fixture.workspaceId,
+      fixture.assetId,
+      fixture.userId,
+      idempotencyKey,
+      fixture.sourceSha256,
+    ),
+    env.DB.prepare(
+      `INSERT INTO generation_job_entitlements (
+         workspace_id, job_id, units, status
+       ) VALUES (?1, ?2, 1, 'reserved')`,
+    ).bind(fixture.workspaceId, jobId),
+    env.DB.prepare(
+      `INSERT INTO generation_credit_events (
+         id, workspace_id, job_id, event_type, units, reason_code
+       ) VALUES (?1, ?2, ?3, 'reserve', 1, 'generation_requested')`,
+    ).bind(crypto.randomUUID(), fixture.workspaceId, jobId),
+  ]);
+}
+
 describe("local generation Workflow", () => {
+  it("cancels before claim, releases exactly once and permits a new queued job", async () => {
+    const cancelFixture: GenerationFixture = {
+      workspaceId: "workspace-local-queued-cancel",
+      userId: "user-local-queued-cancel",
+      partId: "part-local-queued-cancel",
+      assetId: "asset-local-queued-cancel",
+      sourceSha256,
+      slug: "local-queued-cancel",
+      idempotencyKey: "local-queued-cancel-next-001",
+    };
+    const cancelledJobId = "generation-local-queued-cancel";
+    await seedGenerationFixture(cancelFixture);
+    await seedQueuedGenerationJob(
+      cancelFixture,
+      cancelledJobId,
+      "local-queued-cancel-original-001",
+    );
+    const cancelContext = requestContextFor(cancelFixture);
+
+    const cancelled = await generationJobCancelResponse(
+      generationCancelRequest(cancelFixture, cancelledJobId),
+      env.DB,
+      cancelContext,
+      "request-local-queued-cancel",
+    );
+    expect(cancelled.status).toBe(200);
+    await expect(cancelled.json()).resolves.toMatchObject({
+      id: cancelledJobId,
+      status: "cancelled",
+      entitlementStatus: "released",
+    });
+
+    const replay = await generationJobCancelResponse(
+      generationCancelRequest(cancelFixture, cancelledJobId),
+      env.DB,
+      cancelContext,
+      "request-local-queued-cancel-replay",
+    );
+    await expect(replay.json()).resolves.toMatchObject({
+      status: "cancelled",
+      entitlementStatus: "released",
+    });
+    await expect(
+      claimGenerationJob(env.DB, {
+        workspaceId: cancelFixture.workspaceId,
+        assetId: cancelFixture.assetId,
+        jobId: cancelledJobId,
+        requestedReviewVersion: 2,
+      }),
+    ).resolves.toEqual({ disposition: "cancelled" });
+
+    const introspector = await introspectWorkflow(env.ASSET_GENERATION);
+    try {
+      await env.ASSET_GENERATION.create({
+        id: cancelledJobId,
+        params: {
+          workspaceId: cancelFixture.workspaceId,
+          assetId: cancelFixture.assetId,
+          jobId: cancelledJobId,
+          requestedReviewVersion: 2,
+        },
+      });
+      const instances = await introspector.get();
+      expect(instances).toHaveLength(1);
+      await expect(
+        instances[0]!.waitForStatus("complete"),
+      ).resolves.not.toThrow();
+      expect(await instances[0]!.getOutput()).toEqual({
+        jobId: cancelledJobId,
+        status: "cancelled",
+      });
+    } finally {
+      await introspector.dispose();
+    }
+
+    expect(
+      await env.DB.prepare(
+        `SELECT j.status, j.completed_at, e.status AS entitlement_status,
+                e.release_reason_code, a.available_units, a.reserved_units,
+                a.released_units,
+                (SELECT COUNT(*) FROM generation_credit_events AS ce
+                 WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                   AND ce.event_type = 'release') AS release_events,
+                (SELECT COUNT(*) FROM generation_job_events AS je
+                 WHERE je.workspace_id = j.workspace_id AND je.job_id = j.id
+                   AND je.event_type = 'user_cancelled') AS cancel_events,
+                (SELECT COUNT(*) FROM audit_events AS ae
+                 WHERE ae.workspace_id = j.workspace_id AND ae.target_id = j.id
+                   AND ae.action = 'generation.cancel') AS cancel_audits,
+                (SELECT COUNT(*) FROM generation_provider_attempts AS pa
+                 WHERE pa.workspace_id = j.workspace_id AND pa.job_id = j.id)
+                   AS provider_attempts
+         FROM generation_jobs AS j
+         INNER JOIN generation_job_entitlements AS e
+           ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+         INNER JOIN generation_credit_accounts AS a
+           ON a.workspace_id = j.workspace_id
+         WHERE j.workspace_id = ?1 AND j.id = ?2`,
+      )
+        .bind(cancelFixture.workspaceId, cancelledJobId)
+        .first(),
+    ).toEqual({
+      status: "cancelled",
+      completed_at: expect.any(String),
+      entitlement_status: "released",
+      release_reason_code: "user_cancelled",
+      available_units: 2,
+      reserved_units: 0,
+      released_units: 1,
+      release_events: 1,
+      cancel_events: 1,
+      cancel_audits: 1,
+      provider_attempts: 0,
+    });
+
+    const creates: Array<WorkflowInstanceCreateOptions<AssetGenerationParams>> =
+      [];
+    const workflow = {
+      async create(
+        options?: WorkflowInstanceCreateOptions<AssetGenerationParams>,
+      ) {
+        if (options) creates.push(options);
+        return { id: options?.id ?? "generated" } as WorkflowInstance;
+      },
+      async get(id: string) {
+        return {
+          id,
+          async status() {
+            return { status: "unknown" as const };
+          },
+        } as WorkflowInstance;
+      },
+    } as Workflow<AssetGenerationParams>;
+    const next = await generationJobStartResponse(
+      generationRequest(cancelFixture),
+      {
+        ASSET_GENERATION: workflow,
+        DB: env.DB,
+        GENERATION_MODE: "simulation",
+        GENERATION_MAX_COST_MINOR: "0",
+        PRIVATE_ASSETS: env.PRIVATE_ASSETS,
+      },
+      cancelContext,
+      "request-local-queued-cancel-next",
+    );
+    expect(next.status).toBe(202);
+    expect(creates).toHaveLength(1);
+    expect(
+      await env.DB.prepare(
+        `SELECT available_units, reserved_units
+         FROM generation_credit_accounts WHERE workspace_id = ?1`,
+      )
+        .bind(cancelFixture.workspaceId)
+        .first(),
+    ).toEqual({ available_units: 1, reserved_units: 1 });
+  });
+
+  it("keeps the reservation when Workflow wins the queued cancellation race", async () => {
+    const raceFixture: GenerationFixture = {
+      workspaceId: "workspace-local-cancel-race",
+      userId: "user-local-cancel-race",
+      partId: "part-local-cancel-race",
+      assetId: "asset-local-cancel-race",
+      sourceSha256,
+      slug: "local-cancel-race",
+      idempotencyKey: "local-cancel-race-next-001",
+    };
+    const jobId = "generation-local-cancel-race";
+    await seedGenerationFixture(raceFixture);
+    await seedQueuedGenerationJob(
+      raceFixture,
+      jobId,
+      "local-cancel-race-original-001",
+    );
+    const racingDb = databaseWithBeforeBatch(async () => {
+      await env.DB.prepare(
+        `UPDATE generation_jobs SET status = 'running'
+         WHERE workspace_id = ?1 AND id = ?2 AND status = 'queued'`,
+      )
+        .bind(raceFixture.workspaceId, jobId)
+        .run();
+    });
+
+    await expect(
+      generationJobCancelResponse(
+        generationCancelRequest(raceFixture, jobId),
+        racingDb,
+        requestContextFor(raceFixture),
+        "request-local-cancel-race",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "GENERATION_CANCEL_TOO_LATE",
+    });
+
+    expect(
+      await env.DB.prepare(
+        `SELECT j.status, e.status AS entitlement_status,
+                a.available_units, a.reserved_units, a.released_units,
+                (SELECT COUNT(*) FROM generation_credit_events AS ce
+                 WHERE ce.workspace_id = j.workspace_id AND ce.job_id = j.id
+                   AND ce.event_type = 'release') AS release_events,
+                (SELECT COUNT(*) FROM generation_job_events AS je
+                 WHERE je.workspace_id = j.workspace_id AND je.job_id = j.id
+                   AND je.event_type = 'user_cancelled') AS cancel_events,
+                (SELECT COUNT(*) FROM audit_events AS ae
+                 WHERE ae.workspace_id = j.workspace_id AND ae.target_id = j.id
+                   AND ae.action = 'generation.cancel') AS cancel_audits
+         FROM generation_jobs AS j
+         INNER JOIN generation_job_entitlements AS e
+           ON e.workspace_id = j.workspace_id AND e.job_id = j.id
+         INNER JOIN generation_credit_accounts AS a
+           ON a.workspace_id = j.workspace_id
+         WHERE j.workspace_id = ?1 AND j.id = ?2`,
+      )
+        .bind(raceFixture.workspaceId, jobId)
+        .first(),
+    ).toEqual({
+      status: "running",
+      entitlement_status: "reserved",
+      available_units: 1,
+      reserved_units: 1,
+      released_units: 0,
+      release_events: 0,
+      cancel_events: 0,
+      cancel_audits: 0,
+    });
+  });
+
   it("reserves once, retries safely, validates private GLB, and settles on approval", async () => {
     await seedGenerationFixture();
     const introspector = await introspectWorkflow(env.ASSET_GENERATION);

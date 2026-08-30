@@ -41,6 +41,7 @@ import {
 } from "./routes/builds";
 import { dashboardResponse } from "./routes/dashboard";
 import {
+  generationJobCancelResponse,
   generationJobListResponse,
   generationJobStartResponse,
 } from "./routes/generation-jobs";
@@ -242,6 +243,9 @@ export async function routeRequest(
     if (url.pathname === "/api/assets/item/generation-jobs") {
       if (request.method === "GET") {
         return generationJobListResponse(request, env, context);
+      }
+      if (request.method === "DELETE") {
+        return generationJobCancelResponse(request, env.DB, context, requestId);
       }
       return generationJobStartResponse(request, env, context, requestId);
     }

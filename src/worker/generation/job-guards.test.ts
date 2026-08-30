@@ -65,6 +65,18 @@ describe("generation job guards", () => {
     });
   });
 
+  it("treats a user-cancelled queued job as a terminal no-provider result", () => {
+    expect(
+      generationClaimDisposition(
+        state({
+          entitlementStatus: "released",
+          jobStatus: "cancelled",
+        }),
+        2,
+      ),
+    ).toEqual({ kind: "cancelled" });
+  });
+
   it("enforces the cost cap and current input before staging", () => {
     const validating = state({ jobStatus: "validating" });
 

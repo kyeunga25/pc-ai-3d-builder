@@ -47,9 +47,9 @@ RigStage is an invite-only PC catalogue, private visual-asset review and 3D asse
 - 六條相容性規則只讀取已核實的插槽、記憶體類型、尺寸淨空及電源建議；缺少資料會明確標記為未知。
 - 安全 JSON 匯出使用 schema 2，記錄 build version 及每件 component 的 catalogue version；它不包含使用者、workspace 識別資料、價格、庫存、私人素材或 Cloudflare 部署資料，亦不假裝是 immutable snapshot。
 - Cloudflare Workers Static Assets、D1、私人 R2 binding、Workflow binding及按 Access subject 限流。
-- 固定 URL 的生成工作 API 以受保護 asset 標頭指定目標，並受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制；asset ID 與 key 均不進 URL 或 body，瀏覽器只在結果不明時以記憶體保留同一素材版本的 key 作安全重試，同一素材只可有一項進行中或等待人工決定的保留工作。審核面板以繁中優先、英文輔助顯示模式、工作狀態、非貨幣 credit、權益、模擬成本與 GLB 驗證，並明確區分空白狀態；公開 failure／validation code 在共享 schema 及 D1 新增／更新邊界均只接受 1–128 個大寫英數或底線，任意內部文字會 fail closed。
+- 固定 URL 的生成工作 API 以受保護 asset 標頭指定目標，並受 workspace、角色、素材版本、已儲存使用權、可用 generation credit 及 `Idempotency-Key` 限制；asset ID 與 key 均不進 URL 或 body，瀏覽器只在結果不明時以記憶體保留同一素材版本的 key 作安全重試，同一素材只可有一項進行中或等待人工決定的保留工作。Owner／admin 可用另一個受保護 job 標頭及無 body 的兩步操作取消仍在 `queued` 的精確工作；只有取消的條件更新先於 Workflow claim 勝出才會原子釋放 credit，已開始的工作會保持執行並回傳衝突。審核面板以繁中優先、英文輔助顯示模式、工作狀態、非貨幣 credit、權益、模擬成本與 GLB 驗證，並明確區分空白狀態；公開 failure／validation code 在共享 schema 及 D1 新增／更新邊界均只接受 1–128 個大寫英數或底線，任意內部文字會 fail closed。
 - 零成本 synthetic adapter 可在本地或明確控制的非正式環境驗證 Workflow、GLB 格式、安全檢查、私人 R2 draft ingestion 及人工審批銜接。
-- Generation credit 會在要求時原子保留，在核准時結算，在拒絕、失敗、啟動失敗或草稿被取代時釋放；這是非貨幣 entitlement 記帳，不是付款、餘額或售價。
+- Generation credit 會在要求時原子保留，在核准時結算，在排隊取消、拒絕、失敗、啟動失敗或草稿被取代時釋放；這是非貨幣 entitlement 記帳，不是付款、餘額或售價。
 - Provider attempt 以穩定 attempt key 去重，供應商邊界只接收假名化工作參考、來源檔案描述及明確輸出限制。生成 GLB 在寫入 R2 前及讀回後均檢查自包含結構、尺寸、三角形、貼圖、byte bounds 及 checksum。
 - Tracked production 設定的 generation kill switch 預設關閉；沒有外部 3D provider、Workers AI 模型或付款呼叫。
 - 所有生成素材均視為草稿；只有經人手核准的資料才可進入後續流程。

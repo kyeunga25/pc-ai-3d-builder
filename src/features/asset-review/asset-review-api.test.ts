@@ -4,6 +4,7 @@ import { reviewAsset } from "../../shared/domain/mockData";
 import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
+  cancelGenerationJob,
   createAssetFromSource,
   fetchAssetFileBlob,
   fetchGenerationJobs,
@@ -167,6 +168,48 @@ describe("generation request API", () => {
     expect(url).not.toContain(leaseInput.assetId);
     expect(init.body).toBeUndefined();
     expect(headers.get("x-rigstage-asset-id")).toBe(leaseInput.assetId);
+  });
+
+  it("cancels one exact queued job with a bodyless protected request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "generation-private-fixture",
+        assetId: leaseInput.assetId,
+        status: "cancelled",
+        kind: "simulation",
+        outputReady: false,
+        failureCode: null,
+        entitlementStatus: "released",
+        providerCostUnits: null,
+        validationCode: null,
+        createdAt: "2026-08-10T00:00:00Z",
+        updatedAt: "2026-08-10T00:01:00Z",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      cancelGenerationJob(
+        leaseInput.workspaceId,
+        leaseInput.assetId,
+        "generation-private-fixture",
+      ),
+    ).resolves.toMatchObject({
+      status: "cancelled",
+      entitlementStatus: "released",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/item/generation-jobs");
+    expect(url).not.toContain(leaseInput.assetId);
+    expect(url).not.toContain("generation-private-fixture");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect(headers.get("x-rigstage-asset-id")).toBe(leaseInput.assetId);
+    expect(headers.get("x-rigstage-generation-job-id")).toBe(
+      "generation-private-fixture",
+    );
   });
 });
 

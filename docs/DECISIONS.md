@@ -56,6 +56,8 @@ The Asset Review client preserves a valid bilingual API or file-validation messa
 
 Long-running jobs use a swappable provider boundary and an idempotent Workflow. A generation request is accepted only after its workspace-scoped job, initial event and audit record commit. The Workflow uses unique instance IDs, bounded retry/timeout settings and guarded D1 transitions.
 
+Cancellation is intentionally limited to the pre-provider queue boundary. A bodyless owner/admin request identifies one workspace-scoped asset/job through protected headers and may change only `queued` to `cancelled`. The same guarded batch releases the reservation and records the transition exactly once. Once Workflow wins the claim and writes `running`, the cancellation loses with a conflict and never claims that in-flight work stopped. A Workflow claim after cancellation exits before source reads or provider attempts.
+
 The current adapter creates a zero-cost synthetic GLB solely to exercise storage, validation and human-review transitions. Tracked production configuration disables it. The local-development milestone reserves one non-monetary capability unit and caps provider work at one neutral cost unit. A real provider still requires another decision covering commercial terms, data rights, callbacks and a capped non-production test; capability accounting is not a payment ledger.
 
 ## Generated output remains review evidence

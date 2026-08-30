@@ -16,6 +16,12 @@ describe("workspace activity domain", () => {
     expect(normalizeWorkspaceActivityAction("asset.file.source.remove")).toBe(
       "asset.file.source.remove",
     );
+    const generationCancel =
+      normalizeWorkspaceActivityAction("generation.cancel");
+    expect(generationCancel).toBe("generation.cancel");
+    expect(workspaceActivityCategoryForAction(generationCancel)).toBe(
+      "generation",
+    );
 
     const unknown = normalizeWorkspaceActivityAction(
       "private.provider.coordinate.changed",

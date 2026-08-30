@@ -5,6 +5,7 @@ import type { WorkspaceRole } from "../../shared/domain/session";
 import type { RequestContext } from "../auth/workspace";
 import { createD1Stub } from "../test/d1-stub";
 import {
+  generationJobCancelResponse,
   generationJobListResponse,
   generationJobStartResponse,
 } from "./generation-jobs";
@@ -139,6 +140,21 @@ function request(expectedVersion = 2, assetId = "asset-fixture") {
       "x-rigstage-asset-id": assetId,
     },
     body: JSON.stringify({ expectedVersion }),
+  });
+}
+
+function cancelRequest(
+  assetId = "asset-fixture",
+  jobId = "generation-fixture",
+  body?: string,
+) {
+  return new Request("https://app.example/api/assets/item/generation-jobs", {
+    method: "DELETE",
+    headers: {
+      "x-rigstage-asset-id": assetId,
+      "x-rigstage-generation-job-id": jobId,
+    },
+    body,
   });
 }
 
@@ -750,5 +766,211 @@ describe("generation job routes", () => {
     ).rejects.toMatchObject({ code: "GENERATION_DISABLED" });
     expect(calls).toHaveLength(0);
     expect(creates).toHaveLength(0);
+  });
+
+  it("cancels one exact queued job and releases its reserved credit", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [
+        jobRow(),
+        jobRow({ status: "cancelled", entitlement_status: "released" }),
+      ],
+    });
+
+    const response = await generationJobCancelResponse(
+      cancelRequest(),
+      db,
+      context("admin"),
+      "request-cancel-fixture",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toMatchObject({
+      id: "generation-fixture",
+      assetId: "asset-fixture",
+      status: "cancelled",
+      entitlementStatus: "released",
+      outputReady: false,
+    });
+    const transition = calls.find((call) =>
+      call.sql.includes("UPDATE generation_jobs"),
+    );
+    expect(transition?.sql).toContain("status = 'cancelled'");
+    expect(transition?.sql).toContain("status = 'queued'");
+    expect(transition?.values).toContain("workspace-fixture");
+    expect(transition?.values).toContain("asset-fixture");
+    expect(transition?.values).toContain("generation-fixture");
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("INSERT INTO audit_events") &&
+          call.values.includes("generation.cancel"),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("generation_job_entitlements") &&
+          call.values.includes("user_cancelled"),
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(calls)).not.toContain("fixture@example.com");
+  });
+
+  it("replays an already-cancelled target without another credit transition", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [
+        jobRow({ status: "cancelled", entitlement_status: "released" }),
+      ],
+    });
+
+    const response = await generationJobCancelResponse(
+      cancelRequest(),
+      db,
+      context(),
+      "request-cancel-replay",
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "cancelled",
+      entitlementStatus: "released",
+    });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+  });
+
+  it("loses safely when Workflow has already claimed the queued job", async () => {
+    const { calls, db } = createD1Stub({
+      batchChanges: 0,
+      firstResults: [jobRow(), jobRow({ status: "running" })],
+    });
+
+    await expect(
+      generationJobCancelResponse(
+        cancelRequest(),
+        db,
+        context(),
+        "request-cancel-race",
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "GENERATION_CANCEL_TOO_LATE",
+      message: expect.stringMatching(/已開始.+already started/iu),
+    });
+    const transition = calls.find((call) =>
+      call.sql.includes("UPDATE generation_jobs"),
+    );
+    expect(transition?.sql).toContain("status = 'queued'");
+  });
+
+  it.each(["running", "validating", "awaiting_review", "failed"])(
+    "does not cancel a generation job in %s state",
+    async (status) => {
+      const { calls, db } = createD1Stub({
+        firstResults: [jobRow({ status })],
+      });
+
+      await expect(
+        generationJobCancelResponse(
+          cancelRequest(),
+          db,
+          context(),
+          `request-cancel-${status}`,
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        code: "GENERATION_CANCEL_TOO_LATE",
+      });
+      expect(
+        calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+      ).toBe(false);
+    },
+  );
+
+  it("rejects staff before reading cancellation targets or request body", async () => {
+    const { calls, db } = createD1Stub();
+    const cancellation = new Request(
+      "https://app.example/api/assets/item/generation-jobs",
+      { method: "DELETE", body: "private-input" },
+    );
+
+    await expect(
+      generationJobCancelResponse(
+        cancellation,
+        db,
+        context("staff"),
+        "request-cancel-role",
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "ROLE_FORBIDDEN" });
+    expect(cancellation.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it.each([
+    { assetId: "../../escape", jobId: "generation-fixture" },
+    { assetId: "asset-fixture", jobId: "../../escape" },
+    { assetId: "asset-fixture", jobId: "" },
+  ])(
+    "rejects malformed cancellation targets before D1: $assetId / $jobId",
+    async ({ assetId, jobId }) => {
+      const { calls, db } = createD1Stub();
+
+      await expect(
+        generationJobCancelResponse(
+          cancelRequest(assetId, jobId),
+          db,
+          context(),
+          "request-cancel-target",
+        ),
+      ).rejects.toMatchObject({
+        status: 404,
+        code: "GENERATION_JOB_NOT_FOUND",
+      });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("rejects a body-bearing cancellation before D1", async () => {
+    const { calls, db } = createD1Stub();
+    const cancellation = cancelRequest(
+      "asset-fixture",
+      "generation-fixture",
+      "private-input",
+    );
+
+    await expect(
+      generationJobCancelResponse(
+        cancellation,
+        db,
+        context(),
+        "request-cancel-body",
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "UNEXPECTED_REQUEST_BODY",
+    });
+    expect(cancellation.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("does not reveal or mutate a missing or cross-workspace cancellation target", async () => {
+    const { calls, db } = createD1Stub({ firstResults: [null] });
+
+    await expect(
+      generationJobCancelResponse(
+        cancelRequest("asset-other", "generation-other"),
+        db,
+        context(),
+        "request-cancel-isolation",
+      ),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "GENERATION_JOB_NOT_FOUND",
+    });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
   });
 });
