@@ -9,8 +9,8 @@ export const assetReviewFileControlCopy = {
   ),
   sourceImage: bilingualCopy("來源圖片", "Source image"),
   sourceRequirements: bilingualCopy(
-    "靜態 JPEG、PNG 或 WebP · 最多 10 MiB／8,192 px／24 MP",
-    "Static JPEG, PNG or WebP · Up to 10 MiB / 8,192 px / 24 MP",
+    "靜態 JPEG、PNG 或 WebP · 最多 10 MiB／8,192 px／24 MP · 上載前核對檔名／MIME／內容",
+    "Static JPEG, PNG or WebP · Up to 10 MiB / 8,192 px / 24 MP · Filename/MIME/content checked before upload",
   ),
   syntheticImage: bilingualCopy("合成圖片", "Create synthetic image"),
   syntheticImageTitle: bilingualCopy(
@@ -27,8 +27,8 @@ export const assetReviewFileControlCopy = {
   ),
   model: bilingualCopy("3D 模型", "3D model"),
   modelRequirements: bilingualCopy(
-    "自包含及資源有界的 glTF 2.0 GLB · 最多 25 MiB",
-    "Self-contained, resource-bounded glTF 2.0 GLB · Up to 25 MiB",
+    "自包含及資源有界的 glTF 2.0 GLB · 最多 25 MiB · 上載前核對 .glb／MIME／內容",
+    "Self-contained, resource-bounded glTF 2.0 GLB · Up to 25 MiB · .glb/MIME/content checked before upload",
   ),
   modelUploadTitle: bilingualCopy(
     "上載或取代 GLB 會重設核准證據；不會刪除任何來源圖片",

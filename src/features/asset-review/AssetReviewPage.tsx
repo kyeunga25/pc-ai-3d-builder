@@ -39,8 +39,6 @@ import {
 } from "../../shared/components/AsyncState";
 import { StatusBadge } from "../../shared/components/StatusBadge";
 import {
-  AssetFileValidationError,
-  assetFileLimits,
   assetModelContentType,
   validateAssetFileBytes,
   type AssetFileKind,
@@ -74,6 +72,7 @@ import {
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
+import { validateAssetUploadFile } from "./asset-upload-file";
 import {
   assetReviewChecklistCopy,
   assetReviewChecklistProgressCopy,
@@ -1072,19 +1071,7 @@ export function AssetReviewPage() {
         : assetReviewStatusCopy.uploadingModel,
     );
     try {
-      if (file.size > assetFileLimits[kind]) {
-        throw new AssetFileValidationError(
-          kind === "source"
-            ? "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller."
-            : "GLB 模型必須小於或等於 25 MiB。 / The GLB model must be 25 MiB or smaller.",
-        );
-      }
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const contentType = validateAssetFileBytes(
-        kind,
-        kind === "model" ? file.type || assetModelContentType : file.type,
-        bytes,
-      );
+      const upload = await validateAssetUploadFile(kind, file);
 
       let updated: AssetReviewItem;
       if (isLocalPreview) {
@@ -1094,7 +1081,7 @@ export function AssetReviewPage() {
             "GENERATION_DRAFT_SUPERSEDED",
           );
         }
-        const objectUrl = URL.createObjectURL(file);
+        const objectUrl = URL.createObjectURL(upload.file);
         localObjectUrlsRef.current.add(objectUrl);
         updated = {
           ...currentForm.asset,
@@ -1105,14 +1092,14 @@ export function AssetReviewPage() {
           sourceRightsConfirmed: false,
           dimensionsMm: { width: null, height: null, depth: null },
           files:
-            kind === "source"
+            upload.kind === "source"
               ? {
                   ...currentForm.asset.files,
                   sources: {
                     ...currentForm.asset.files.sources,
                     [sourceView]: {
-                      contentType,
-                      sizeBytes: file.size,
+                      contentType: upload.contentType,
+                      sizeBytes: upload.file.size,
                     },
                   },
                 }
@@ -1120,7 +1107,7 @@ export function AssetReviewPage() {
                   ...currentForm.asset.files,
                   model: {
                     contentType: assetModelContentType,
-                    sizeBytes: file.size,
+                    sizeBytes: upload.file.size,
                   },
                 },
           version: currentForm.asset.version + 1,
@@ -1130,9 +1117,13 @@ export function AssetReviewPage() {
           const sameAsset = current.assetKey === currentKey;
           const sources = sameAsset ? current.sources : emptyAssetSourceUrls();
           const model =
-            kind === "model" ? objectUrl : sameAsset ? current.model : null;
+            upload.kind === "model"
+              ? objectUrl
+              : sameAsset
+                ? current.model
+                : null;
           const replaced =
-            kind === "source" ? sources[sourceView] : current.model;
+            upload.kind === "source" ? sources[sourceView] : current.model;
           if (replaced && localObjectUrlsRef.current.has(replaced)) {
             URL.revokeObjectURL(replaced);
             localObjectUrlsRef.current.delete(replaced);
@@ -1141,7 +1132,7 @@ export function AssetReviewPage() {
             assetKey: assetKey(updated),
             model,
             sources:
-              kind === "source"
+              upload.kind === "source"
                 ? { ...sources, [sourceView]: objectUrl }
                 : sources,
           };
@@ -1150,16 +1141,15 @@ export function AssetReviewPage() {
         updated = await uploadAssetFile(
           currentWorkspace.id,
           currentForm.asset.id,
-          kind,
           currentForm.asset.version,
-          file,
+          upload,
           sourceView,
         );
       }
 
       setForm(createReviewForm(updated));
       setReviewNotice(
-        kind === "source"
+        upload.kind === "source"
           ? assetReviewStatusCopy.sourceUploaded
           : assetReviewStatusCopy.modelUploaded,
       );
@@ -1623,7 +1613,7 @@ export function AssetReviewPage() {
         ref={sourceInputRef}
         hidden
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
         disabled={
           !canEdit || fileOperationPending || submitting || generationSubmitting
         }

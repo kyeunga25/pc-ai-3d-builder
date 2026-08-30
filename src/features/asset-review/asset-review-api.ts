@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   type AssetFileKind,
   type AssetSourceView,
-  assetModelContentType,
 } from "../../shared/domain/asset-files";
 import {
   assetReviewItemSchema,
@@ -26,6 +25,10 @@ import {
   generationJobTargetHeader,
 } from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
+import type {
+  ValidatedAssetUpload,
+  ValidatedSourceUpload,
+} from "./asset-upload-file";
 
 const apiErrorSchema = z.object({
   error: z.object({
@@ -154,23 +157,19 @@ export async function updateAssetReview(
   return assetReviewItemSchema.parse(await response.json());
 }
 
-function uploadContentType(kind: AssetFileKind, file: File): string {
-  return kind === "model" ? assetModelContentType : file.type.toLowerCase();
-}
-
 export async function createAssetFromSource(
   workspaceId: string,
   partId: string,
-  file: File,
+  upload: ValidatedSourceUpload,
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
-  headers.set("content-type", uploadContentType("source", file));
+  headers.set("content-type", upload.contentType);
   headers.set(cataloguePartTargetHeader, partId);
   const response = await apiFetch("/api/catalogue/part/source", {
     method: "POST",
     credentials: "same-origin",
     headers,
-    body: file,
+    body: upload.file,
   });
   if (!response.ok) {
     throw await apiError(response);
@@ -181,22 +180,21 @@ export async function createAssetFromSource(
 export async function uploadAssetFile(
   workspaceId: string,
   assetId: string,
-  kind: AssetFileKind,
   expectedVersion: number,
-  file: File,
+  upload: ValidatedAssetUpload,
   sourceView: AssetSourceView = "front",
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
-  headers.set("content-type", uploadContentType(kind, file));
-  headers.set(assetFileKindHeader, kind);
-  if (kind === "source") headers.set(assetSourceViewHeader, sourceView);
+  headers.set("content-type", upload.contentType);
+  headers.set(assetFileKindHeader, upload.kind);
+  if (upload.kind === "source") headers.set(assetSourceViewHeader, sourceView);
   headers.set(assetTargetHeader, assetId);
   headers.set("x-rigstage-expected-version", String(expectedVersion));
   const response = await apiFetch("/api/assets/item/file", {
     method: "PUT",
     credentials: "same-origin",
     headers,
-    body: file,
+    body: upload.file,
   });
   if (!response.ok) {
     throw await apiError(response);

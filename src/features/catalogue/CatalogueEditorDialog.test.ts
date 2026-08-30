@@ -55,6 +55,10 @@ describe("CatalogueEditorDialog critical operations", () => {
     expect(markup).toContain('<span lang="en">Archive product</span>');
     expect(markup).toContain("建立素材草稿");
     expect(markup).toContain('<span lang="en">Create asset draft</span>');
+    expect(markup).toContain(
+      'accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"',
+    );
+    expect(markup).toContain("filename, MIME and content are checked");
     expect(markup).toContain("取消");
     expect(markup).toContain('<span lang="en">Cancel</span>');
     expect(markup).toContain("儲存產品");

@@ -218,14 +218,19 @@ describe("catalogue source target API", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
     vi.stubGlobal("fetch", fetchMock);
     const source = new File([new Uint8Array([0x89])], "fixture.png", {
-      type: "image/png",
+      type: "application/octet-stream",
     });
+    const sourceUpload = {
+      contentType: "image/png" as const,
+      file: source,
+      kind: "source" as const,
+    };
 
     await expect(
       createAssetFromSource(
         "workspace-fixture",
         "part-private-fixture",
-        source,
+        sourceUpload,
       ),
     ).resolves.toEqual(reviewAsset);
 
@@ -233,13 +238,17 @@ describe("catalogue source target API", () => {
     const headers = new Headers(init.headers);
     expect(url).toBe("/api/catalogue/part/source");
     expect(url).not.toContain("part-private-fixture");
+    expect(url).not.toContain(source.name);
     expect(String(init.body)).not.toContain("part-private-fixture");
+    expect(String(init.body)).not.toContain(source.name);
     expect(init.body).toBe(source);
     expect(headers.get("x-rigstage-catalogue-part-id")).toBe(
       "part-private-fixture",
     );
     expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
     expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+    expect(headers.get("content-type")).toBe("image/png");
+    expect(JSON.stringify([...headers.entries()])).not.toContain(source.name);
   });
 });
 
@@ -294,16 +303,20 @@ describe("private asset file target API", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
     vi.stubGlobal("fetch", fetchMock);
     const source = new File([new Uint8Array([0x89])], "fixture.png", {
-      type: "image/png",
+      type: "application/octet-stream",
     });
+    const sourceUpload = {
+      contentType: "image/png" as const,
+      file: source,
+      kind: "source" as const,
+    };
 
     await expect(
       uploadAssetFile(
         "workspace-fixture",
         "asset-private-fixture",
-        "source",
         3,
-        source,
+        sourceUpload,
         "three-quarter",
       ),
     ).resolves.toEqual(reviewAsset);
@@ -312,12 +325,16 @@ describe("private asset file target API", () => {
     const headers = new Headers(init.headers);
     expect(url).toBe("/api/assets/item/file");
     expect(url).not.toContain("asset-private-fixture");
+    expect(url).not.toContain(source.name);
     expect(init.body).toBe(source);
     expect(String(init.body)).not.toContain("asset-private-fixture");
+    expect(String(init.body)).not.toContain(source.name);
     expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
     expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
     expect(headers.get("x-rigstage-asset-source-view")).toBe("three-quarter");
     expect(headers.get("x-rigstage-expected-version")).toBe("3");
+    expect(headers.get("content-type")).toBe("image/png");
+    expect(JSON.stringify([...headers.entries()])).not.toContain(source.name);
   });
 
   it("keeps the private asset ID out of the protected file-read URL", async () => {
@@ -353,7 +370,7 @@ describe("private asset file target API", () => {
       [new Uint8Array([0x67, 0x6c, 0x54, 0x46])],
       "fixture.glb",
       {
-        type: "model/gltf-binary",
+        type: "application/octet-stream",
       },
     );
     const fetchMock = vi
@@ -366,19 +383,27 @@ describe("private asset file target API", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    await uploadAssetFile(
-      "workspace-fixture",
-      "asset-private-fixture",
-      "model",
-      3,
-      model,
-    );
+    await uploadAssetFile("workspace-fixture", "asset-private-fixture", 3, {
+      contentType: "model/gltf-binary",
+      file: model,
+      kind: "model",
+    });
     await fetchAssetFileBlob(
       new AbortController().signal,
       "workspace-fixture",
       "asset-private-fixture",
       "model",
     );
+
+    const [, uploadInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(uploadInit.body).toBe(model);
+    expect(new Headers(uploadInit.headers).get("content-type")).toBe(
+      "model/gltf-binary",
+    );
+    expect(
+      JSON.stringify([...new Headers(uploadInit.headers).entries()]),
+    ).not.toContain(model.name);
+    expect(String(uploadInit.body)).not.toContain(model.name);
 
     for (const call of fetchMock.mock.calls) {
       const [, init] = call as [string, RequestInit];

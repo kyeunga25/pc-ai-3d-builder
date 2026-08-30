@@ -351,7 +351,7 @@ export function CatalogueEditorDialog({
             ref={sourceInputRef}
             hidden
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             disabled={busy || readOnly}
             onChange={(event) => void createAssetFromSource(event)}
           />
@@ -520,6 +520,9 @@ export function CatalogueEditorDialog({
                   className="button button--secondary"
                   type="button"
                   disabled={busy}
+                  title={bilingualCataloguePageTitle(
+                    catalogueEditorCopy.assetDraftFileRequirements,
+                  )}
                   onClick={() => sourceInputRef.current?.click()}
                 >
                   <Upload aria-hidden="true" />

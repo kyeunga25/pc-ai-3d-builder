@@ -13,7 +13,7 @@ const bilingualCopyPattern = {
 
 describe("Catalogue editor copy", () => {
   it("keeps every editor label and operation state bilingual", () => {
-    expect(Object.keys(catalogueEditorCopy)).toHaveLength(27);
+    expect(Object.keys(catalogueEditorCopy)).toHaveLength(28);
     for (const [key, copy] of Object.entries(catalogueEditorCopy)) {
       expect(copy.english).toMatch(bilingualCopyPattern.english);
       if (key !== "sku") {
@@ -24,6 +24,9 @@ describe("Catalogue editor copy", () => {
     expect(catalogueEditorCopy.archiveProduct.english).toBe("Archive product");
     expect(catalogueEditorCopy.confirmArchive.english).toBe("Confirm archive");
     expect(catalogueEditorCopy.archiving.english).toBe("Archiving…");
+    expect(catalogueEditorCopy.assetDraftFileRequirements.english).toContain(
+      "filename, MIME and content",
+    );
     expect(catalogueEditorCopy.unverifiedSpecification.english).toBe(
       "Unverified",
     );
