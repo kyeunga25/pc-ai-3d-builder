@@ -46,13 +46,14 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 
 - [x] Protected owner/admin workspace-member directory with bounded listing, D1 invitations, role changes, two-step suspension, optimistic versions and a database last-owner guard.
 - [x] Protected owner/admin workspace activity log with 50-row pages, header-only pagination, bilingual filters and no raw audit metadata or visible private identifiers.
+- [x] Two-step, optimistic removal of one selected private source view or GLB with atomic evidence reset, minimal audit, reserved-credit compensation and exact-key R2 cleanup.
 - [x] Workspace-scoped, non-monetary generation capability accounts with reserve, settle and release transitions.
 - [x] One customer capability unit and a one-unit provider-cost ceiling per local synthetic job, without price, currency, purchase or payment semantics.
 - [x] Immutable provider-attempt records and stable provider idempotency references for duplicate, late, conflicting and out-of-order results.
 - [x] Pseudonymous provider input that excludes workspace, user, asset, object and deployment identifiers.
 - [x] Strict GLB validation for binary structure, buffer/accessor bounds, node graphs, transformed dimensions, triangles, textures and external resources.
 - [x] Validation both before private R2 storage and after read-back, with stable public failure codes and private raw errors.
-- [x] Exact-once reservation settlement after human approval and release after rejection, source replacement or terminal failure.
+- [x] Exact-once reservation settlement after human approval and release after rejection, file replacement, exact file removal or terminal failure.
 - [x] Workers Runtime integration tests using real migrations plus local D1, R2 and Workflow bindings, including forced transient retry.
 - [x] A browser-only synthetic PNG-to-GLB-to-review-to-Builder path with visible capability state and no external calls.
 - [x] Explicit local development, migration, debugging and verification commands.

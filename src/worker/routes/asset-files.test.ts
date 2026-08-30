@@ -4,10 +4,12 @@ import { assetFileLimits } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
+import { assetGenerationCreditReleasedHeader } from "../../shared/lib/asset-target";
 import type { RequestContext } from "../auth/workspace";
 import { sha256Hex } from "../lib/digest";
 import { createD1Stub } from "../test/d1-stub";
 import {
+  assetFileRemoveResponse,
   assetFileResponse,
   assetFileUploadResponse,
   createAssetSourceResponse,
@@ -332,6 +334,385 @@ describe("private asset routes", () => {
       calls.find((call) => call.values.includes("asset.file.model.upload"))
         ?.sql,
     ).toContain("changes() = 1");
+  });
+
+  it("removes one canonical source file after the guarded D1 transition", async () => {
+    const current = assetRow();
+    const updated = assetRow({
+      review_version: 1,
+      source_object_key: null,
+      source_content_type: null,
+      source_size_bytes: null,
+      source_sha256: null,
+    });
+    const { calls, db } = createD1Stub({ firstResults: [current, updated] });
+    const { bucket, deletes } = createR2Stub([
+      {
+        key: "private/source-fixture",
+        bytes: minimalSource,
+        contentType: "image/png",
+      },
+    ]);
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "DELETE",
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-expected-version": "0",
+      },
+    });
+
+    const response = await assetFileRemoveResponse(
+      request,
+      db,
+      bucket,
+      context("staff"),
+      "request-remove-source",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get(assetGenerationCreditReleasedHeader)).toBe(
+      "false",
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      version: 1,
+      sourceRightsConfirmed: false,
+      completedChecks: [],
+      files: { sources: { front: null } },
+    });
+    expect(request.body).toBeNull();
+    expect(deletes).toEqual(["private/source-fixture"]);
+    expect(
+      calls.find((call) => call.sql.includes("source_object_key = NULL"))?.sql,
+    ).toContain("source_object_key = ?5");
+    const auditCall = calls.find((call) =>
+      call.values.includes("asset.file.source.remove"),
+    );
+    expect(auditCall?.sql).toContain("changes() = 1");
+    expect(auditCall?.values.join(" ")).not.toContain("private/source");
+  });
+
+  it("compensates a reserved generated draft in the same removal batch", async () => {
+    const current = assetRow({
+      source_kind: "generated",
+      model_object_key: "private/generated-model",
+      model_content_type: "model/gltf-binary",
+      model_size_bytes: 1_024,
+      model_sha256: "a".repeat(64),
+    });
+    const updated = assetRow({
+      review_version: 1,
+      source_object_key: null,
+      source_content_type: null,
+      source_size_bytes: null,
+      source_sha256: null,
+    });
+    const { calls, db } = createD1Stub({
+      firstResults: [current, { job_id: "job-generated" }, updated],
+    });
+    const { bucket } = createR2Stub([
+      {
+        key: "private/source-fixture",
+        bytes: minimalSource,
+        contentType: "image/png",
+      },
+    ]);
+
+    const response = await assetFileRemoveResponse(
+      new Request("https://app.example/api/assets/item/file", {
+        method: "DELETE",
+        headers: {
+          "x-rigstage-asset-file-kind": "source",
+          "x-rigstage-asset-id": "asset-fixture",
+          "x-rigstage-expected-version": "0",
+        },
+      }),
+      db,
+      bucket,
+      context(),
+      "request-remove-generated",
+    );
+
+    expect(response.headers.get(assetGenerationCreditReleasedHeader)).toBe(
+      "true",
+    );
+
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("UPDATE generation_jobs") &&
+          call.values.includes("GENERATION_DRAFT_SUPERSEDED"),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (call) =>
+          call.sql.includes("UPDATE generation_job_entitlements") &&
+          call.values.includes("draft_superseded"),
+      ),
+    ).toBe(true);
+  });
+
+  it("removes only the current GLB while preserving all source metadata", async () => {
+    const glb = createSyntheticDraftGlb();
+    const glbSha256 = await sha256Hex(glb);
+    const current = assetRow({
+      model_object_key: "private/model-fixture",
+      model_content_type: "model/gltf-binary",
+      model_size_bytes: glb.byteLength,
+      model_sha256: glbSha256,
+    });
+    const updated = assetRow({
+      review_version: 1,
+      model_object_key: null,
+      model_content_type: null,
+      model_size_bytes: null,
+      model_sha256: null,
+    });
+    const { calls, db } = createD1Stub({ firstResults: [current, updated] });
+    const { bucket, deletes } = createR2Stub([
+      {
+        key: "private/model-fixture",
+        bytes: glb,
+        contentType: "model/gltf-binary",
+      },
+    ]);
+
+    const response = await assetFileRemoveResponse(
+      new Request("https://app.example/api/assets/item/file", {
+        method: "DELETE",
+        headers: {
+          "x-rigstage-asset-file-kind": "model",
+          "x-rigstage-asset-id": "asset-fixture",
+          "x-rigstage-expected-version": "0",
+        },
+      }),
+      db,
+      bucket,
+      context("staff"),
+      "request-remove-model",
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      version: 1,
+      files: {
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: minimalSource.byteLength,
+          },
+        },
+        model: null,
+      },
+    });
+    expect(response.headers.get(assetGenerationCreditReleasedHeader)).toBe(
+      "false",
+    );
+    expect(deletes).toEqual(["private/model-fixture"]);
+    const updateCall = calls.find((call) =>
+      call.sql.includes("model_object_key = NULL"),
+    );
+    expect(updateCall?.sql).toContain("model_object_key = ?5");
+    const auditCall = calls.find((call) =>
+      call.values.includes("asset.file.model.remove"),
+    );
+    expect(auditCall?.values.join(" ")).toContain('"sourceView":null');
+    expect(auditCall?.values.join(" ")).not.toContain("private/model");
+  });
+
+  it("removes only the selected additional source-view metadata", async () => {
+    const current = assetRow({
+      source_back_object_key: "private/source-back",
+      source_back_content_type: "image/png",
+      source_back_size_bytes: minimalSource.byteLength,
+      source_back_sha256: minimalSourceSha256,
+    });
+    const updated = assetRow({ review_version: 1 });
+    const { calls, db } = createD1Stub({ firstResults: [current, updated] });
+    const { bucket, deletes } = createR2Stub([
+      {
+        key: "private/source-back",
+        bytes: minimalSource,
+        contentType: "image/png",
+      },
+    ]);
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "DELETE",
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "back",
+        "x-rigstage-expected-version": "0",
+      },
+    });
+
+    await assetFileRemoveResponse(
+      request,
+      db,
+      bucket,
+      context("admin"),
+      "request-remove-back",
+    );
+
+    expect(deletes).toEqual(["private/source-back"]);
+    const deleteCall = calls.find((call) =>
+      call.sql.includes("DELETE FROM product_asset_source_files"),
+    );
+    expect(deleteCall?.values).toEqual([
+      "workspace-fixture",
+      "asset-fixture",
+      "back",
+      "private/source-back",
+    ]);
+    const auditCall = calls.find((call) =>
+      call.values.includes("asset.file.source.remove"),
+    );
+    expect(auditCall?.values.join(" ")).toContain('"sourceView":"back"');
+    expect(auditCall?.values.join(" ")).not.toContain("private/source-back");
+  });
+
+  it("rejects a viewer removal before target, D1 or R2 work", async () => {
+    const { calls, db } = createD1Stub();
+    const { bucket, deletes } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "DELETE",
+    });
+
+    await expect(
+      assetFileRemoveResponse(
+        request,
+        db,
+        bucket,
+        context("viewer"),
+        "request-remove-viewer",
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "ROLE_FORBIDDEN" });
+    expect(calls).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+  });
+
+  it("does not mutate or delete when the selected file is missing", async () => {
+    const { calls, db } = createD1Stub({
+      firstResults: [
+        assetRow({
+          source_back_object_key: null,
+          source_back_content_type: null,
+          source_back_size_bytes: null,
+          source_back_sha256: null,
+        }),
+      ],
+    });
+    const { bucket, deletes } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      method: "DELETE",
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "back",
+        "x-rigstage-expected-version": "0",
+      },
+    });
+
+    await expect(
+      assetFileRemoveResponse(
+        request,
+        db,
+        bucket,
+        context(),
+        "request-remove-missing",
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_FILE_NOT_FOUND" });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+    expect(deletes).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: "an unknown source view",
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "rear",
+        "x-rigstage-expected-version": "0",
+      },
+    },
+    {
+      name: "a source view on a model request",
+      headers: {
+        "x-rigstage-asset-file-kind": "model",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "front",
+        "x-rigstage-expected-version": "0",
+      },
+    },
+    {
+      name: "a malformed expected version",
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "front",
+        "x-rigstage-expected-version": "-1",
+      },
+    },
+  ])("rejects $name before D1 or R2 work", async ({ headers }) => {
+    const { calls, db } = createD1Stub();
+    const { bucket, deletes } = createR2Stub();
+
+    await expect(
+      assetFileRemoveResponse(
+        new Request("https://app.example/api/assets/item/file", {
+          method: "DELETE",
+          headers,
+        }),
+        db,
+        bucket,
+        context(),
+        "request-remove-invalid",
+      ),
+    ).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+    expect(calls).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: "an approved asset",
+      current: assetRow({ status: "approved" }),
+      version: "0",
+      code: "ASSET_LOCKED",
+    },
+    {
+      name: "a stale asset version",
+      current: assetRow({ review_version: 2 }),
+      version: "1",
+      code: "ASSET_VERSION_CONFLICT",
+    },
+  ])("does not mutate or delete $name", async ({ current, version, code }) => {
+    const { calls, db } = createD1Stub({ firstResults: [current] });
+    const { bucket, deletes } = createR2Stub();
+
+    await expect(
+      assetFileRemoveResponse(
+        new Request("https://app.example/api/assets/item/file", {
+          method: "DELETE",
+          headers: {
+            "x-rigstage-asset-file-kind": "source",
+            "x-rigstage-asset-id": "asset-fixture",
+            "x-rigstage-expected-version": version,
+          },
+        }),
+        db,
+        bucket,
+        context(),
+        "request-remove-guarded",
+      ),
+    ).rejects.toMatchObject({ code });
+    expect(
+      calls.some((call) => /\b(?:INSERT|UPDATE|DELETE)\b/u.test(call.sql)),
+    ).toBe(false);
+    expect(deletes).toHaveLength(0);
   });
 
   it("rejects a viewer replacement before target, body, D1 or R2 work", async () => {

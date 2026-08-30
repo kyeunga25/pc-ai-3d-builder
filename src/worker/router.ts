@@ -21,6 +21,7 @@ import {
   assetReviewQueueResponse,
 } from "./routes/assets";
 import {
+  assetFileRemoveResponse,
   assetFileResponse,
   assetFileUploadResponse,
   createAssetSourceResponse,
@@ -219,6 +220,15 @@ export async function routeRequest(
     if (url.pathname === "/api/assets/item/file") {
       if (request.method === "GET") {
         return assetFileResponse(request, env.DB, env.PRIVATE_ASSETS, context);
+      }
+      if (request.method === "DELETE") {
+        return assetFileRemoveResponse(
+          request,
+          env.DB,
+          env.PRIVATE_ASSETS,
+          context,
+          requestId,
+        );
       }
       return assetFileUploadResponse(
         request,

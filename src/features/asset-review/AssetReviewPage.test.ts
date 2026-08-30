@@ -131,8 +131,33 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("3D model");
     expect(markup).toContain("Upload GLB");
     expect(markup).toContain("resets the approval checklist");
-    expect(markup).toContain("Only the selected view or GLB is replaced");
+    expect(markup).toContain("affects only the selected view or GLB");
     expect(markup).toContain("all other private files remain private");
+  });
+
+  it("renders exact two-step removal controls only for stored private files", () => {
+    const markup = renderPage({
+      ...reviewAsset,
+      files: {
+        sources: {
+          ...reviewAsset.files.sources,
+          front: { contentType: "image/png", sizeBytes: 2_048 },
+        },
+        model: { contentType: "model/gltf-binary", sizeBytes: 4_096 },
+      },
+    });
+
+    expect(markup).toContain("移除圖片");
+    expect(markup).toContain("Remove image");
+    expect(markup).toContain("移除 GLB");
+    expect(markup).toContain("Remove GLB");
+    expect(markup).toContain(
+      "After confirmation, only the selected source view is removed",
+    );
+    expect(markup).toContain(
+      "After confirmation, only the private GLB is removed",
+    );
+    expect(markup.match(/lucide-trash-2/gu)).toHaveLength(2);
   });
 
   it("keeps private file actions readable in the narrow layout", async () => {
@@ -143,6 +168,7 @@ describe("AssetReviewPage", () => {
 
     expect(styles).not.toContain(".asset-file-control span,");
     expect(styles).toContain(".asset-file-control > div > span,");
+    expect(styles).toContain(".asset-file-control .button--danger.is-armed");
     expect(styles).toMatch(
       /@media[^]*?\.asset-file-control\s*\{[^}]*flex-direction:\s*column;/u,
     );

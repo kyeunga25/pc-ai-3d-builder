@@ -4,6 +4,7 @@ import { AssetFileValidationError } from "../../shared/domain/asset-files";
 import { AssetReviewApiError } from "./asset-review-api";
 import {
   assetReviewErrorNotice,
+  assetReviewFileRemovedNotice,
   assetReviewNotice,
   assetReviewRejectActionLabel,
   assetReviewSavedNotice,
@@ -31,9 +32,11 @@ describe("Asset Review status copy", () => {
   it.each([
     "approve",
     "generation",
+    "model-remove",
     "model-upload",
     "reject",
     "save",
+    "source-remove",
     "source-upload",
   ] as const)(
     "replaces a monolingual %s failure with an uncertainty-safe fallback",
@@ -101,6 +104,36 @@ describe("Asset Review status copy", () => {
       nextArmedKey: "workspace-a:asset-a:4",
       shouldSubmit: false,
     });
+  });
+
+  it("describes exact private-file removal confirmation and credit release", () => {
+    expect(assetReviewStatusCopy.confirmSourceRemoval).toMatchObject({
+      tone: "warning",
+    });
+    expect(assetReviewStatusCopy.confirmSourceRemoval.zhHant).toContain(
+      "所選私人來源視角",
+    );
+    expect(assetReviewStatusCopy.confirmSourceRemoval.english).toContain(
+      "Other private files are unchanged",
+    );
+    expect(assetReviewStatusCopy.confirmModelRemoval.english).toContain(
+      "All source images are unchanged",
+    );
+    expect(assetReviewStatusCopy.confirmationCanceled).toMatchObject({
+      tone: "info",
+    });
+    expect(assetReviewStatusCopy.confirmationCanceled.english).toContain(
+      "No file-removal or rejection request was submitted",
+    );
+
+    const released = assetReviewFileRemovedNotice("source", true);
+    expect(released).toMatchObject({ tone: "success" });
+    expect(released.zhHant).toContain("已釋放保留 credit");
+    expect(released.english).toContain("Reserved credit was released");
+
+    const removedModel = assetReviewFileRemovedNotice("model", false);
+    expect(removedModel.zhHant).toContain("私人 GLB 已移除");
+    expect(removedModel.english).not.toContain("credit");
   });
 
   it("retains bounded bilingual API and file-validation messages", () => {

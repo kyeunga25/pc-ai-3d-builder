@@ -12,7 +12,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Owner/admin workspace-member directory, D1 invitation, role update and two-step suspension with optimistic versions and a database last-owner guard.
 - Owner/admin workspace activity log with a 50-row read bound, header-only private pagination and a metadata-free public projection.
 - Catalogue create, optimistic update, logical archive and transactional CSV import.
-- Four-view private R2 source-image storage plus one GLB, with protected Worker reads, per-view replacement and safe metadata projection.
+- Four-view private R2 source-image storage plus one GLB, with protected Worker reads, exact per-view replacement/removal and safe metadata projection.
 - Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
 - A local-only generation milestone with non-monetary capability reservation, immutable provider-attempt records, strict GLB structure limits and Workers Runtime integration tests.
 - Deterministic build compatibility and sanitized portable JSON export.
@@ -30,6 +30,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - `front` is the only canonical generation source; `back`, `left` and `three-quarter` remain manual-review evidence unless a separately reviewed provider contract explicitly changes that boundary.
 - Generated meshes remain drafts until explicit human approval.
 - Asset-review writes require an authorized role and the current review version.
+- Private-file removal must target one existing selected view or GLB, commit the guarded D1 transition before exact-key R2 cleanup, and never add a bulk-delete path.
 - Catalogue writes require an authorized role and the current record version for existing rows.
 - Build writes require an authorized role, one part per category and the current record version.
 - Build export excludes identities, workspace IDs, price, stock and private asset metadata.
@@ -40,7 +41,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Activity reads must remain workspace-first, owner/admin-only and bounded; do not select or return raw audit metadata, target IDs, request IDs or email addresses, and do not append an audit event for reading the log.
 - Tests and documentation use synthetic identities and data.
 - Generation starts only after a workspace-scoped job/event/audit commit, saved source-rights confirmation, current review version and explicit owner/admin action.
-- Generation also requires one workspace-scoped capability credit. It is reserved once, settled once after approval, or released once after rejection, replacement or terminal failure; replaying a request cannot duplicate any transition.
+- Generation also requires one workspace-scoped capability credit. It is reserved once, settled once after approval, or released once after rejection, replacement, exact file removal or terminal failure; replaying a request cannot duplicate any transition.
 - Generated output is checksum-validated, remains private, resets review evidence and cannot enter the Builder before human approval.
 - Provider calls receive only pseudonymous generation/source references, a verified source descriptor and bounded output requirements. Internal workspace, user, asset and object identifiers stay outside the provider contract.
 - Provider-attempt IDs are stable idempotency keys. Duplicate, late, conflicting and out-of-order callbacks or retries cannot create another cost or state transition.

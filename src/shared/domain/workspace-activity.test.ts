@@ -13,6 +13,9 @@ describe("workspace activity domain", () => {
     const action = normalizeWorkspaceActivityAction("asset.review.approve");
     expect(action).toBe("asset.review.approve");
     expect(workspaceActivityCategoryForAction(action)).toBe("asset");
+    expect(normalizeWorkspaceActivityAction("asset.file.source.remove")).toBe(
+      "asset.file.source.remove",
+    );
 
     const unknown = normalizeWorkspaceActivityAction(
       "private.provider.coordinate.changed",

@@ -21,6 +21,10 @@ export const assetReviewFileControlCopy = {
     "上載或取代所選來源視角會重設核准證據；不會刪除其他私人檔案",
     "Uploading or replacing the selected source view resets approval evidence; it does not delete other private files",
   ),
+  sourceRemoveTitle: bilingualCopy(
+    "再次確認後只會移除所選來源視角，並重設所有核准證據",
+    "After confirmation, only the selected source view is removed and all approval evidence is reset",
+  ),
   model: bilingualCopy("3D 模型", "3D model"),
   modelRequirements: bilingualCopy(
     "自包含及資源有界的 glTF 2.0 GLB · 最多 25 MiB",
@@ -30,9 +34,13 @@ export const assetReviewFileControlCopy = {
     "上載或取代 GLB 會重設核准證據；不會刪除任何來源圖片",
     "Uploading or replacing the GLB resets approval evidence; it does not delete any source image",
   ),
+  modelRemoveTitle: bilingualCopy(
+    "再次確認後只會移除私人 GLB，並重設所有核准證據",
+    "After confirmation, only the private GLB is removed and all approval evidence is reset",
+  ),
   replacementWarning: bilingualCopy(
-    "取代任何檔案會重設核准清單、來源權利確認及已核實尺寸，避免沿用舊版本判斷。只會取代所選視角或 GLB；其他私人檔案仍保持私人。",
-    "Replacing any file resets the approval checklist, source-rights confirmation and verified dimensions so old evidence is not reused. Only the selected view or GLB is replaced; all other private files remain private.",
+    "取代或移除任何檔案會重設核准清單、來源權利確認及已核實尺寸，避免沿用舊版本判斷。操作只影響所選視角或 GLB；其他私人檔案仍保持私人。",
+    "Replacing or removing any file resets the approval checklist, source-rights confirmation and verified dimensions so old evidence is not reused. The operation affects only the selected view or GLB; all other private files remain private.",
   ),
 } as const satisfies Record<string, BilingualCopy>;
 
@@ -52,4 +60,34 @@ export function assetReviewFileActionCopy(
   return exists
     ? bilingualCopy("取代 GLB", "Replace GLB")
     : bilingualCopy("上載 GLB", "Upload GLB");
+}
+
+export function assetReviewFileRemoveActionCopy(
+  kind: AssetFileKind,
+  armed: boolean,
+  removing: boolean,
+): BilingualCopy {
+  if (removing) {
+    return kind === "source"
+      ? bilingualCopy("移除圖片中…", "Removing image…")
+      : bilingualCopy("移除 GLB 中…", "Removing GLB…");
+  }
+  if (armed) {
+    return kind === "source"
+      ? bilingualCopy("確認移除圖片", "Confirm image removal")
+      : bilingualCopy("確認移除 GLB", "Confirm GLB removal");
+  }
+  return kind === "source"
+    ? bilingualCopy("移除圖片", "Remove image")
+    : bilingualCopy("移除 GLB", "Remove GLB");
+}
+
+export function nextAssetReviewFileRemoveIntent(
+  armedKey: string | null,
+  currentKey: string,
+): { nextArmedKey: string | null; shouldSubmit: boolean } {
+  if (armedKey === currentKey) {
+    return { nextArmedKey: null, shouldSubmit: true };
+  }
+  return { nextArmedKey: currentKey, shouldSubmit: false };
 }

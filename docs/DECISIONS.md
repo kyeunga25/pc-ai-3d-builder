@@ -40,6 +40,12 @@ Each asset has four enumerated private source slots. Canonical `front` preserves
 
 The builder may decode only the selected component's approved GLB. It uses the protected file route and an abort-bound, revocable browser object URL; model geometry remains non-authoritative.
 
+## Private-file removal is exact, versioned and metadata-first
+
+An authorized reviewer may remove one currently selected source view or the current GLB, never an asset directory or a set of objects. The fixed route accepts no body and binds the request to the resolved workspace, bounded asset target, current review version, file kind and enumerated source view. Approved assets stay locked. The browser requires a second activation for that unchanged target, but this is only an accidental-action guard; the Worker remains authoritative.
+
+D1 first commits the exact metadata change, review-evidence reset, minimal audit event and any reserved-generation release in one guarded batch. Only a successful commit permits cleanup of the one object key that was read from the matching record. An archive race, stale version, missing slot or changed key therefore deletes nothing. Exact-key R2 cleanup retries one transient failure, then leaves a private unreachable orphan rather than reversing the committed relational state or broadening deletion.
+
 ## Public errors are bilingual and bounded
 
 Every public API failure keeps a stable machine code and request ID while presenting Traditional Chinese first and English second. A shared construction guard rejects single-language public copy. Validation layers may keep detailed internal diagnostics for control flow, but CSV parser state, GLB structure labels, raw exceptions and private identifiers are reduced to bounded corrective categories before serialization. This preserves actionable error handling without turning parser details into a public debugging channel.

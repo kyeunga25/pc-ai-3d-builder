@@ -86,7 +86,7 @@ describe("Worker API preflight", () => {
   it("rejects a disallowed protected method before D1 with its exact Allow policy", async () => {
     const response = await routeRequest(
       new Request("https://rigstage.test/api/assets/item/file", {
-        method: "DELETE",
+        method: "POST",
       }),
       env,
       "request-invalid-method",
@@ -96,7 +96,7 @@ describe("Worker API preflight", () => {
     expect(mocks.enforcePilotRateLimit).toHaveBeenCalledTimes(1);
     expect(mocks.resolveRequestContext).not.toHaveBeenCalled();
     expect(response.status).toBe(405);
-    expect(response.headers.get("allow")).toBe("GET, PUT");
+    expect(response.headers.get("allow")).toBe("GET, PUT, DELETE");
   });
 
   it("keeps the health method check public and free of protected bindings", async () => {
