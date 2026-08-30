@@ -260,6 +260,7 @@ describe("private asset file target API", () => {
         "source",
         3,
         source,
+        "three-quarter",
       ),
     ).resolves.toEqual(reviewAsset);
 
@@ -271,6 +272,7 @@ describe("private asset file target API", () => {
     expect(String(init.body)).not.toContain("asset-private-fixture");
     expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
     expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
+    expect(headers.get("x-rigstage-asset-source-view")).toBe("three-quarter");
     expect(headers.get("x-rigstage-expected-version")).toBe("3");
   });
 
@@ -288,6 +290,7 @@ describe("private asset file target API", () => {
       "workspace-fixture",
       "asset-private-fixture",
       "source",
+      "left",
     );
 
     expect(blob.size).toBe(bytes.byteLength);
@@ -298,5 +301,46 @@ describe("private asset file target API", () => {
     expect(init.body).toBeUndefined();
     expect(headers.get("x-rigstage-asset-id")).toBe("asset-private-fixture");
     expect(headers.get("x-rigstage-asset-file-kind")).toBe("source");
+    expect(headers.get("x-rigstage-asset-source-view")).toBe("left");
+  });
+
+  it("never sends a source-view header for a model request", async () => {
+    const model = new File(
+      [new Uint8Array([0x67, 0x6c, 0x54, 0x46])],
+      "fixture.glb",
+      {
+        type: "model/gltf-binary",
+      },
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(reviewAsset))
+      .mockResolvedValueOnce(
+        new Response(model, {
+          headers: { "content-type": "model/gltf-binary" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await uploadAssetFile(
+      "workspace-fixture",
+      "asset-private-fixture",
+      "model",
+      3,
+      model,
+    );
+    await fetchAssetFileBlob(
+      new AbortController().signal,
+      "workspace-fixture",
+      "asset-private-fixture",
+      "model",
+    );
+
+    for (const call of fetchMock.mock.calls) {
+      const [, init] = call as [string, RequestInit];
+      expect(
+        new Headers(init.headers).has("x-rigstage-asset-source-view"),
+      ).toBe(false);
+    }
   });
 });

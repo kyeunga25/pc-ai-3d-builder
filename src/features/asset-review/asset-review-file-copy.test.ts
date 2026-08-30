@@ -38,10 +38,10 @@ describe("Asset Review private file copy", () => {
       "resets the approval checklist",
     );
     expect(assetReviewFileControlCopy.replacementWarning.english).toContain(
-      "Only the selected file is replaced",
+      "Only the selected view or GLB is replaced",
     );
     expect(assetReviewFileControlCopy.replacementWarning.english).toContain(
-      "other private file remains private",
+      "all other private files remain private",
     );
   });
 });

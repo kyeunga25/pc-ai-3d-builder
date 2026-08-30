@@ -16,7 +16,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 - [x] Role-protected catalogue creation, optimistic update and logical archive.
 - [x] Validated CSV template and transactional import of at most 50 records.
 - [x] D1 asset-review queue with role checks and optimistic concurrency.
-- [x] Private R2 source-image and GLB upload with bounded binary validation.
+- [x] Four-view private R2 source-image and GLB upload with bounded binary validation, selected-view replacement and canonical-front generation isolation.
 - [x] Access- and workspace-protected private-file streaming.
 - [x] Lazy-loaded Three.js GLB preview with manual camera controls.
 - [x] Builder preview of the selected component's approved private GLB with short-lived object URLs.
@@ -31,7 +31,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 - [x] D1 migrations and synthetic unit fixtures.
 - [x] Active private R2 and Workflow bindings with external-provider activity disabled.
 - [x] Workspace-scoped generation-job and append-only event schema with unique idempotency and one-active-job constraints.
-- [x] Owner/admin generation request API with current asset version, stored source image and saved rights gate.
+- [x] Owner/admin generation request API with current asset version, stored canonical-front source image and saved rights gate.
 - [x] Zero-cost runtime synthetic adapter for controlled pipeline validation without source-image reads or external calls.
 - [x] Workflow claim, bounded retry/timeout, private R2 write/read-back, GLB validation, checksum comparison and guarded draft staging.
 - [x] Generated-output review-version increment and complete approval-evidence reset before `awaiting_review`.

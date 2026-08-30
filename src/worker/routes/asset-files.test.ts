@@ -157,9 +157,14 @@ describe("private asset routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       id: "asset-fixture",
       files: {
-        source: {
-          contentType: "image/png",
-          sizeBytes: minimalSource.byteLength,
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: minimalSource.byteLength,
+          },
+          back: null,
+          left: null,
+          "three-quarter": null,
         },
         model: null,
       },
@@ -394,6 +399,41 @@ describe("private asset routes", () => {
     },
   );
 
+  it.each([
+    { kind: "source", sourceView: "side" },
+    { kind: "model", sourceView: "front" },
+  ])(
+    "rejects an incompatible $kind source-view header before body, D1 or R2",
+    async ({ kind, sourceView }) => {
+      const { calls, db } = createD1Stub();
+      const { bucket, puts } = createR2Stub();
+      const request = new Request("https://app.example/api/assets/item/file", {
+        method: "PUT",
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-asset-file-kind": kind,
+          "x-rigstage-asset-id": "asset-fixture",
+          "x-rigstage-asset-source-view": sourceView,
+          "x-rigstage-expected-version": "0",
+        },
+        body: minimalSource.buffer as ArrayBuffer,
+      });
+
+      await expect(
+        assetFileUploadResponse(
+          request,
+          db,
+          bucket,
+          context("staff"),
+          "request-source-view",
+        ),
+      ).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(puts).toHaveLength(0);
+    },
+  );
+
   it("rejects an oversized replacement before private storage or mutation", async () => {
     const { calls, db } = createD1Stub({ firstResults: [assetRow()] });
     const { bucket, deletes, puts } = createR2Stub();
@@ -569,6 +609,24 @@ describe("private asset routes", () => {
       expect(materializedReads).toHaveLength(0);
     },
   );
+
+  it("rejects an invalid source view before D1 or R2 read work", async () => {
+    const { calls, db } = createD1Stub();
+    const { bucket, materializedReads } = createR2Stub();
+    const request = new Request("https://app.example/api/assets/item/file", {
+      headers: {
+        "x-rigstage-asset-file-kind": "source",
+        "x-rigstage-asset-id": "asset-fixture",
+        "x-rigstage-asset-source-view": "side",
+      },
+    });
+
+    await expect(
+      assetFileResponse(request, db, bucket, context("viewer")),
+    ).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+    expect(calls).toHaveLength(0);
+    expect(materializedReads).toHaveLength(0);
+  });
 
   it.each([
     {

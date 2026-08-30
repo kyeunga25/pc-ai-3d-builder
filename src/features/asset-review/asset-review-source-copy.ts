@@ -1,19 +1,17 @@
+import {
+  assetSourceViews,
+  type AssetSourceView,
+} from "../../shared/domain/asset-files";
 import { bilingualCopy, type BilingualCopy } from "./asset-review-status";
 
-export const assetReviewSourceViews = [
-  "正面",
-  "背面",
-  "左側",
-  "三分之四角度",
-] as const;
-
-export type AssetReviewSourceView = (typeof assetReviewSourceViews)[number];
+export const assetReviewSourceViews = assetSourceViews;
+export type AssetReviewSourceView = AssetSourceView;
 
 export const assetReviewSourceViewCopy = {
-  正面: bilingualCopy("正面", "Front"),
-  背面: bilingualCopy("背面", "Back"),
-  左側: bilingualCopy("左側", "Left"),
-  三分之四角度: bilingualCopy("三分之四角度", "Three-quarter"),
+  front: bilingualCopy("正面", "Front"),
+  back: bilingualCopy("背面", "Back"),
+  left: bilingualCopy("左側", "Left"),
+  "three-quarter": bilingualCopy("三分之四角度", "Three-quarter"),
 } as const satisfies Record<AssetReviewSourceView, BilingualCopy>;
 
 export const assetReviewSourceCopy = {
@@ -47,18 +45,20 @@ export function assetReviewSourceFrameCopy(
         `${copy.english} private source image`,
       )
     : bilingualCopy(
-        `${copy.zhHant}來源圖片介面佔位`,
-        `${copy.english} source-image interface placeholder`,
+        `${copy.zhHant}來源圖片尚未上載；選擇此視角後上載`,
+        `${copy.english} source image not uploaded; select this view to upload`,
       );
 }
 
 export function assetReviewSourcePreviewAltCopy(
   manufacturer: string,
   model: string,
+  view: AssetReviewSourceView,
 ): BilingualCopy {
   const productName = `${manufacturer} ${model}`.trim();
+  const viewCopy = assetReviewSourceViewCopy[view];
   return bilingualCopy(
-    `${productName} 私人來源預覽`,
-    `Private source preview for ${productName}`,
+    `${productName} ${viewCopy.zhHant}私人來源預覽`,
+    `${viewCopy.english} private source preview for ${productName}`,
   );
 }

@@ -43,6 +43,7 @@ import {
   assetModelContentType,
   validateAssetFileBytes,
   type AssetFileKind,
+  type AssetSourceView,
 } from "../../shared/domain/asset-files";
 import {
   assetReviewChecks,
@@ -146,7 +147,7 @@ type ReviewForm = {
 type AssetFileUrls = {
   assetKey: string;
   model: string | null;
-  source: string | null;
+  sources: Record<AssetSourceView, string | null>;
 };
 
 type LocalAssetNavigationState = {
@@ -204,6 +205,17 @@ function assetKey(asset: AssetReviewItem): string {
   return `${asset.id}:${asset.version}`;
 }
 
+function emptyAssetSourceUrls(
+  front: string | null = null,
+): Record<AssetSourceView, string | null> {
+  return {
+    front,
+    back: null,
+    left: null,
+    "three-quarter": null,
+  };
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
@@ -252,6 +264,8 @@ export function AssetReviewPage() {
     ? (localNavigationState?.localAsset ?? reviewAsset)
     : null;
   const [camera, setCamera] = useState<AssetReviewCameraPreset>("等角");
+  const [selectedSourceView, setSelectedSourceView] =
+    useState<AssetSourceView>("front");
   const [modelRenderMode, setModelRenderMode] = useState<
     "shaded" | "wireframe"
   >("shaded");
@@ -262,7 +276,7 @@ export function AssetReviewPage() {
   const [fileUrls, setFileUrls] = useState<AssetFileUrls>(() => ({
     assetKey: initialAsset ? assetKey(initialAsset) : "",
     model: null,
-    source: localNavigationState?.sourceUrl ?? null,
+    sources: emptyAssetSourceUrls(localNavigationState?.sourceUrl ?? null),
   }));
   const [loadState, setLoadState] = useState<"error" | "loading" | "ready">(
     isLocalPreview ? "ready" : "loading",
@@ -344,6 +358,7 @@ export function AssetReviewPage() {
     void loadItems
       .then((items) => {
         setQueueCount(items.length);
+        setSelectedSourceView("front");
         setForm(items[0] ? createReviewForm(items[0]) : null);
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
@@ -386,7 +401,11 @@ export function AssetReviewPage() {
     const currentAsset = activeAsset;
     const currentAssetKey = assetKey(currentAsset);
     const privateUrls: AbortBoundObjectUrl[] = [];
-    const loadFile = async (kind: AssetFileKind, available: boolean) => {
+    const loadFile = async (
+      kind: AssetFileKind,
+      available: boolean,
+      sourceView: AssetSourceView = "front",
+    ) => {
       if (!available) {
         return null;
       }
@@ -396,6 +415,7 @@ export function AssetReviewPage() {
           currentWorkspace.id,
           currentAsset.id,
           kind,
+          sourceView,
         );
         const privateUrl = createAbortBoundObjectUrl(blob, controller.signal);
         if (!privateUrl) {
@@ -409,14 +429,26 @@ export function AssetReviewPage() {
     };
 
     void Promise.all([
-      loadFile("source", currentAsset.files.source !== null),
+      loadFile("source", currentAsset.files.sources.front !== null, "front"),
+      loadFile("source", currentAsset.files.sources.back !== null, "back"),
+      loadFile("source", currentAsset.files.sources.left !== null, "left"),
+      loadFile(
+        "source",
+        currentAsset.files.sources["three-quarter"] !== null,
+        "three-quarter",
+      ),
       loadFile("model", currentAsset.files.model !== null),
-    ]).then(([source, model]) => {
+    ]).then(([front, back, left, threeQuarter, model]) => {
       if (!controller.signal.aborted) {
         setFileUrls({
           assetKey: currentAssetKey,
           model,
-          source,
+          sources: {
+            front,
+            back,
+            left,
+            "three-quarter": threeQuarter,
+          },
         });
       }
     });
@@ -575,7 +607,7 @@ export function AssetReviewPage() {
   const visibleFileUrls =
     fileUrls.assetKey === assetKey(asset)
       ? fileUrls
-      : { assetKey: "", model: null, source: null };
+      : { assetKey: "", model: null, sources: emptyAssetSourceUrls() };
   const canEdit =
     currentWorkspace.role !== "viewer" && asset.status !== "approved";
   const canDecide =
@@ -626,7 +658,7 @@ export function AssetReviewPage() {
     parsedDimensions.depth !== asset.dimensionsMm.depth;
   const canRequestGeneration =
     canDecide &&
-    asset.files.source !== null &&
+    asset.files.sources.front !== null &&
     asset.sourceRightsConfirmed &&
     !reviewHasUnsavedChanges &&
     generationState.capability.mode === "simulation" &&
@@ -652,9 +684,10 @@ export function AssetReviewPage() {
       : reviewActionCopy.save;
   const sourceFileActionLabel = assetReviewFileActionCopy(
     "source",
-    asset.files.source !== null,
+    asset.files.sources[selectedSourceView] !== null,
     uploadingKind === "source",
   );
+  const selectedSourceFile = asset.files.sources[selectedSourceView];
   const modelFileActionLabel = assetReviewFileActionCopy(
     "model",
     asset.files.model !== null,
@@ -671,7 +704,7 @@ export function AssetReviewPage() {
             "只有 owner 或 admin 可建立生成工作",
             "Only an owner or admin can create a generation job",
           )
-        : asset.files.source === null
+        : asset.files.sources.front === null
           ? bilingualTitle(
               "先上載私人來源圖片",
               "Upload a private source image first",
@@ -802,22 +835,33 @@ export function AssetReviewPage() {
       dimensionsMm: { width: null, height: null, depth: null },
       files: {
         ...currentForm.asset.files,
-        source: { contentType, sizeBytes: bytes.byteLength },
+        sources: {
+          ...currentForm.asset.files.sources,
+          [selectedSourceView]: {
+            contentType,
+            sizeBytes: bytes.byteLength,
+          },
+        },
       },
       version: currentForm.asset.version + 1,
     };
     setFileUrls((current) => {
-      if (current.source && localObjectUrlsRef.current.has(current.source)) {
-        URL.revokeObjectURL(current.source);
-        localObjectUrlsRef.current.delete(current.source);
+      const sameAsset = current.assetKey === assetKey(currentForm.asset);
+      const currentSources = sameAsset
+        ? current.sources
+        : emptyAssetSourceUrls();
+      const replaced = currentSources[selectedSourceView];
+      if (replaced && localObjectUrlsRef.current.has(replaced)) {
+        URL.revokeObjectURL(replaced);
+        localObjectUrlsRef.current.delete(replaced);
       }
       return {
         assetKey: assetKey(updated),
-        model:
-          current.assetKey === assetKey(currentForm.asset)
-            ? current.model
-            : null,
-        source: objectUrl,
+        model: sameAsset ? current.model : null,
+        sources: {
+          ...currentSources,
+          [selectedSourceView]: objectUrl,
+        },
       };
     });
     setForm(createReviewForm(updated));
@@ -874,6 +918,7 @@ export function AssetReviewPage() {
       inputElement.value = "";
       return;
     }
+    const sourceView = selectedSourceView;
 
     setRejectArmedKey(null);
     setUploadingKind(kind);
@@ -915,35 +960,47 @@ export function AssetReviewPage() {
           completedChecks: [],
           sourceRightsConfirmed: false,
           dimensionsMm: { width: null, height: null, depth: null },
-          files: {
-            ...currentForm.asset.files,
-            [kind]: {
-              contentType,
-              sizeBytes: file.size,
-            },
-          },
+          files:
+            kind === "source"
+              ? {
+                  ...currentForm.asset.files,
+                  sources: {
+                    ...currentForm.asset.files.sources,
+                    [sourceView]: {
+                      contentType,
+                      sizeBytes: file.size,
+                    },
+                  },
+                }
+              : {
+                  ...currentForm.asset.files,
+                  model: {
+                    contentType: assetModelContentType,
+                    sizeBytes: file.size,
+                  },
+                },
           version: currentForm.asset.version + 1,
         };
         setFileUrls((current) => {
           const currentKey = assetKey(currentForm.asset);
-          const source =
-            kind === "source"
-              ? objectUrl
-              : current.assetKey === currentKey
-                ? current.source
-                : null;
+          const sameAsset = current.assetKey === currentKey;
+          const sources = sameAsset ? current.sources : emptyAssetSourceUrls();
           const model =
-            kind === "model"
-              ? objectUrl
-              : current.assetKey === currentKey
-                ? current.model
-                : null;
-          const replaced = kind === "source" ? current.source : current.model;
+            kind === "model" ? objectUrl : sameAsset ? current.model : null;
+          const replaced =
+            kind === "source" ? sources[sourceView] : current.model;
           if (replaced && localObjectUrlsRef.current.has(replaced)) {
             URL.revokeObjectURL(replaced);
             localObjectUrlsRef.current.delete(replaced);
           }
-          return { assetKey: assetKey(updated), model, source };
+          return {
+            assetKey: assetKey(updated),
+            model,
+            sources:
+              kind === "source"
+                ? { ...sources, [sourceView]: objectUrl }
+                : sources,
+          };
         });
       } else {
         updated = await uploadAssetFile(
@@ -952,6 +1009,7 @@ export function AssetReviewPage() {
           kind,
           currentForm.asset.version,
           file,
+          sourceView,
         );
       }
 
@@ -1022,10 +1080,10 @@ export function AssetReviewPage() {
           return {
             assetKey: assetKey(updated),
             model: objectUrl,
-            source:
+            sources:
               current.assetKey === assetKey(currentForm.asset)
-                ? current.source
-                : null,
+                ? current.sources
+                : emptyAssetSourceUrls(),
           };
         });
         const now = new Date().toISOString();
@@ -1259,7 +1317,7 @@ export function AssetReviewPage() {
               <BilingualStrongText copy={assetReviewSourceCopy.heading} />
               <BilingualInterfaceText
                 copy={
-                  visibleFileUrls.source
+                  Object.values(visibleFileUrls.sources).some(Boolean)
                     ? assetReviewSourceCopy.loaded
                     : assetReviewSourceCopy.missing
                 }
@@ -1267,24 +1325,28 @@ export function AssetReviewPage() {
             </div>
           </div>
           {assetReviewSourceViews.map((view, index) => {
-            const hasPrivateImage =
-              index === 0 && visibleFileUrls.source !== null;
+            const sourceUrl = visibleFileUrls.sources[view];
+            const hasPrivateImage = sourceUrl !== null;
             const frameCopy = assetReviewSourceFrameCopy(view, hasPrivateImage);
             const previewAltCopy = assetReviewSourcePreviewAltCopy(
               asset.part.manufacturer,
               asset.part.model,
+              view,
             );
             return (
               <button
-                className={`source-frame${index === 0 ? " is-selected" : ""}`}
+                className={`source-frame${selectedSourceView === view ? " is-selected" : ""}`}
                 key={view}
                 type="button"
                 aria-label={bilingualTitle(frameCopy.zhHant, frameCopy.english)}
-                disabled
+                aria-controls="asset-source-file-control"
+                aria-pressed={selectedSourceView === view}
+                disabled={uploadingKind !== null}
+                onClick={() => setSelectedSourceView(view)}
               >
-                {hasPrivateImage && visibleFileUrls.source ? (
+                {hasPrivateImage && sourceUrl ? (
                   <img
-                    src={visibleFileUrls.source}
+                    src={sourceUrl}
                     alt={bilingualTitle(
                       previewAltCopy.zhHant,
                       previewAltCopy.english,
@@ -1512,15 +1574,18 @@ export function AssetReviewPage() {
                 />
               </div>
             </div>
-            <div className="asset-file-control">
+            <div className="asset-file-control" id="asset-source-file-control">
               <div>
                 <BilingualStrongText
                   copy={assetReviewFileControlCopy.sourceImage}
                 />
-                {asset.files.source ? (
+                <BilingualInterfaceText
+                  copy={assetReviewSourceViewCopy[selectedSourceView]}
+                />
+                {selectedSourceFile ? (
                   <span>
-                    {asset.files.source.contentType} ·{" "}
-                    {formatFileSize(asset.files.source.sizeBytes)}
+                    {selectedSourceFile.contentType} ·{" "}
+                    {formatFileSize(selectedSourceFile.sizeBytes)}
                   </span>
                 ) : (
                   <BilingualInterfaceText

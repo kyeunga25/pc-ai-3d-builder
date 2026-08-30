@@ -131,8 +131,8 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("3D model");
     expect(markup).toContain("Upload GLB");
     expect(markup).toContain("resets the approval checklist");
-    expect(markup).toContain("Only the selected file is replaced");
-    expect(markup).toContain("other private file remains private");
+    expect(markup).toContain("Only the selected view or GLB is replaced");
+    expect(markup).toContain("all other private files remain private");
   });
 
   it("keeps private file actions readable in the narrow layout", async () => {
@@ -223,11 +223,21 @@ describe("AssetReviewPage", () => {
     expect(missingMarkup).toContain("Back");
     expect(missingMarkup).toContain("Left");
     expect(missingMarkup).toContain("Three-quarter");
+    const sourceFrames = missingMarkup.match(
+      /<button class="source-frame[^"]*"[^>]*>/gu,
+    );
+    expect(sourceFrames).toHaveLength(4);
+    expect(
+      sourceFrames?.filter((frame) => frame.includes('aria-pressed="true"')),
+    ).toHaveLength(1);
+    expect(sourceFrames?.every((frame) => !frame.includes("disabled"))).toBe(
+      true,
+    );
     expect(missingMarkup).toContain("Image usage rights not confirmed");
     expect(missingMarkup).toContain("source-rights is-missing");
     expect(loadedMarkup).toContain("Loaded through the authorized API");
     expect(loadedMarkup).toContain(
-      "Private source preview for RigStage Fixture 162 mm Tower Cooler",
+      "Front private source preview for RigStage Fixture 162 mm Tower Cooler",
     );
     expect(loadedMarkup).toContain(
       "Commercial usage-rights confirmation recorded",

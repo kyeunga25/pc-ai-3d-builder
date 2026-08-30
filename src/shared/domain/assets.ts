@@ -1,8 +1,11 @@
 import { z } from "zod";
 
 import {
+  assetFileLimits,
   assetModelContentType,
   assetSourceContentTypeSchema,
+  assetSourceViews,
+  type AssetSourceView,
 } from "./asset-files";
 
 export const assetReviewChecks = [
@@ -28,6 +31,29 @@ export const assetSourceKindSchema = z.enum([
 ]);
 
 const dimensionSchema = z.number().finite().positive().max(10_000).nullable();
+export const assetSourceFileSchema = z
+  .object({
+    contentType: assetSourceContentTypeSchema,
+    sizeBytes: z.number().int().positive().max(assetFileLimits.source),
+  })
+  .nullable();
+export type AssetSourceFile = z.infer<typeof assetSourceFileSchema>;
+
+export const emptyAssetSourceFiles = (): Record<
+  AssetSourceView,
+  AssetSourceFile
+> => ({
+  front: null,
+  back: null,
+  left: null,
+  "three-quarter": null,
+});
+
+const assetSourceFilesSchema = z.object(
+  Object.fromEntries(
+    assetSourceViews.map((view) => [view, assetSourceFileSchema]),
+  ) as Record<AssetSourceView, typeof assetSourceFileSchema>,
+);
 
 export const assetDimensionsSchema = z.object({
   width: dimensionSchema,
@@ -54,16 +80,11 @@ export const assetReviewItemSchema = z.object({
     }),
   sourceRightsConfirmed: z.boolean(),
   files: z.object({
-    source: z
-      .object({
-        contentType: assetSourceContentTypeSchema,
-        sizeBytes: z.number().int().positive(),
-      })
-      .nullable(),
+    sources: assetSourceFilesSchema,
     model: z
       .object({
         contentType: z.literal(assetModelContentType),
-        sizeBytes: z.number().int().positive(),
+        sizeBytes: z.number().int().positive().max(assetFileLimits.model),
       })
       .nullable(),
   }),

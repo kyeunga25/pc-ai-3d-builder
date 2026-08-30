@@ -2,12 +2,15 @@ import {
   AssetFileValidationError,
   assetFileKindSchema,
   assetFileLimits,
+  assetSourceViewSchema,
   validateAssetFileBytes,
   type AssetFileKind,
+  type AssetSourceView,
 } from "../../shared/domain/asset-files";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import {
   assetFileKindHeader,
+  assetSourceViewHeader,
   assetTargetHeader,
 } from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
@@ -25,7 +28,12 @@ import {
   putPrivateObject,
 } from "../lib/private-assets";
 import { readBoundedBinary } from "../lib/request-body";
-import { assetRecordIdPattern, findAsset, mapAssetReviewRow } from "./assets";
+import {
+  assetRecordIdPattern,
+  findAsset,
+  mapAssetReviewRow,
+  type AssetReviewRow,
+} from "./assets";
 import { catalogueRecordIdPattern } from "./catalogue";
 
 type CataloguePartIdentity = {
@@ -36,6 +44,13 @@ type ValidatedAssetFile = {
   bytes: Uint8Array;
   contentType: string;
   sha256: string;
+};
+
+type StoredAssetFile = {
+  contentType: string | null | undefined;
+  objectKey: string | null | undefined;
+  sha256: string | null | undefined;
+  sizeBytes: number | null | undefined;
 };
 
 function writeRoleError(): ApiError {
@@ -100,6 +115,64 @@ function normalizedContentType(request: Request): string {
   );
 }
 
+function requestedSourceView(
+  request: Request,
+  kind: AssetFileKind,
+): AssetSourceView | null {
+  const rawView = request.headers.get(assetSourceViewHeader);
+  if (kind === "model") {
+    if (rawView !== null) {
+      throw validationError(
+        "GLB 要求不可包含來源圖片視角。 / A GLB request cannot include a source-image view.",
+      );
+    }
+    return null;
+  }
+  const parsed = assetSourceViewSchema.safeParse(rawView ?? "front");
+  if (!parsed.success) {
+    throw validationError(
+      "來源圖片視角無效。 / The source-image view is invalid.",
+    );
+  }
+  return parsed.data;
+}
+
+function storedSourceFile(
+  asset: AssetReviewRow,
+  view: AssetSourceView,
+): StoredAssetFile {
+  if (view === "front") {
+    return {
+      contentType: asset.source_content_type,
+      objectKey: asset.source_object_key,
+      sha256: asset.source_sha256,
+      sizeBytes: asset.source_size_bytes,
+    };
+  }
+  if (view === "back") {
+    return {
+      contentType: asset.source_back_content_type,
+      objectKey: asset.source_back_object_key,
+      sha256: asset.source_back_sha256,
+      sizeBytes: asset.source_back_size_bytes,
+    };
+  }
+  if (view === "left") {
+    return {
+      contentType: asset.source_left_content_type,
+      objectKey: asset.source_left_object_key,
+      sha256: asset.source_left_sha256,
+      sizeBytes: asset.source_left_size_bytes,
+    };
+  }
+  return {
+    contentType: asset.source_three_quarter_content_type,
+    objectKey: asset.source_three_quarter_object_key,
+    sha256: asset.source_three_quarter_sha256,
+    sizeBytes: asset.source_three_quarter_size_bytes,
+  };
+}
+
 async function readValidatedFile(
   request: Request,
   kind: AssetFileKind,
@@ -128,8 +201,9 @@ function uploadAuditMetadata(
   kind: AssetFileKind,
   sizeBytes: number,
   reviewVersion: number,
+  sourceView: AssetSourceView | null = kind === "source" ? "front" : null,
 ): string {
-  return JSON.stringify({ kind, sizeBytes, reviewVersion });
+  return JSON.stringify({ kind, sourceView, sizeBytes, reviewVersion });
 }
 
 export async function createAssetSourceResponse(
@@ -294,6 +368,7 @@ export async function assetFileUploadResponse(
     throw assetNotFound();
   }
   const kind = kindResult.data;
+  const sourceView = requestedSourceView(request, kind);
   const current = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!current) {
     throw assetNotFound();
@@ -314,7 +389,9 @@ export async function assetFileUploadResponse(
   const file = await readValidatedFile(request, kind);
   const objectKey = assetObjectKey(context.currentWorkspace.id, assetId, kind);
   const previousObjectKey =
-    kind === "source" ? current.source_object_key : current.model_object_key;
+    kind === "source" && sourceView
+      ? storedSourceFile(current, sourceView).objectKey
+      : current.model_object_key;
   const reservedGeneration =
     current.source_kind === "generated"
       ? await findReservedGenerationForAsset(
@@ -334,7 +411,7 @@ export async function assetFileUploadResponse(
   );
 
   const updateStatement =
-    kind === "source"
+    kind === "source" && sourceView === "front"
       ? db
           .prepare(
             `UPDATE product_assets
@@ -371,9 +448,38 @@ export async function assetFileUploadResponse(
             context.currentWorkspace.id,
             currentVersion,
           )
-      : db
-          .prepare(
-            `UPDATE product_assets
+      : kind === "source"
+        ? db
+            .prepare(
+              `UPDATE product_assets
+               SET source_kind = 'uploaded',
+                   status = 'draft',
+                   quality = 'unreviewed',
+                   completed_checks_json = '[]',
+                   source_rights_confirmed = 0,
+                   verified_width_mm = NULL,
+                   verified_height_mm = NULL,
+                   verified_depth_mm = NULL,
+                   review_version = review_version + 1,
+                   updated_by = ?1,
+                   approved_by = NULL,
+                   approved_at = NULL,
+                   rejected_at = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?2
+                 AND workspace_id = ?3
+                 AND review_version = ?4
+                 AND status <> 'approved'`,
+            )
+            .bind(
+              context.user.id,
+              assetId,
+              context.currentWorkspace.id,
+              currentVersion,
+            )
+        : db
+            .prepare(
+              `UPDATE product_assets
              SET source_kind = 'uploaded',
                  model_object_key = ?1,
                  model_content_type = ?2,
@@ -396,8 +502,43 @@ export async function assetFileUploadResponse(
                AND workspace_id = ?7
                AND review_version = ?8
                AND status <> 'approved'`,
+            )
+            .bind(
+              objectKey,
+              file.contentType,
+              file.bytes.byteLength,
+              file.sha256,
+              context.user.id,
+              assetId,
+              context.currentWorkspace.id,
+              currentVersion,
+            );
+
+  const additionalSourceStatement =
+    kind === "source" && sourceView && sourceView !== "front"
+      ? db
+          .prepare(
+            `INSERT INTO product_asset_source_files (
+               workspace_id, asset_id, source_view, object_key, content_type,
+               size_bytes, sha256, created_by, updated_by
+             )
+             SELECT workspace_id, id, ?1, ?2, ?3, ?4, ?5, ?6, ?6
+             FROM product_assets
+             WHERE id = ?7
+               AND workspace_id = ?8
+               AND review_version = ?9
+               AND changes() = 1
+             ON CONFLICT (workspace_id, asset_id, source_view)
+             DO UPDATE SET
+               object_key = excluded.object_key,
+               content_type = excluded.content_type,
+               size_bytes = excluded.size_bytes,
+               sha256 = excluded.sha256,
+               updated_by = excluded.updated_by,
+               updated_at = CURRENT_TIMESTAMP`,
           )
           .bind(
+            sourceView,
             objectKey,
             file.contentType,
             file.bytes.byteLength,
@@ -405,13 +546,17 @@ export async function assetFileUploadResponse(
             context.user.id,
             assetId,
             context.currentWorkspace.id,
-            currentVersion,
-          );
+            nextVersion,
+          )
+      : null;
 
   let updateResult: D1Result<unknown> | undefined;
   try {
-    const statements = [
-      updateStatement,
+    const statements = [updateStatement];
+    if (additionalSourceStatement) {
+      statements.push(additionalSourceStatement);
+    }
+    statements.push(
       db
         .prepare(
           `INSERT INTO audit_events (
@@ -430,12 +575,17 @@ export async function assetFileUploadResponse(
           context.user.id,
           `asset.file.${kind}.upload`,
           requestId,
-          uploadAuditMetadata(kind, file.bytes.byteLength, nextVersion),
+          uploadAuditMetadata(
+            kind,
+            file.bytes.byteLength,
+            nextVersion,
+            sourceView,
+          ),
           assetId,
           context.currentWorkspace.id,
           nextVersion,
         ),
-    ];
+    );
     if (reservedGeneration) {
       statements.push(
         ...generationSupersededAccountingStatements(db, {
@@ -465,7 +615,7 @@ export async function assetFileUploadResponse(
     throw assetVersionConflict();
   }
 
-  await deletePrivateObjectQuietly(bucket, previousObjectKey);
+  await deletePrivateObjectQuietly(bucket, previousObjectKey ?? null);
   const updated = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!updated) {
     throw new Error("Uploaded asset could not be read.");
@@ -502,19 +652,29 @@ export async function assetFileResponse(
     throw assetFileNotFound();
   }
   const kind = kindResult.data;
+  const sourceView = requestedSourceView(request, kind);
   const asset = await findAsset(db, context.currentWorkspace.id, assetId);
   if (!asset) {
     throw assetNotFound();
   }
 
-  const objectKey =
-    kind === "source" ? asset.source_object_key : asset.model_object_key;
-  const contentType =
-    kind === "source" ? asset.source_content_type : asset.model_content_type;
-  const sizeBytes =
-    kind === "source" ? asset.source_size_bytes : asset.model_size_bytes;
-  const sha256 = kind === "source" ? asset.source_sha256 : asset.model_sha256;
-  if (!objectKey || !contentType || sizeBytes === null || !sha256) {
+  const stored =
+    kind === "source" && sourceView
+      ? storedSourceFile(asset, sourceView)
+      : {
+          contentType: asset.model_content_type,
+          objectKey: asset.model_object_key,
+          sha256: asset.model_sha256,
+          sizeBytes: asset.model_size_bytes,
+        };
+  const { objectKey, contentType, sizeBytes, sha256 } = stored;
+  if (
+    !objectKey ||
+    !contentType ||
+    sizeBytes === null ||
+    sizeBytes === undefined ||
+    !sha256
+  ) {
     throw assetFileNotFound();
   }
 
@@ -533,7 +693,11 @@ export async function assetFileResponse(
   return new Response(object.body, {
     headers: {
       "cache-control": "private, no-store",
-      "content-disposition": `inline; filename="${kind}.${fileExtension(kind, contentType)}"`,
+      "content-disposition": `inline; filename="${
+        kind === "source" && sourceView && sourceView !== "front"
+          ? `source-${sourceView}`
+          : kind
+      }.${fileExtension(kind, contentType)}"`,
       "content-length": String(object.sizeBytes),
       "content-type": contentType,
     },

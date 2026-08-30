@@ -188,7 +188,12 @@ describe("asset creation runtime constraints", () => {
       part: { id: partId },
       status: "draft",
       files: {
-        source: { contentType: "image/png", sizeBytes: sourceBytes.byteLength },
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: sourceBytes.byteLength,
+          },
+        },
       },
     });
 
