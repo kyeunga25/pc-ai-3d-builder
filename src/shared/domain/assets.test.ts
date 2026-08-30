@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { assetFileLimits } from "./asset-files";
-import { assetReviewItemSchema, emptyAssetSourceFiles } from "./assets";
+import {
+  assetReviewItemSchema,
+  assetReviewQueueResponseSchema,
+  emptyAssetSourceFiles,
+} from "./assets";
 
 function item() {
   return {
@@ -63,5 +67,31 @@ describe("asset review multi-view source contract", () => {
       left: null,
       "three-quarter": null,
     });
+  });
+});
+
+describe("asset review queue contract", () => {
+  it("requires one bounded opaque cursor field on every queue page", () => {
+    expect(
+      assetReviewQueueResponseSchema.parse({
+        items: [item()],
+        nextCursor: null,
+      }),
+    ).toMatchObject({ items: [{ id: "asset-multi-view-fixture" }] });
+    expect(
+      assetReviewQueueResponseSchema.safeParse({ items: [item()] }).success,
+    ).toBe(false);
+    expect(
+      assetReviewQueueResponseSchema.safeParse({
+        items: [item()],
+        nextCursor: "invalid/cursor",
+      }).success,
+    ).toBe(false);
+    expect(
+      assetReviewQueueResponseSchema.safeParse({
+        items: Array.from({ length: 51 }, item),
+        nextCursor: null,
+      }).success,
+    ).toBe(false);
   });
 });

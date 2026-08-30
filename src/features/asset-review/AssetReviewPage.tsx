@@ -3,6 +3,8 @@ import {
   Box,
   Camera,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleDot,
   Cuboid,
   FileBox,
@@ -20,6 +22,7 @@ import {
   type ChangeEvent,
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -54,7 +57,7 @@ import {
   type GenerationJob,
   type GenerationJobListResponse,
 } from "../../shared/domain/generation-jobs";
-import { reviewAsset } from "../../shared/domain/mockData";
+import { reviewQueueAssets } from "../../shared/domain/mockData";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import {
@@ -115,6 +118,7 @@ import {
   assetReviewFileRemovedNotice,
   assetReviewGenerationFailureNotice,
   assetReviewQueueNotice,
+  assetReviewQueuePageLoadedNotice,
   assetReviewRejectActionLabel,
   assetReviewSavedNotice,
   assetReviewSavingNotice,
@@ -143,6 +147,16 @@ import {
   targetAssetIdForWorkspace,
   useAssetReviewNavigation,
 } from "./asset-review-navigation";
+import {
+  assetReviewQueueCopy,
+  assetReviewQueuePositionCopy,
+} from "./asset-review-queue-copy";
+import {
+  appendAssetReviewQueueItems,
+  assetReviewFormHasUnsavedChanges,
+  assetReviewQueueNavigationState,
+  replaceAssetReviewQueueItem,
+} from "./asset-review-queue-state";
 import { AssetReviewStatusView } from "./AssetReviewStatusView";
 import "./asset-review.css";
 
@@ -274,9 +288,12 @@ export function AssetReviewPage() {
   );
   const localNavigationState =
     (location.state as LocalAssetNavigationState | null) ?? null;
-  const initialAsset = isLocalPreview
-    ? (localNavigationState?.localAsset ?? reviewAsset)
-    : null;
+  const initialQueueItems = isLocalPreview
+    ? localNavigationState?.localAsset
+      ? [localNavigationState.localAsset]
+      : reviewQueueAssets
+    : [];
+  const initialAsset = initialQueueItems[0] ?? null;
   const [camera, setCamera] = useState<AssetReviewCameraPreset>("等角");
   const [selectedSourceView, setSelectedSourceView] =
     useState<AssetSourceView>("front");
@@ -295,7 +312,12 @@ export function AssetReviewPage() {
   const [loadState, setLoadState] = useState<"error" | "loading" | "ready">(
     isLocalPreview ? "ready" : "loading",
   );
-  const [queueCount, setQueueCount] = useState(isLocalPreview ? 1 : 0);
+  const [queueItems, setQueueItems] =
+    useState<AssetReviewItem[]>(initialQueueItems);
+  const [queueNextCursor, setQueueNextCursor] = useState<string | null>(null);
+  const [queuePageState, setQueuePageState] = useState<
+    "error" | "idle" | "loading"
+  >("idle");
   const [reloadToken, setReloadToken] = useState(0);
   const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<string | null>(
     isLocalPreview ? currentWorkspace.id : null,
@@ -311,6 +333,7 @@ export function AssetReviewPage() {
       localNavigationState?.sourceUrl ? [localNavigationState.sourceUrl] : [],
     ),
   );
+  const localFileUrlsByAssetRef = useRef(new Map<string, AssetFileUrls>());
   const [submittingAction, setSubmittingAction] = useState<
     AssetReviewMutation["action"] | null
   >(null);
@@ -352,6 +375,11 @@ export function AssetReviewPage() {
   const fileOperationPending = uploadingKind !== null || removingKind !== null;
   const appliedGenerationJobRef = useRef<string | null>(null);
   const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
+  const queuePageRequestRef = useRef<AbortController | null>(null);
+  const adoptReviewAsset = useCallback((updated: AssetReviewItem) => {
+    setQueueItems((current) => replaceAssetReviewQueueItem(current, updated));
+    setForm(createReviewForm(updated));
+  }, []);
 
   useEffect(() => {
     if (initialNavigationTarget) {
@@ -373,30 +401,34 @@ export function AssetReviewPage() {
       return;
     }
 
+    queuePageRequestRef.current?.abort();
+    queuePageRequestRef.current = null;
     const controller = new AbortController();
-    const loadItems = targetAssetId
+    const loadPage = targetAssetId
       ? fetchAssetReview(
           controller.signal,
           currentWorkspace.id,
           targetAssetId,
-        ).then((asset) => [asset])
+        ).then((asset) => ({ items: [asset], nextCursor: null }))
       : fetchAssetReviewQueue(controller.signal, currentWorkspace.id);
 
-    void loadItems
-      .then((items) => {
-        setQueueCount(items.length);
+    void loadPage
+      .then((page) => {
+        setQueueItems(page.items);
+        setQueueNextCursor(page.nextCursor);
+        setQueuePageState("idle");
         setSelectedSourceView("front");
         setRejectArmedKey(null);
         setRemoveArmedKey(null);
         setGenerationCancelArmedKey(null);
-        setForm(items[0] ? createReviewForm(items[0]) : null);
+        setForm(page.items[0] ? createReviewForm(page.items[0]) : null);
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
         setReviewNotice(
-          targetAssetId && items[0]
+          targetAssetId && page.items[0]
             ? assetReviewStatusCopy.selectedLoaded
-            : items.length > 0
-              ? assetReviewQueueNotice(items.length)
+            : page.items.length > 0
+              ? assetReviewQueueNotice(page.items.length)
               : assetReviewStatusCopy.queueEmpty,
         );
       })
@@ -412,6 +444,7 @@ export function AssetReviewPage() {
 
   useEffect(
     () => () => {
+      queuePageRequestRef.current?.abort();
       for (const url of localObjectUrlsRef.current) {
         URL.revokeObjectURL(url);
       }
@@ -571,7 +604,7 @@ export function AssetReviewPage() {
             setRejectArmedKey(null);
             setRemoveArmedKey(null);
             setGenerationCancelArmedKey(null);
-            setForm(createReviewForm(updated));
+            adoptReviewAsset(updated);
             setReviewNotice(assetReviewStatusCopy.generatedDraftValidated);
           }
         } else if (latest?.status === "failed") {
@@ -595,11 +628,22 @@ export function AssetReviewPage() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [activeAsset, currentWorkspace.id, generationState.items, isLocalPreview]);
+  }, [
+    activeAsset,
+    adoptReviewAsset,
+    currentWorkspace.id,
+    generationState.items,
+    isLocalPreview,
+  ]);
 
   const retryQueue = () => {
+    queuePageRequestRef.current?.abort();
+    queuePageRequestRef.current = null;
     setLoadState("loading");
     setForm(null);
+    setQueueItems([]);
+    setQueueNextCursor(null);
+    setQueuePageState("idle");
     setRejectArmedKey(null);
     setRemoveArmedKey(null);
     setGenerationCancelArmedKey(null);
@@ -654,9 +698,14 @@ export function AssetReviewPage() {
   const sourceRemoveArmed = removeArmedKey === currentSourceRemoveKey;
   const modelRemoveArmed = removeArmedKey === currentModelRemoveKey;
   const badge = assetReviewStatusPresentation[asset.status];
+  const queueActiveIndex = queueItems.findIndex((item) => item.id === asset.id);
+  const queuePosition = Math.max(1, queueActiveIndex + 1);
+  const queueCount = queueItems.length;
   const queueSuffix = assetReviewQueueSuffixCopy(
     targetAssetId !== null,
     queueCount,
+    queuePosition,
+    queueNextCursor !== null,
   );
   const visibleFileUrls =
     fileUrls.assetKey === assetKey(asset)
@@ -719,13 +768,44 @@ export function AssetReviewPage() {
       (job.status === "awaiting_review" &&
         job.entitlementStatus === "reserved"),
   );
-  const persistedChecks = new Set(asset.completedChecks);
-  const reviewHasUnsavedChanges =
-    form.checks.size !== persistedChecks.size ||
-    [...form.checks].some((check) => !persistedChecks.has(check)) ||
-    parsedDimensions.width !== asset.dimensionsMm.width ||
-    parsedDimensions.height !== asset.dimensionsMm.height ||
-    parsedDimensions.depth !== asset.dimensionsMm.depth;
+  const reviewHasUnsavedChanges = assetReviewFormHasUnsavedChanges(asset, form);
+  const queueTransitionBlocked =
+    reviewHasUnsavedChanges ||
+    fileOperationPending ||
+    submitting ||
+    generationSubmitting ||
+    queuePageState === "loading";
+  const queueNavigation = assetReviewQueueNavigationState({
+    activeAssetId: asset.id,
+    blocked: queueTransitionBlocked,
+    items: queueItems,
+    nextCursor: queueNextCursor,
+  });
+  const queuePositionCopy = assetReviewQueuePositionCopy(
+    queuePosition,
+    queueCount,
+    queueNextCursor !== null,
+  );
+  const queueNextCopy =
+    queuePageState === "loading"
+      ? assetReviewQueueCopy.loading
+      : queuePageState === "error" && queueNavigation.next === "page"
+        ? assetReviewQueueCopy.retry
+        : assetReviewQueueCopy.next;
+  const queueTransitionTitle = reviewHasUnsavedChanges
+    ? bilingualTitle(
+        "先儲存或還原目前審核變更，才可切換素材",
+        "Save or reset the current review changes before switching assets",
+      )
+    : queueTransitionBlocked
+      ? bilingualTitle(
+          "目前操作完成後才可切換素材",
+          "Wait for the current operation before switching assets",
+        )
+      : bilingualTitle(
+          "切換時不會把私人素材 ID 寫入 URL",
+          "Switch without writing the private asset ID to the URL",
+        );
   const canRequestGeneration =
     canDecide &&
     asset.files.sources.front !== null &&
@@ -866,6 +946,104 @@ export function AssetReviewPage() {
     }
   };
 
+  const activateQueueAsset = (
+    nextAsset: AssetReviewItem,
+    notice: AssetReviewNotice,
+  ) => {
+    clearConfirmationIntents();
+    generationRequestLeaseRef.current = null;
+    appliedGenerationJobRef.current = null;
+    setSelectedSourceView("front");
+    setModelRenderMode("shaded");
+    setModelResetToken((token) => token + 1);
+    setFileUrls((current) => {
+      if (isLocalPreview) {
+        localFileUrlsByAssetRef.current.set(asset.id, current);
+        return (
+          localFileUrlsByAssetRef.current.get(nextAsset.id) ?? {
+            assetKey: "",
+            model: null,
+            sources: emptyAssetSourceUrls(),
+          }
+        );
+      }
+      return {
+        assetKey: "",
+        model: null,
+        sources: emptyAssetSourceUrls(),
+      };
+    });
+    setForm(createReviewForm(nextAsset));
+    setReviewNotice(notice);
+  };
+
+  const selectQueueIndex = (index: number) => {
+    const nextAsset = queueItems[index];
+    if (!nextAsset || queueTransitionBlocked) {
+      return;
+    }
+    activateQueueAsset(nextAsset, assetReviewStatusCopy.queueItemChanged);
+  };
+
+  const moveToPreviousQueueAsset = () => {
+    if (queueNavigation.canPrevious) {
+      selectQueueIndex(queueNavigation.activeIndex - 1);
+    }
+  };
+
+  const moveToNextQueueAsset = async () => {
+    if (queueNavigation.next === "loaded") {
+      selectQueueIndex(queueNavigation.activeIndex + 1);
+      return;
+    }
+    if (
+      queueNavigation.next !== "page" ||
+      queueNextCursor === null ||
+      queueTransitionBlocked
+    ) {
+      return;
+    }
+
+    queuePageRequestRef.current?.abort();
+    const controller = new AbortController();
+    queuePageRequestRef.current = controller;
+    setQueuePageState("loading");
+    setReviewNotice(assetReviewStatusCopy.queueLoadingMore);
+    try {
+      const page = await fetchAssetReviewQueue(
+        controller.signal,
+        currentWorkspace.id,
+        queueNextCursor,
+      );
+      if (controller.signal.aborted) {
+        return;
+      }
+      setQueueItems((current) =>
+        appendAssetReviewQueueItems(current, page.items),
+      );
+      setQueueNextCursor(page.nextCursor);
+      setQueuePageState("idle");
+      const firstNewAsset = page.items[0];
+      if (firstNewAsset) {
+        activateQueueAsset(
+          firstNewAsset,
+          assetReviewQueuePageLoadedNotice(page.items.length),
+        );
+      } else {
+        setReviewNotice(assetReviewQueuePageLoadedNotice(0));
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        setQueuePageState("error");
+        setReviewNotice(assetReviewStatusCopy.queuePageFailed);
+      }
+    } finally {
+      if (queuePageRequestRef.current === controller) {
+        queuePageRequestRef.current = null;
+      }
+    }
+  };
+
   const transitionLocalReservedGeneration = (
     transition: "released" | "settled",
     failureCode: string | null = null,
@@ -990,7 +1168,7 @@ export function AssetReviewPage() {
         },
       };
     });
-    setForm(createReviewForm(updated));
+    adoptReviewAsset(updated);
     setReviewNotice(assetReviewStatusCopy.localSourceCreated);
   };
 
@@ -1147,7 +1325,7 @@ export function AssetReviewPage() {
         );
       }
 
-      setForm(createReviewForm(updated));
+      adoptReviewAsset(updated);
       setReviewNotice(
         upload.kind === "source"
           ? assetReviewStatusCopy.sourceUploaded
@@ -1271,7 +1449,7 @@ export function AssetReviewPage() {
         reservedGenerationReleased = result.reservedGenerationReleased;
       }
 
-      setForm(createReviewForm(updated));
+      adoptReviewAsset(updated);
       setReviewNotice(
         assetReviewFileRemovedNotice(kind, reservedGenerationReleased),
       );
@@ -1450,7 +1628,7 @@ export function AssetReviewPage() {
           },
           items: [job, ...current.items].slice(0, 20),
         }));
-        setForm(createReviewForm(updated));
+        adoptReviewAsset(updated);
       } else {
         const lease = acquireGenerationRequestLease(
           generationRequestLeaseRef.current,
@@ -1564,7 +1742,7 @@ export function AssetReviewPage() {
           );
         }
       }
-      setForm(createReviewForm(updated));
+      adoptReviewAsset(updated);
       setReviewNotice(assetReviewSavedNotice(action, hadReservedGeneration));
     } catch (error) {
       const failureOperation =
@@ -1641,6 +1819,41 @@ export function AssetReviewPage() {
           <p>
             <BilingualInterfaceText copy={assetReviewHeaderCopy.guidance} />
           </p>
+          {targetAssetId === null ? (
+            <div
+              className="asset-review-queue-nav"
+              role="group"
+              aria-label={bilingualTitle(
+                assetReviewQueueCopy.heading.zhHant,
+                assetReviewQueueCopy.heading.english,
+              )}
+            >
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={!queueNavigation.canPrevious}
+                title={queueTransitionTitle}
+                onClick={moveToPreviousQueueAsset}
+              >
+                <ChevronLeft aria-hidden="true" />
+                <BilingualActionLabel copy={assetReviewQueueCopy.previous} />
+              </button>
+              <BilingualInterfaceText
+                className="asset-review-queue-nav__position"
+                copy={queuePositionCopy}
+              />
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={queueNavigation.next === null}
+                title={queueTransitionTitle}
+                onClick={() => void moveToNextQueueAsset()}
+              >
+                <BilingualActionLabel copy={queueNextCopy} />
+                <ChevronRight aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="asset-review-header__meta">
           <StatusBadge tone={badge.tone}>

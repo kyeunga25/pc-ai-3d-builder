@@ -6,8 +6,13 @@ import {
 } from "../../shared/domain/assets";
 import { createSyntheticDraftGlb } from "../../shared/domain/synthetic-glb";
 import type { WorkspaceRole } from "../../shared/domain/session";
+import { assetReviewCursorHeader } from "../../shared/lib/asset-review-pagination";
 import type { RequestContext } from "../auth/workspace";
 import { sha256Hex } from "../lib/digest";
+import {
+  decodeAssetReviewCursor,
+  encodeAssetReviewCursor,
+} from "../lib/asset-review-cursor";
 import {
   assetDetailResponse,
   assetReviewMutationResponse,
@@ -52,6 +57,7 @@ const assetRow = {
   model_content_type: "model/gltf-binary",
   model_size_bytes: modelBytes.byteLength,
   model_sha256: modelSha256,
+  asset_updated_at: "2026-08-30 00:00:00",
 };
 
 const privateAssets = {
@@ -101,12 +107,17 @@ function reviewInput(
 }
 
 function fakeDatabase(
-  options: { changes?: number; rows?: Array<Record<string, unknown>> } = {},
+  options: {
+    changes?: number;
+    firstRows?: Array<Record<string, unknown> | null>;
+    rows?: Array<Record<string, unknown>>;
+  } = {},
 ) {
   const prepared: FakeStatement[] = [];
   const batches: FakeStatement[][] = [];
   const batchChanges: number[][] = [];
   const rows = options.rows ?? [assetRow];
+  let firstCall = 0;
   const db = {
     prepare(sql: string) {
       const statement: FakeStatement = {
@@ -120,6 +131,11 @@ function fakeDatabase(
           return { success: true as const, results: rows };
         },
         async first() {
+          if (options.firstRows) {
+            const row = options.firstRows[firstCall] ?? null;
+            firstCall += 1;
+            return row;
+          }
           return rows[0] ?? null;
         },
       };
@@ -221,36 +237,119 @@ describe("asset review routes", () => {
     },
   );
 
-  it("returns only the verified workspace review queue", async () => {
+  it("returns only one bounded workspace review page and an opaque continuation", async () => {
+    const rows = Array.from({ length: 51 }, (_, index) => ({
+      ...assetRow,
+      asset_id: `asset-fixture-${String(index).padStart(3, "0")}`,
+      part_id: `part-fixture-${String(index).padStart(3, "0")}`,
+      sku: `FIXTURE-${String(index).padStart(3, "0")}`,
+      status: "in_review",
+      quality: "draft",
+      asset_updated_at: `2026-08-30 00:00:${String(index).padStart(2, "0")}`,
+    }));
     const { db, prepared } = fakeDatabase({
-      rows: [{ ...assetRow, status: "in_review", quality: "draft" }],
+      rows,
     });
+    const request = new Request("https://app.example/api/assets/review-queue");
 
-    const response = await assetReviewQueueResponse(db, context());
+    const response = await assetReviewQueueResponse(request, db, context());
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      items: [
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const body = (await response.json()) as {
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
+    expect(body.items).toHaveLength(50);
+    expect(body.items.at(-1)?.id).toBe("asset-fixture-049");
+    expect(decodeAssetReviewCursor(body.nextCursor ?? "")).toEqual({
+      assetId: "asset-fixture-049",
+      updatedAt: "2026-08-30 00:00:49",
+    });
+    expect(prepared[0]?.sql).toContain("a.workspace_id = ?1");
+    expect(prepared[0]?.sql).toContain("LIMIT ?2");
+    expect(prepared[0]?.values).toEqual(["workspace-fixture", 51]);
+  });
+
+  it("validates a replayable cursor in the workspace before composite seeking", async () => {
+    const cursor = encodeAssetReviewCursor({
+      assetId: "asset-cursor-fixture",
+      updatedAt: "2026-08-30 00:10:00",
+    });
+    const { db, prepared } = fakeDatabase({
+      firstRows: [{ available: 1 }],
+      rows: [
         {
-          id: "asset-fixture",
-          version: 1,
-          files: {
-            sources: {
-              front: { contentType: "image/png", sizeBytes: 128 },
-              back: null,
-              left: null,
-              "three-quarter": null,
-            },
-            model: {
-              contentType: "model/gltf-binary",
-              sizeBytes: modelBytes.byteLength,
-            },
-          },
+          ...assetRow,
+          asset_id: "asset-next-fixture",
+          asset_updated_at: "2026-08-30 00:11:00",
         },
       ],
     });
-    expect(prepared[0]?.sql).toContain("a.workspace_id = ?1");
-    expect(prepared[0]?.values).toEqual(["workspace-fixture"]);
+    const request = new Request("https://app.example/api/assets/review-queue", {
+      headers: { [assetReviewCursorHeader]: cursor },
+    });
+
+    const response = await assetReviewQueueResponse(request, db, context());
+
+    await expect(response.json()).resolves.toMatchObject({
+      items: [{ id: "asset-next-fixture" }],
+      nextCursor: null,
+    });
+    expect(prepared[0]?.sql).toContain("workspace_id = ?1 AND id = ?2");
+    expect(prepared[0]?.values).toEqual([
+      "workspace-fixture",
+      "asset-cursor-fixture",
+    ]);
+    expect(prepared[1]?.sql).toContain("a.updated_at > ?2");
+    expect(prepared[1]?.sql).toContain("a.id > ?3");
+    expect(prepared[1]?.values).toEqual([
+      "workspace-fixture",
+      "2026-08-30 00:10:00",
+      "asset-cursor-fixture",
+      51,
+    ]);
+  });
+
+  it.each([
+    ["URL cursor", "?cursor=asset-private", null],
+    ["malformed header", "", "invalid/cursor"],
+  ])(
+    "rejects a %s before queue database work",
+    async (_label, query, cursor) => {
+      const { db, prepared } = fakeDatabase();
+      const headers = new Headers();
+      if (cursor !== null) headers.set(assetReviewCursorHeader, cursor);
+      const request = new Request(
+        `https://app.example/api/assets/review-queue${query}`,
+        { headers },
+      );
+
+      await expect(
+        assetReviewQueueResponse(request, db, context()),
+      ).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      expect(prepared).toHaveLength(0);
+    },
+  );
+
+  it("rejects a syntactically valid foreign cursor after one workspace lookup", async () => {
+    const cursor = encodeAssetReviewCursor({
+      assetId: "asset-foreign-fixture",
+      updatedAt: "2026-08-30 00:10:00",
+    });
+    const { db, prepared } = fakeDatabase({ firstRows: [null] });
+    const request = new Request("https://app.example/api/assets/review-queue", {
+      headers: { [assetReviewCursorHeader]: cursor },
+    });
+
+    await expect(
+      assetReviewQueueResponse(request, db, context()),
+    ).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.values).toEqual([
+      "workspace-fixture",
+      "asset-foreign-fixture",
+    ]);
   });
 
   it("rejects viewer review mutations before reading or private work", async () => {

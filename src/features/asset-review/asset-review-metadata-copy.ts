@@ -58,14 +58,16 @@ export function assetReviewHeaderEyebrowCopy(version: number): BilingualCopy {
 
 export function assetReviewQueueSuffixCopy(
   selected: boolean,
-  count: number,
+  loadedCount: number,
+  position: number,
+  hasMore: boolean,
 ): BilingualCopy {
   if (selected) {
     return bilingualCopy(" · 指定素材", " · Selected asset");
   }
 
   return bilingualCopy(
-    ` · 佇列 ${count} 項`,
-    ` · ${count} ${count === 1 ? "item" : "items"} in queue`,
+    ` · 第 ${position} 項 / 已載入 ${loadedCount} 項${hasMore ? " / 尚有更多" : ""}`,
+    ` · Item ${position} / ${loadedCount} loaded${hasMore ? " / more available" : ""}`,
   );
 }

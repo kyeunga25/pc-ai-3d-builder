@@ -32,6 +32,36 @@
   line-height: 1.65;
 }
 
+.asset-review-header > div:first-child {
+  min-width: 0;
+}
+
+.asset-review-queue-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.asset-review-queue-nav .button {
+  min-height: 46px;
+  padding: 6px 10px;
+}
+
+.asset-review-queue-nav .button svg {
+  width: 16px;
+  flex: 0 0 auto;
+}
+
+.asset-review-queue-nav__position {
+  min-width: 150px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+}
+
 .asset-review-header__meta {
   display: flex;
   align-items: center;
@@ -839,6 +869,21 @@
     width: 100%;
     align-items: flex-start;
     justify-content: space-between;
+  }
+
+  .asset-review-queue-nav {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .asset-review-queue-nav .button {
+    flex: 1 1 128px;
+  }
+
+  .asset-review-queue-nav__position {
+    flex: 1 1 100%;
+    order: -1;
+    text-align: left;
   }
 
   .asset-review-status {

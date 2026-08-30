@@ -201,7 +201,7 @@ export async function routeRequest(
     }
 
     if (url.pathname === "/api/assets/review-queue") {
-      return assetReviewQueueResponse(env.DB, context);
+      return assetReviewQueueResponse(request, env.DB, context);
     }
 
     if (url.pathname === "/api/assets/item/review") {

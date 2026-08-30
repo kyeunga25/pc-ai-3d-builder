@@ -9,6 +9,7 @@ import {
   assetReviewQueueResponseSchema,
   type AssetReviewItem,
   type AssetReviewMutation,
+  type AssetReviewQueueResponse,
 } from "../../shared/domain/assets";
 import {
   generationJobListResponseSchema,
@@ -17,6 +18,7 @@ import {
   type GenerationJobStartInput,
 } from "../../shared/domain/generation-jobs";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { assetReviewCursorHeader } from "../../shared/lib/asset-review-pagination";
 import {
   assetFileKindHeader,
   assetGenerationCreditReleasedHeader,
@@ -103,10 +105,13 @@ function workspaceHeaders(workspaceId: string): Headers {
 export async function fetchAssetReviewQueue(
   signal: AbortSignal,
   workspaceId: string,
-): Promise<AssetReviewItem[]> {
+  cursor: string | null = null,
+): Promise<AssetReviewQueueResponse> {
+  const headers = workspaceHeaders(workspaceId);
+  if (cursor !== null) headers.set(assetReviewCursorHeader, cursor);
   const response = await apiFetch("/api/assets/review-queue", {
     credentials: "same-origin",
-    headers: workspaceHeaders(workspaceId),
+    headers,
     signal,
   });
 
@@ -114,7 +119,7 @@ export async function fetchAssetReviewQueue(
     throw await apiError(response);
   }
 
-  return assetReviewQueueResponseSchema.parse(await response.json()).items;
+  return assetReviewQueueResponseSchema.parse(await response.json());
 }
 
 export async function fetchAssetReview(
