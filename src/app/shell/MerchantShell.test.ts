@@ -98,14 +98,20 @@ describe("MerchantShell workspace selection", () => {
   });
 
   it("shows member management only to workspace managers", () => {
-    expect(
-      renderShell({ status: "idle", targetWorkspaceId: null, error: null }),
-    ).toContain('href="/dashboard/members"');
-    expect(
-      renderShell(
-        { status: "idle", targetWorkspaceId: null, error: null },
-        "staff",
-      ),
-    ).not.toContain('href="/dashboard/members"');
+    const managerMarkup = renderShell({
+      status: "idle",
+      targetWorkspaceId: null,
+      error: null,
+    });
+    const staffMarkup = renderShell(
+      { status: "idle", targetWorkspaceId: null, error: null },
+      "staff",
+    );
+
+    expect(managerMarkup).toContain('href="/dashboard/members"');
+    expect(managerMarkup).toContain('href="/dashboard/activity"');
+    expect(managerMarkup).toContain("活動記錄 / Activity log");
+    expect(staffMarkup).not.toContain('href="/dashboard/members"');
+    expect(staffMarkup).not.toContain('href="/dashboard/activity"');
   });
 });

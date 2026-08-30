@@ -10,6 +10,7 @@ import { LoginPage } from "../../features/auth/LoginPage";
 import { CataloguePage } from "../../features/catalogue/CataloguePage";
 import { DashboardPage } from "../../features/dashboard/DashboardPage";
 import { LandingPage } from "../../features/landing/LandingPage";
+import { WorkspaceActivityPage } from "../../features/workspace-activity/WorkspaceActivityPage";
 import { WorkspaceMembersPage } from "../../features/workspace-members/WorkspaceMembersPage";
 import { LoadingState } from "../../shared/components/AsyncState";
 
@@ -48,6 +49,10 @@ export function AppRouter({ demoMode = false }: { demoMode?: boolean }) {
       <Route element={<ProtectedWorkspace />}>
         <Route element={<MerchantShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route
+            path="/dashboard/activity"
+            element={<WorkspaceActivityPage />}
+          />
           <Route path="/dashboard/members" element={<WorkspaceMembersPage />} />
           <Route path="/catalogue" element={<CataloguePage />} />
           <Route path="/asset-review" element={<AssetReviewPage />} />

@@ -54,6 +54,7 @@ import {
   workspaceMemberListResponse,
   workspaceMemberUpdateResponse,
 } from "./routes/workspace-members";
+import { workspaceActivityResponse } from "./routes/workspace-activity";
 
 function apiNotFound(requestId: string): Response {
   return apiErrorResponse(
@@ -137,6 +138,10 @@ export async function routeRequest(
 
     if (url.pathname === "/api/dashboard") {
       return dashboardResponse(env.DB, context);
+    }
+
+    if (url.pathname === "/api/workspace/activity") {
+      return workspaceActivityResponse(request, env.DB, context);
     }
 
     if (url.pathname === "/api/workspace/members") {
