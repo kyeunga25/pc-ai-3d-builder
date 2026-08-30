@@ -262,6 +262,11 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("Upload image");
     expect(markup).toContain("3D model");
     expect(markup).toContain("Upload GLB");
+    expect(markup).toContain(
+      'accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"',
+    );
+    expect(markup).toContain("Filename/MIME/content checked before upload");
+    expect(markup).toContain(".glb/MIME/content checked before upload");
     expect(markup).toContain("resets the approval checklist");
     expect(markup).toContain("affects only the selected view or GLB");
     expect(markup).toContain("all other private files remain private");

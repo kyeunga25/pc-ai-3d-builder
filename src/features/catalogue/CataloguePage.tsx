@@ -12,6 +12,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { createAssetFromSource } from "../asset-review/asset-review-api";
+import { validateAssetUploadFile } from "../asset-review/asset-upload-file";
 import { useAssetReviewNavigation } from "../asset-review/asset-review-navigation";
 import { useAuthenticatedSession } from "../auth/session-context";
 import { isPublicDemoPath } from "../../shared/lib/demo-mode";
@@ -21,11 +22,6 @@ import {
   LoadingState,
 } from "../../shared/components/AsyncState";
 import { StatusBadge } from "../../shared/components/StatusBadge";
-import {
-  AssetFileValidationError,
-  assetFileLimits,
-  validateAssetFileBytes,
-} from "../../shared/domain/asset-files";
 import type { AssetReviewItem } from "../../shared/domain/assets";
 import {
   catalogueImportMediaTypes,
@@ -283,21 +279,12 @@ export function CataloguePage() {
         "請先儲存產品，然後再建立素材草稿。 / Save the product before creating an asset draft.",
       );
     }
-    if (file.size > assetFileLimits.source) {
-      throw new AssetFileValidationError(
-        "來源圖片必須小於或等於 10 MiB。 / The source image must be 10 MiB or smaller.",
-      );
-    }
-    const contentType = validateAssetFileBytes(
-      "source",
-      file.type,
-      new Uint8Array(await file.arrayBuffer()),
-    );
+    const upload = await validateAssetUploadFile("source", file);
 
     let asset: AssetReviewItem;
     let sourceUrl: string | undefined;
     if (isLocalPreview) {
-      sourceUrl = URL.createObjectURL(file);
+      sourceUrl = URL.createObjectURL(upload.file);
       asset = {
         id: `asset_local_${crypto.randomUUID()}`,
         part: {
@@ -313,7 +300,10 @@ export function CataloguePage() {
         sourceRightsConfirmed: false,
         files: {
           sources: {
-            front: { contentType, sizeBytes: file.size },
+            front: {
+              contentType: upload.contentType,
+              sizeBytes: upload.file.size,
+            },
             back: null,
             left: null,
             "three-quarter": null,
@@ -327,7 +317,7 @@ export function CataloguePage() {
       asset = await createAssetFromSource(
         currentWorkspace.id,
         editorPart.id,
-        file,
+        upload,
       );
     }
 

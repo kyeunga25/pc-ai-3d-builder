@@ -17,6 +17,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 - [x] Validated CSV template and transactional import of at most 50 records.
 - [x] D1 asset-review queue with role checks and optimistic concurrency.
 - [x] Four-view private R2 source-image and GLB upload with bounded binary validation, selected-view replacement and canonical-front generation isolation.
+- [x] Shared Catalogue/Asset Review filename-MIME-bytes browser preflight with canonical upload MIME, safe empty/generic MIME recovery and independent Worker revalidation.
 - [x] Access- and workspace-protected private-file streaming.
 - [x] Lazy-loaded Three.js GLB preview with manual camera controls.
 - [x] Builder preview of the selected component's approved private GLB with short-lived object URLs.

@@ -6,6 +6,10 @@ function editorCopy(zhHant: string, english: string): CataloguePageCopy {
 
 export const catalogueEditorCopy = {
   addProduct: editorCopy("新增產品", "Add product"),
+  assetDraftFileRequirements: editorCopy(
+    "選擇 JPEG、PNG 或 WebP；上載前會核對檔名、MIME 及內容",
+    "Choose JPEG, PNG or WebP; filename, MIME and content are checked before upload",
+  ),
   archiveProduct: editorCopy("封存產品", "Archive product"),
   archiving: editorCopy("正在封存…", "Archiving…"),
   cancel: editorCopy("取消", "Cancel"),
