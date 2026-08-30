@@ -7,6 +7,11 @@ import {
   assetSourceViews,
   type AssetSourceView,
 } from "./asset-files";
+import {
+  assetReviewCursorMaxLength,
+  assetReviewCursorPattern,
+  assetReviewQueuePageSize,
+} from "../lib/asset-review-pagination";
 
 export const assetReviewChecks = [
   "model_identity",
@@ -93,7 +98,13 @@ export const assetReviewItemSchema = z.object({
 });
 
 export const assetReviewQueueResponseSchema = z.object({
-  items: z.array(assetReviewItemSchema),
+  items: z.array(assetReviewItemSchema).max(assetReviewQueuePageSize),
+  nextCursor: z
+    .string()
+    .min(1)
+    .max(assetReviewCursorMaxLength)
+    .regex(assetReviewCursorPattern)
+    .nullable(),
 });
 
 export const assetReviewMutationSchema = z.object({
@@ -110,4 +121,7 @@ export const assetReviewMutationSchema = z.object({
 
 export type AssetReviewCheck = z.infer<typeof assetReviewCheckSchema>;
 export type AssetReviewItem = z.infer<typeof assetReviewItemSchema>;
+export type AssetReviewQueueResponse = z.infer<
+  typeof assetReviewQueueResponseSchema
+>;
 export type AssetReviewMutation = z.infer<typeof assetReviewMutationSchema>;

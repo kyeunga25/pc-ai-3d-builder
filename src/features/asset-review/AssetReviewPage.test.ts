@@ -43,7 +43,7 @@ const sessionValue = {
 };
 
 function renderPage(
-  localAsset = reviewAsset,
+  localAsset?: typeof reviewAsset,
   initialEntry = "/asset-review",
   sourceUrl?: string,
   generationState?: GenerationJobListResponse,
@@ -431,13 +431,40 @@ describe("AssetReviewPage", () => {
       "All generated or uploaded material remains a draft",
     );
     expect(markup).toContain("Needs review");
-    expect(markup).toContain("1 item in queue");
+    expect(markup).toContain("2 loaded");
     expect(markup).toContain("Asset details");
     expect(markup).toContain("Synthetic test asset");
     expect(markup).toContain("Product SKU");
     expect(markup).toContain("Quality");
     expect(markup).toContain("Draft quality");
     expect(markup).toContain("Review version");
+  });
+
+  it("renders private-ID-free bilingual queue navigation with a safe first position", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain("審核佇列導覽");
+    expect(markup).toContain("Asset review queue navigation");
+    expect(markup).toContain("上一項");
+    expect(markup).toContain("Previous asset");
+    expect(markup).toContain("下一項");
+    expect(markup).toContain("Next asset");
+    expect(markup).toContain("Item 1 of 2 loaded");
+    expect(markup).not.toContain("asset_review_fixture_secondary");
+  });
+
+  it("keeps queue navigation readable and wrapped at phone width", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toMatch(
+      /\.asset-review-queue-nav\s*\{[^}]*flex-wrap:\s*wrap;/u,
+    );
+    expect(styles).toMatch(
+      /@media \(max-width: 720px\)[^]*?\.asset-review-queue-nav\s*\{[^}]*width:\s*100%;/u,
+    );
   });
 
   it.each([

@@ -10,11 +10,13 @@ import {
   fetchGenerationJobs,
   removeAssetFile,
   fetchAssetReview,
+  fetchAssetReviewQueue,
   shouldRetainGenerationRequestLease,
   startGenerationJob,
   uploadAssetFile,
   updateAssetReview,
 } from "./asset-review-api";
+import { assetReviewCursorHeader } from "../../shared/lib/asset-review-pagination";
 
 const leaseInput = {
   workspaceId: "workspace-fixture",
@@ -253,6 +255,33 @@ describe("catalogue source target API", () => {
 });
 
 describe("asset review target API", () => {
+  it("keeps the opaque queue cursor in a protected header and returns the full page", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ items: [reviewAsset], nextCursor: "cursor_next_001" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchAssetReviewQueue(
+        new AbortController().signal,
+        "workspace-fixture",
+        "cursor_current_001",
+      ),
+    ).resolves.toMatchObject({
+      items: [{ id: reviewAsset.id }],
+      nextCursor: "cursor_next_001",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/assets/review-queue");
+    expect(url).not.toContain("cursor_current_001");
+    expect(headers.get(assetReviewCursorHeader)).toBe("cursor_current_001");
+    expect(init.body).toBeUndefined();
+  });
+
   it("keeps the private asset ID out of the detail URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(reviewAsset));
     vi.stubGlobal("fetch", fetchMock);

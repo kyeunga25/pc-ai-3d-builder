@@ -12,12 +12,21 @@ import {
 } from "../../shared/domain/assets";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import { assetTargetHeader } from "../../shared/lib/asset-target";
+import {
+  assetReviewCursorHeader,
+  assetReviewQueuePageSize,
+  assetReviewRecordIdPattern,
+} from "../../shared/lib/asset-review-pagination";
 import type { RequestContext } from "../auth/workspace";
 import {
   findReservedGenerationForAsset,
   generationReviewAccountingStatements,
 } from "../generation/accounting";
 import { ApiError } from "../lib/api-error";
+import {
+  decodeAssetReviewCursor,
+  encodeAssetReviewCursor,
+} from "../lib/asset-review-cursor";
 import { privateModelObjectMatches } from "../lib/private-assets";
 import { readBoundedJson } from "../lib/request-body";
 
@@ -36,6 +45,7 @@ export type AssetReviewRow = {
   verified_height_mm: number | null;
   verified_depth_mm: number | null;
   review_version: number;
+  asset_updated_at: string;
   source_object_key: string | null;
   source_content_type: string | null;
   source_size_bytes: number | null;
@@ -63,7 +73,7 @@ type ReviewTransition = {
   quality: AssetReviewItem["quality"];
 };
 
-export const assetRecordIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
+export const assetRecordIdPattern = assetReviewRecordIdPattern;
 
 function roleError(): ApiError {
   return new ApiError(
@@ -92,6 +102,14 @@ function assetNotFound(): ApiError {
     404,
     "ASSET_NOT_FOUND",
     "找不到所要求的素材。 / The requested asset was not found.",
+  );
+}
+
+function assetReviewPaginationError(): ApiError {
+  return new ApiError(
+    400,
+    "VALIDATION_ERROR",
+    "素材審核佇列分頁資料無效。 / The asset review queue cursor is invalid.",
   );
 }
 
@@ -205,7 +223,9 @@ export const assetSelect = `SELECT a.id AS asset_id, p.id AS part_id, p.sku,
                             a.source_kind, a.completed_checks_json,
                             a.source_rights_confirmed, a.verified_width_mm,
                             a.verified_height_mm, a.verified_depth_mm,
-                            a.review_version, a.source_object_key,
+                            a.review_version,
+                            a.updated_at AS asset_updated_at,
+                            a.source_object_key,
                             a.source_content_type, a.source_size_bytes,
                             a.source_sha256,
                             source_back.object_key AS source_back_object_key,
@@ -275,26 +295,70 @@ export async function assetDetailResponse(
 }
 
 export async function assetReviewQueueResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
 ): Promise<Response> {
+  if (new URL(request.url).search.length > 0) {
+    throw assetReviewPaginationError();
+  }
+
+  const rawCursor = request.headers.get(assetReviewCursorHeader);
+  const values: Array<number | string> = [context.currentWorkspace.id];
+  let afterCursorClause = "";
+  if (rawCursor !== null) {
+    const cursor = decodeAssetReviewCursor(rawCursor);
+    if (!cursor) {
+      throw assetReviewPaginationError();
+    }
+    const cursorAsset = await db
+      .prepare(
+        `SELECT 1 AS available
+         FROM product_assets
+         WHERE workspace_id = ?1 AND id = ?2
+         LIMIT 1`,
+      )
+      .bind(context.currentWorkspace.id, cursor.assetId)
+      .first<{ available: number }>();
+    if (!cursorAsset) {
+      throw assetReviewPaginationError();
+    }
+    afterCursorClause =
+      "AND (a.updated_at > ?2 OR (a.updated_at = ?2 AND a.id > ?3))";
+    values.push(cursor.updatedAt, cursor.assetId);
+  }
+  values.push(assetReviewQueuePageSize + 1);
+
   const result = await db
     .prepare(
       `${assetSelect}
        WHERE a.workspace_id = ?1
          AND a.status IN ('draft', 'in_review')
          AND p.status = 'active'
+         ${afterCursorClause}
        ORDER BY a.updated_at, a.id
-       LIMIT 50`,
+       LIMIT ?${values.length}`,
     )
-    .bind(context.currentWorkspace.id)
+    .bind(...values)
     .all<AssetReviewRow>();
+  const hasMore = result.results.length > assetReviewQueuePageSize;
+  const rows = hasMore
+    ? result.results.slice(0, assetReviewQueuePageSize)
+    : result.results;
+  const lastRow = rows.at(-1);
   const body = assetReviewQueueResponseSchema.parse({
-    items: result.results.map(mapAssetReviewRow),
+    items: rows.map(mapAssetReviewRow),
+    nextCursor:
+      hasMore && lastRow
+        ? encodeAssetReviewCursor({
+            assetId: lastRow.asset_id,
+            updatedAt: lastRow.asset_updated_at,
+          })
+        : null,
   });
 
   return Response.json(body, {
-    headers: { "cache-control": "no-store" },
+    headers: { "cache-control": "private, no-store" },
   });
 }
 

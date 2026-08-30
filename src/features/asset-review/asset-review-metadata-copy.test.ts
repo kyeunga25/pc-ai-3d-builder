@@ -47,18 +47,18 @@ describe("Asset Review metadata copy", () => {
     }
   });
 
-  it("formats version and queue context with correct English plurality", () => {
+  it("formats version and loaded queue position without claiming a total", () => {
     expect(assetReviewHeaderEyebrowCopy(3)).toEqual({
       english: "Private asset · Version 3",
       zhHant: "私人素材 · 版本 3",
     });
-    expect(assetReviewQueueSuffixCopy(false, 1).english).toBe(
-      " · 1 item in queue",
+    expect(assetReviewQueueSuffixCopy(false, 1, 1, false).english).toBe(
+      " · Item 1 / 1 loaded",
     );
-    expect(assetReviewQueueSuffixCopy(false, 2).english).toBe(
-      " · 2 items in queue",
+    expect(assetReviewQueueSuffixCopy(false, 2, 1, true).english).toBe(
+      " · Item 1 / 2 loaded / more available",
     );
-    expect(assetReviewQueueSuffixCopy(true, 9)).toEqual({
+    expect(assetReviewQueueSuffixCopy(true, 9, 1, true)).toEqual({
       english: " · Selected asset",
       zhHant: " · 指定素材",
     });

@@ -107,6 +107,21 @@ export const assetReviewStatusCopy = {
     "The asset review queue is empty",
     "info",
   ),
+  queueItemChanged: assetReviewNotice(
+    "已切換至另一項已載入素材",
+    "Moved to another loaded asset",
+    "info",
+  ),
+  queueLoadingMore: assetReviewNotice(
+    "正在安全載入下一頁素材…",
+    "Loading the next asset page safely…",
+    "info",
+  ),
+  queuePageFailed: assetReviewNotice(
+    "無法載入下一頁；目前素材及未送出的資料仍然保留，可安全重試",
+    "Unable to load the next page. The current asset and unsent data remain available for a safe retry.",
+    "error",
+  ),
   generatedDraftValidated: assetReviewNotice(
     "模擬 GLB 草稿已通過格式驗證；必須重新完成人工審核",
     "The simulated GLB draft passed format validation. Complete the human review again.",
@@ -310,9 +325,19 @@ export function nextAssetReviewRejectIntent(
 
 export function assetReviewQueueNotice(count: number): AssetReviewNotice {
   return assetReviewNotice(
-    `審核佇列共有 ${count} 項素材`,
-    `Asset review queue has ${count} item${count === 1 ? "" : "s"}`,
+    `已載入 ${count} 項審核素材`,
+    `Loaded ${count} asset review item${count === 1 ? "" : "s"}`,
     "info",
+  );
+}
+
+export function assetReviewQueuePageLoadedNotice(
+  count: number,
+): AssetReviewNotice {
+  return assetReviewNotice(
+    `已載入下一頁 ${count} 項素材`,
+    `Loaded ${count} more asset review item${count === 1 ? "" : "s"}`,
+    "success",
   );
 }
 

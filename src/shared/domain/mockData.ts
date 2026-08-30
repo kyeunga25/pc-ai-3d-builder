@@ -316,3 +316,23 @@ export const reviewAsset: AssetReviewItem = {
   },
   version: 0,
 };
+
+export const reviewQueueAssets: AssetReviewItem[] = [
+  reviewAsset,
+  {
+    ...reviewAsset,
+    id: "asset_review_fixture_secondary",
+    part: {
+      id: "part_cooling_fixture_240",
+      sku: "COOLING-FIXTURE-240",
+      manufacturer: "RigStage Fixture",
+      model: "240 mm Liquid Cooler",
+    },
+    status: "draft",
+    quality: "unreviewed",
+    sourceKind: "uploaded",
+    completedChecks: [],
+    sourceRightsConfirmed: false,
+    dimensionsMm: { width: null, height: null, depth: null },
+  },
+];

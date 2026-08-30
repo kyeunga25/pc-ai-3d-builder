@@ -45,6 +45,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 
 ## Local development milestone
 
+- [x] Workspace-scoped asset-review queue continuation with 50-record D1 pages, header-only stable cursors, replay and cross-workspace guards, loaded-record navigation, unsaved-change blocking and retry-safe page failures.
 - [x] Protected owner/admin workspace-member directory with 100-record header-only pagination, cancellable/retry-safe continuation, D1 invitations, role changes, reactivation, two-step suspension, optimistic versions and a database last-owner guard.
 - [x] Protected owner/admin workspace activity log with 50-row pages, header-only pagination, bilingual filters and no raw audit metadata or visible private identifiers.
 - [x] Two-step, optimistic removal of one selected private source view or GLB with atomic evidence reset, minimal audit, reserved-credit compensation and exact-key R2 cleanup.
