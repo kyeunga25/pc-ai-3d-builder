@@ -9,7 +9,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Cloudflare Access identity verification.
 - D1 workspace membership, catalogue, asset-review history, persistent build and audit schema.
 - Workspace-scoped dashboard, catalogue, asset-review and build APIs with bounded reads and mutation bodies.
-- Owner/admin workspace-member directory, D1 invitation, role update and two-step suspension with optimistic versions and a database last-owner guard.
+- Owner/admin workspace-member directory with protected header-only pagination, D1 invitation, role update and two-step suspension with optimistic versions and a database last-owner guard.
 - Owner/admin workspace activity log with a 50-row read bound, header-only private pagination and a metadata-free public projection.
 - Catalogue create, optimistic update, logical archive and transactional CSV／TSV import through one shared schema.
 - Four-view private R2 source-image storage plus one GLB, with protected Worker reads, exact per-view replacement/removal and safe metadata projection.

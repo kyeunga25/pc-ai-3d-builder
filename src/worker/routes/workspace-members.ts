@@ -12,6 +12,7 @@ import {
   workspaceMemberIdPattern,
   workspaceMemberTargetHeader,
 } from "../../shared/lib/workspace-member-target";
+import { workspaceMemberCursorHeader } from "../../shared/lib/workspace-member-pagination";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
 import { readBoundedJson } from "../lib/request-body";
@@ -34,6 +35,8 @@ const memberSelect = `
          wm.record_version, wm.created_at
   FROM workspace_memberships AS wm
   INNER JOIN users AS u ON u.id = wm.user_id`;
+
+const memberPageSize = 100;
 
 function roleForbidden(): ApiError {
   return new ApiError(
@@ -88,6 +91,14 @@ function validationError(): ApiError {
     400,
     "VALIDATION_ERROR",
     "成員資料無效。 / The member data is invalid.",
+  );
+}
+
+function paginationValidationError(): ApiError {
+  return new ApiError(
+    400,
+    "VALIDATION_ERROR",
+    "成員名單分頁資料無效。 / The member-directory page cursor is invalid.",
   );
 }
 
@@ -161,30 +172,62 @@ async function findMemberByEmail(
 }
 
 export async function workspaceMemberListResponse(
+  request: Request,
   db: D1Database,
   context: RequestContext,
 ): Promise<Response> {
   assertManager(context.currentWorkspace.role);
+  const url = new URL(request.url);
+  if (url.search.length > 0) {
+    throw paginationValidationError();
+  }
+
+  const cursor = request.headers.get(workspaceMemberCursorHeader);
+  const values: string[] = [context.currentWorkspace.id];
+  let afterCursorClause = "";
+  if (cursor !== null) {
+    if (!workspaceMemberIdPattern.test(cursor)) {
+      throw paginationValidationError();
+    }
+    const cursorMember = await db
+      .prepare(
+        `SELECT 1 AS available
+         FROM workspace_memberships
+         WHERE workspace_id = ?1 AND user_id = ?2
+         LIMIT 1`,
+      )
+      .bind(context.currentWorkspace.id, cursor)
+      .first<{ available: number }>();
+    if (!cursorMember) {
+      throw paginationValidationError();
+    }
+    afterCursorClause = "AND u.id > ?2";
+    values.push(cursor);
+  }
+
+  const limitParameter = values.length + 1;
   const result = await db
     .prepare(
       `${memberSelect}
        WHERE wm.workspace_id = ?1
-       ORDER BY CASE wm.status WHEN 'active' THEN 0 ELSE 1 END,
-                lower(u.email), u.id
-       LIMIT 101`,
+         ${afterCursorClause}
+       ORDER BY u.id
+       LIMIT ?${limitParameter}`,
     )
-    .bind(context.currentWorkspace.id)
+    .bind(...values, memberPageSize + 1)
     .all<WorkspaceMemberRow>();
-  const items = result.results
-    .slice(0, 100)
-    .map((row) => mapMember(row, context.user.id));
+  const hasMore = result.results.length > memberPageSize;
+  const rows = hasMore
+    ? result.results.slice(0, memberPageSize)
+    : result.results;
+  const items = rows.map((row) => mapMember(row, context.user.id));
 
   return Response.json(
     workspaceMemberListResponseSchema.parse({
       items,
-      hasMore: result.results.length > 100,
+      nextCursor: hasMore ? (rows.at(-1)?.id ?? null) : null,
     }),
-    { headers: { "cache-control": "no-store" } },
+    { headers: { "cache-control": "private, no-store" } },
   );
 }
 

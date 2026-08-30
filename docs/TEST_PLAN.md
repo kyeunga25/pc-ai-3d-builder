@@ -24,7 +24,7 @@ Current unit tests cover:
 - exhaustive typed bilingual login copy for the introduction, identity/membership/fail-closed boundaries, five login reasons, fixed destination labels, Access continuation, unauthorized logout, public-home recovery and footer; bilingual ARIA labels; root-only return targets with dynamic identifier/query/fragment absence; and phone-width wrapping;
 - workspace membership selection and tampering rejection;
 - concurrent first-login subject binding, active-membership revocation at the binding boundary, zero preference writes during bound-identity reads and guarded explicit workspace-switch persistence;
-- bounded workspace-member schemas, owner/admin role assignment rules and normalized invitation input;
+- bounded workspace-member schemas, nullable private pagination cursors, owner/admin role assignment rules and normalized invitation input;
 - protected member-directory API transport, private target IDs limited to a fixed request header, bilingual Access-policy separation, owner/admin-only navigation and phone-width controls without visible member IDs;
 - owner/admin-only activity action normalization, 50-row workspace-first pagination, fixed-header cursor transport, foreign/malformed cursor denial, raw metadata/identity/target/request exclusion, system-actor fallback, bilingual category filtering and phone-width cards without visible private identifiers;
 - versioned subject-digest API rate limiting, including raw-identifier exclusion, deterministic replay/concurrency and distinct actor keys;
@@ -105,7 +105,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - 首頁的正文、案例、圖說及輔助文字在桌面和 390 px 均維持適合繁體中文閱讀的字級、行距及對比；
 - the authentication loading and failure states are readable;
 - workspace switching keeps the previous scope visible until a matching success, disables repeated selection while pending, and shows readable bilingual retry/stay actions after a recoverable failure at desktop and 390 px;
-- owner/admin member management shows protected bilingual identity and membership state, exact Access-policy separation, safe role controls and two-step suspension without visible private member IDs; the layout becomes one column without horizontal overflow at 390 px;
+- owner/admin member management shows protected bilingual identity and membership state, exact Access-policy separation, loaded counts, retry-safe continuation, safe role controls and two-step suspension without visible private member IDs; 100-record pages use a header-only cursor, reject URL/malformed/missing/cross-workspace cursors and append without duplicates; the layout becomes one column without horizontal overflow at 390 px;
 - owner/admin activity shows bilingual action/category/actor/time, filters the loaded projection, loads older records through a protected header only and displays neither private IDs, email nor raw metadata; cards and controls remain readable without horizontal overflow at 390 px;
 - logout clears the Access application session, re-login uses a top-level navigation, and an expired AJAX session returns a bounded authorization failure;
 - every navigation item is keyboard reachable;

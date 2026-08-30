@@ -41,6 +41,8 @@ export const workspaceMemberInterfaceCopy = {
     "owner 可管理所有非本人角色；admin 只可管理 staff 與 viewer。自己的角色及資格須由另一位 owner 管理。",
     "Owners can manage every role except themselves. Admins can manage only staff and viewers. Another owner must manage your own role and membership.",
   ),
+  loadMore: copy("載入更多成員", "Load more members"),
+  loadingMore: copy("正在載入更多…", "Loading more…"),
   currentUser: copy("目前帳戶", "Current account"),
   saveRole: copy("儲存角色", "Save role"),
   saving: copy("正在儲存…", "Saving…"),
@@ -55,16 +57,21 @@ export const workspaceMemberInterfaceCopy = {
     "目前角色不可管理此成員。",
     "Your current role cannot manage this member.",
   ),
-  truncated: copy(
-    "工作空間成員超過 100 位；目前只顯示首 100 位，請使用更窄的營運流程處理其餘成員。",
-    "This workspace has more than 100 members. Only the first 100 are shown; use a narrower operational process for the remainder.",
-  ),
   forbiddenHeading: copy("沒有成員管理權限", "Member management unavailable"),
   forbiddenBody: copy(
     "只有工作空間 owner 或 admin 可以查看受保護的成員名單。",
     "Only workspace owners or admins can view the protected member directory.",
   ),
 } as const;
+
+export function workspaceMemberLoadedCount(
+  count: number,
+): WorkspaceMemberBilingualCopy {
+  return copy(
+    `已載入 ${count} 位成員`,
+    `${count} ${count === 1 ? "member" : "members"} loaded`,
+  );
+}
 
 export const workspaceMemberRoleCopy = {
   owner: copy("擁有人", "Owner"),
@@ -127,6 +134,13 @@ export const workspaceMemberNoticeCopy = {
     copy: copy("成員資格已更新。", "Membership updated."),
     tone: "success",
   },
+  loadingMore: {
+    copy: copy(
+      "正在安全載入下一頁成員。",
+      "Loading the next member page securely.",
+    ),
+    tone: "info",
+  },
   confirmSuspend: {
     copy: copy(
       "再次按下確認停用；此操作不會刪除帳戶或工作空間資料。",
@@ -144,6 +158,10 @@ const operationFallback = {
   invite: copy(
     "無法確認邀請結果；請重新載入成員名單後再安全重試。",
     "Unable to confirm the invitation result. Reload the member directory before retrying safely.",
+  ),
+  paginate: copy(
+    "無法載入下一頁成員；目前名單保持不變，可安全重試。",
+    "Unable to load the next member page. The current directory is unchanged and can be retried safely.",
   ),
   update: copy(
     "無法確認成員更新結果；請重新載入成員名單後再安全重試。",

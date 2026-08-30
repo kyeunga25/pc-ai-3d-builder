@@ -9,7 +9,7 @@ import {
   UsersRound,
   UserX,
 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuthenticatedSession } from "../auth/session-context";
 import {
@@ -38,6 +38,7 @@ import {
   workspaceMemberFailureNotice,
   workspaceMemberIdentityCopy,
   workspaceMemberInterfaceCopy,
+  workspaceMemberLoadedCount,
   workspaceMemberNoticeCopy,
   workspaceMemberRoleCopy,
   workspaceMemberStatusCopy,
@@ -79,49 +80,68 @@ function sortMembers(items: WorkspaceMember[]): WorkspaceMember[] {
   });
 }
 
-function localDirectory(user: {
-  id: string;
-  email: string;
-  displayName: string;
-}): WorkspaceMemberListResponse {
+const localMemberPageCursor = "user_synthetic_operator";
+
+function localDirectory(
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+  },
+  cursor: string | null = null,
+): WorkspaceMemberListResponse {
+  const owner = {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    role: "owner" as const,
+    status: "active" as const,
+    identityState: "bound" as const,
+    isCurrentUser: true,
+    version: 0,
+    createdAt: "2026-08-30 00:00:00",
+  };
+  const operator = {
+    id: localMemberPageCursor,
+    email: "operator@example.invalid",
+    displayName: "合成營運員",
+    role: "staff" as const,
+    status: "active" as const,
+    identityState: "pending" as const,
+    isCurrentUser: false,
+    version: 0,
+    createdAt: "2026-08-30 00:00:00",
+  };
+  const viewer = {
+    id: "user_synthetic_viewer",
+    email: "viewer@example.invalid",
+    displayName: "Synthetic Viewer",
+    role: "viewer" as const,
+    status: "suspended" as const,
+    identityState: "bound" as const,
+    isCurrentUser: false,
+    version: 1,
+    createdAt: "2026-08-30 00:00:00",
+  };
+
   return workspaceMemberListResponseSchema.parse({
-    hasMore: false,
-    items: [
-      {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        role: "owner",
-        status: "active",
-        identityState: "bound",
-        isCurrentUser: true,
-        version: 0,
-        createdAt: "2026-08-30 00:00:00",
-      },
-      {
-        id: "user_synthetic_operator",
-        email: "operator@example.invalid",
-        displayName: "合成營運員",
-        role: "staff",
-        status: "active",
-        identityState: "pending",
-        isCurrentUser: false,
-        version: 0,
-        createdAt: "2026-08-30 00:00:00",
-      },
-      {
-        id: "user_synthetic_viewer",
-        email: "viewer@example.invalid",
-        displayName: "Synthetic Viewer",
-        role: "viewer",
-        status: "suspended",
-        identityState: "bound",
-        isCurrentUser: false,
-        version: 1,
-        createdAt: "2026-08-30 00:00:00",
-      },
-    ],
+    items: cursor === null ? [owner, operator] : [viewer],
+    nextCursor: cursor === null ? localMemberPageCursor : null,
   });
+}
+
+function mergeMemberPages(
+  current: WorkspaceMember[],
+  next: WorkspaceMember[],
+): WorkspaceMember[] {
+  const members = new Map(current.map((member) => [member.id, member]));
+  for (const member of next) {
+    const existing = members.get(member.id);
+    if (!existing || member.version >= existing.version) {
+      members.set(member.id, member);
+    }
+  }
+  return sortMembers([...members.values()]);
 }
 
 function noticeIcon(tone: WorkspaceMemberNotice["tone"]) {
@@ -152,6 +172,7 @@ function MemberNotice({ notice }: { notice: WorkspaceMemberNotice }) {
 function MemberCard({
   actorRole,
   armedForSuspension,
+  busy,
   member,
   pending,
   onCancelSuspension,
@@ -160,6 +181,7 @@ function MemberCard({
 }: {
   actorRole: WorkspaceRole;
   armedForSuspension: boolean;
+  busy: boolean;
   member: WorkspaceMember;
   pending: boolean;
   onCancelSuspension: () => void;
@@ -215,7 +237,7 @@ function MemberCard({
           <BilingualText copy={workspaceMemberInterfaceCopy.role} />
           <select
             value={selectedRole}
-            disabled={!canManageTarget || pending}
+            disabled={!canManageTarget || busy}
             onChange={(event) => {
               onCancelSuspension();
               setSelectedRole(event.target.value as WorkspaceRole);
@@ -235,7 +257,7 @@ function MemberCard({
             !canManageTarget ||
             !selectedRoleAllowed ||
             selectedRole === member.role ||
-            pending
+            busy
           }
           onClick={() => onRoleSave(member, selectedRole)}
         >
@@ -255,7 +277,7 @@ function MemberCard({
         <button
           className={`button ${member.status === "active" ? "button--danger" : "button--secondary"}`}
           type="button"
-          disabled={!canManageTarget || pending}
+          disabled={!canManageTarget || busy}
           onClick={() => onStatusToggle(member)}
         >
           {member.status === "active" ? (
@@ -313,7 +335,9 @@ export function WorkspaceMembersPage() {
   const [displayName, setDisplayName] = useState("");
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("staff");
   const [invitePending, setInvitePending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
+  const pageRequestRef = useRef<AbortController | null>(null);
   const [suspensionTargetId, setSuspensionTargetId] = useState<string | null>(
     null,
   );
@@ -329,7 +353,7 @@ export function WorkspaceMembersPage() {
         setState({
           status: "ready",
           workspaceId: currentWorkspace.id,
-          data,
+          data: { ...data, items: sortMembers(data.items) },
         });
         setNotice(null);
       })
@@ -345,6 +369,14 @@ export function WorkspaceMembersPage() {
       });
     return () => controller.abort();
   }, [canManageDirectory, currentWorkspace.id, isLocalPreview, reloadToken]);
+
+  useEffect(
+    () => () => {
+      pageRequestRef.current?.abort();
+      pageRequestRef.current = null;
+    },
+    [currentWorkspace.id],
+  );
 
   if (!canManageDirectory) {
     return (
@@ -505,6 +537,58 @@ export function WorkspaceMembersPage() {
     );
   };
 
+  const loadMoreMembers = async () => {
+    const cursor = data.nextCursor;
+    if (
+      cursor === null ||
+      loadingMore ||
+      invitePending ||
+      pendingMemberId !== null
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    pageRequestRef.current?.abort();
+    pageRequestRef.current = controller;
+    setLoadingMore(true);
+    setNotice(workspaceMemberNoticeCopy.loadingMore);
+    try {
+      const page = isLocalPreview
+        ? localDirectory(user, cursor)
+        : await fetchWorkspaceMembers(
+            controller.signal,
+            currentWorkspace.id,
+            cursor,
+          );
+      setState((current) =>
+        current.status === "ready" &&
+        current.workspaceId === currentWorkspace.id &&
+        current.data.nextCursor === cursor
+          ? {
+              ...current,
+              data: {
+                items: mergeMemberPages(current.data.items, page.items),
+                nextCursor: page.nextCursor,
+              },
+            }
+          : current,
+      );
+      setNotice(null);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setNotice(workspaceMemberFailureNotice(error, "paginate"));
+      }
+    } finally {
+      if (pageRequestRef.current === controller) {
+        pageRequestRef.current = null;
+        setLoadingMore(false);
+      }
+    }
+  };
+
+  const directoryBusy =
+    loadingMore || invitePending || pendingMemberId !== null;
+
   return (
     <div className="page workspace-members-page">
       <header className="page-header workspace-members-header">
@@ -522,7 +606,7 @@ export function WorkspaceMembersPage() {
         <button
           className="button button--secondary"
           type="button"
-          disabled={invitePending || pendingMemberId !== null}
+          disabled={directoryBusy}
           onClick={() => {
             setNotice(null);
             setSuspensionTargetId(null);
@@ -606,7 +690,7 @@ export function WorkspaceMembersPage() {
           <button
             className="button button--primary"
             type="submit"
-            disabled={invitePending || pendingMemberId !== null}
+            disabled={directoryBusy}
           >
             {invitePending ? (
               <LoaderCircle aria-hidden="true" />
@@ -623,7 +707,7 @@ export function WorkspaceMembersPage() {
           </button>
         </form>
 
-        <section className="workspace-member-directory">
+        <section className="workspace-member-directory" aria-busy={loadingMore}>
           <header>
             <UsersRound aria-hidden="true" />
             <div>
@@ -637,16 +721,13 @@ export function WorkspaceMembersPage() {
                   copy={workspaceMemberInterfaceCopy.directoryGuidance}
                 />
               </p>
+              <p className="workspace-member-directory__count">
+                <BilingualText
+                  copy={workspaceMemberLoadedCount(data.items.length)}
+                />
+              </p>
             </div>
           </header>
-          {data.hasMore ? (
-            <MemberNotice
-              notice={{
-                copy: workspaceMemberInterfaceCopy.truncated,
-                tone: "warning",
-              }}
-            />
-          ) : null}
           <div className="workspace-member-list">
             {data.items.map((member) => (
               <MemberCard
@@ -654,6 +735,7 @@ export function WorkspaceMembersPage() {
                 actorRole={currentWorkspace.role}
                 member={member}
                 pending={pendingMemberId === member.id}
+                busy={directoryBusy}
                 armedForSuspension={suspensionTargetId === member.id}
                 onCancelSuspension={() => setSuspensionTargetId(null)}
                 onRoleSave={(target, role) => {
@@ -664,6 +746,29 @@ export function WorkspaceMembersPage() {
               />
             ))}
           </div>
+          {data.nextCursor ? (
+            <footer className="workspace-member-directory__footer">
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={directoryBusy}
+                onClick={() => void loadMoreMembers()}
+              >
+                {loadingMore ? (
+                  <LoaderCircle aria-hidden="true" />
+                ) : (
+                  <UsersRound aria-hidden="true" />
+                )}
+                <BilingualText
+                  copy={
+                    loadingMore
+                      ? workspaceMemberInterfaceCopy.loadingMore
+                      : workspaceMemberInterfaceCopy.loadMore
+                  }
+                />
+              </button>
+            </footer>
+          ) : null}
         </section>
       </section>
     </div>

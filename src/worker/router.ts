@@ -148,7 +148,7 @@ export async function routeRequest(
 
     if (url.pathname === "/api/workspace/members") {
       if (request.method === "GET") {
-        return workspaceMemberListResponse(env.DB, context);
+        return workspaceMemberListResponse(request, env.DB, context);
       }
       return workspaceMemberInviteResponse(request, env.DB, context, requestId);
     }
