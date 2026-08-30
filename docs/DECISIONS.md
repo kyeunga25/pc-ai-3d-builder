@@ -26,7 +26,7 @@ Build archive is a logical state transition with the same optimistic version bou
 
 ## Catalogue onboarding is bounded and transactional
 
-Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV imports validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch.
+Viewer roles remain read-only. Catalogue creation, update and logical archive use the resolved workspace context and minimal audit events. Existing rows require an optimistic record version. CSV and TSV imports share one ordered-header/schema parser and validate every row before submitting at most 50 catalogue inserts and matching audit events in one D1 batch. Client preflight rejects oversized or mismatched files early, while the Worker independently enforces exact registered media types and repeats the complete parse.
 
 Catalogue operation feedback is centrally enumerated in Traditional Chinese and English with explicit info, success, warning and error tones. A valid bilingual public error can remain visible, but a raw monolingual exception is replaced with operation-specific recovery copy. Network or response failures after a write are treated as ambiguous: the interface asks the user to reload before retrying and does not claim that the server made no change.
 
@@ -48,7 +48,7 @@ D1 first commits the exact metadata change, review-evidence reset, minimal audit
 
 ## Public errors are bilingual and bounded
 
-Every public API failure keeps a stable machine code and request ID while presenting Traditional Chinese first and English second. A shared construction guard rejects single-language public copy. Validation layers may keep detailed internal diagnostics for control flow, but CSV parser state, GLB structure labels, raw exceptions and private identifiers are reduced to bounded corrective categories before serialization. This preserves actionable error handling without turning parser details into a public debugging channel.
+Every public API failure keeps a stable machine code and request ID while presenting Traditional Chinese first and English second. A shared construction guard rejects single-language public copy. Validation layers may keep detailed internal diagnostics for control flow, but CSV／TSV parser state, GLB structure labels, raw exceptions and private identifiers are reduced to bounded corrective categories before serialization. This preserves actionable error handling without turning parser details into a public debugging channel.
 
 The Asset Review client preserves a valid bilingual API or file-validation message but never presents a raw monolingual exception. Its typed operation channel uses alert semantics for failures and distinct status semantics for progress, success and unsaved-warning states. A lost response after save, approve, reject, upload or generation start is described as unconfirmed and requires a reload before retry, because the browser cannot prove that the server-side transition did not commit.
 

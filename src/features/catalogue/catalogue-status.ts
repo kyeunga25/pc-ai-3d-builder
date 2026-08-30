@@ -1,4 +1,5 @@
 import { splitBilingualMessage } from "../../shared/i18n/locale";
+import type { CatalogueImportFormat } from "../../shared/domain/catalogue-import";
 
 type CatalogueOperation = "archive" | "asset-draft" | "import" | "save";
 
@@ -37,9 +38,9 @@ const failureCopy = {
       "Unable to confirm whether the asset draft was created; reload the product before retrying safely.",
   },
   import: {
-    zhHant: "無法確認 CSV 匯入結果；請重新載入目錄後再安全重試。",
+    zhHant: "無法確認 CSV／TSV 匯入結果；請重新載入目錄後再安全重試。",
     english:
-      "Unable to confirm the CSV import result; reload the catalogue before retrying safely.",
+      "Unable to confirm the CSV or TSV import result; reload the catalogue before retrying safely.",
   },
   save: {
     zhHant: "無法確認產品是否已儲存；請重新載入目錄後再安全重試。",
@@ -62,7 +63,7 @@ export const catalogueStatusCopy = {
     "error",
   ),
   validatingImport: status(
-    "正在驗證 CSV 及工作空間資料。 / Validating the CSV and workspace data.",
+    "正在驗證 CSV／TSV 及工作空間資料。 / Validating the CSV or TSV and workspace data.",
     "info",
   ),
   saving: status("正在儲存產品… / Saving the product…", "info"),
@@ -70,10 +71,6 @@ export const catalogueStatusCopy = {
   creatingAssetDraft: status(
     "正在建立私人素材草稿… / Creating the private asset draft…",
     "info",
-  ),
-  templateDownloadStarted: status(
-    "不含真實資料的 CSV 範本已開始下載。 / The synthetic-data-only CSV template download has started.",
-    "success",
   ),
   confirmArchive: status(
     "再次按下「確認封存」即可從目前目錄隱藏此產品；資料不會被永久刪除。 / Press Confirm archive again to hide this product from the current catalogue; the data will not be permanently deleted.",
@@ -127,6 +124,16 @@ export function catalogueImportedStatus(
 ): CatalogueOperationStatus {
   return status(
     `已匯入 ${count} 件產品 / Imported ${count} product${count === 1 ? "" : "s"}`,
+    "success",
+  );
+}
+
+export function catalogueTemplateDownloadStarted(
+  format: CatalogueImportFormat,
+): CatalogueOperationStatus {
+  const label = format.toUpperCase();
+  return status(
+    `不含真實資料的 ${label} 範本已開始下載。 / The synthetic-data-only ${label} template download has started.`,
     "success",
   );
 }

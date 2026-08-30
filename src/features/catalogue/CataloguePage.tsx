@@ -28,9 +28,10 @@ import {
 } from "../../shared/domain/asset-files";
 import type { AssetReviewItem } from "../../shared/domain/assets";
 import {
-  catalogueCsvTemplate,
-  parseCatalogueCsvFile,
-} from "../../shared/domain/catalogue-csv";
+  catalogueImportMediaTypes,
+  catalogueImportTemplates,
+  type CatalogueImportFormat,
+} from "../../shared/domain/catalogue-import";
 import { catalogParts } from "../../shared/domain/mockData";
 import type {
   CataloguePartInput,
@@ -41,7 +42,7 @@ import { formatHkd } from "../../shared/i18n/locale";
 import {
   createCataloguePart,
   fetchCataloguePage,
-  importCatalogueCsv,
+  importCatalogueFile,
   mutateCataloguePart,
 } from "./catalogue-api";
 import { CatalogueEditorDialog } from "./CatalogueEditorDialog";
@@ -65,10 +66,12 @@ import {
   catalogueFailureStatus,
   catalogueImportedStatus,
   catalogueStatusCopy,
+  catalogueTemplateDownloadStarted,
   catalogueUpdatedStatus,
   type CatalogueOperationStatus,
 } from "./catalogue-status";
 import { CatalogueStatusView } from "./CatalogueStatusView";
+import { validateCatalogueImportFile } from "./catalogue-import-file";
 import "./catalogue.css";
 
 function CatalogueCopy({ copy }: { copy: CataloguePageCopy }) {
@@ -347,23 +350,22 @@ export function CataloguePage() {
     });
   };
 
-  const importCsvFile = async (file: File) => {
-    if (file.size > 256 * 1024) {
-      throw new Error(
-        "CSV 檔案不可超過 256 KiB。 / The CSV file must be 256 KiB or smaller.",
-      );
-    }
+  const importTabularFile = async (file: File) => {
+    const validated = await validateCatalogueImportFile(file);
 
     if (isLocalPreview) {
-      const inputs = parseCatalogueCsvFile(await file.text());
       const existingSkus = new Set(parts.map((part) => part.sku.toLowerCase()));
-      if (inputs.some((input) => existingSkus.has(input.sku.toLowerCase()))) {
+      if (
+        validated.inputs.some((input) =>
+          existingSkus.has(input.sku.toLowerCase()),
+        )
+      ) {
         throw new Error(
-          "目前目錄已經存在 CSV 內的其中一個 SKU。 / The current catalogue already contains a SKU from the CSV file.",
+          "目前目錄已經存在匯入檔案內的其中一個 SKU。 / The current catalogue already contains a SKU from the import file.",
         );
       }
 
-      const created = inputs.map((input) => ({
+      const created = validated.inputs.map((input) => ({
         id: `part_local_${crypto.randomUUID()}`,
         ...input,
         catalogueStatus: "active" as const,
@@ -377,12 +379,18 @@ export function CataloguePage() {
       return created.length;
     }
 
-    const response = await importCatalogueCsv(currentWorkspace.id, file);
+    const response = await importCatalogueFile(
+      currentWorkspace.id,
+      file,
+      validated.format,
+    );
     setParts((current) => [...current, ...response.created]);
     return response.created.length;
   };
 
-  const handleCsvSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImportSelection = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
     const inputElement = event.currentTarget;
     const file = inputElement.files?.[0];
     if (!file) {
@@ -392,7 +400,7 @@ export function CataloguePage() {
     setImporting(true);
     setNotice(catalogueStatusCopy.validatingImport);
     try {
-      const createdCount = await importCsvFile(file);
+      const createdCount = await importTabularFile(file);
       setNotice(catalogueImportedStatus(createdCount));
     } catch (error) {
       setNotice(catalogueFailureStatus(error, "import"));
@@ -402,17 +410,17 @@ export function CataloguePage() {
     }
   };
 
-  const downloadCsvTemplate = () => {
-    const blob = new Blob([`${catalogueCsvTemplate}\n`], {
-      type: "text/csv;charset=utf-8",
+  const downloadImportTemplate = (format: CatalogueImportFormat) => {
+    const blob = new Blob([`${catalogueImportTemplates[format]}\n`], {
+      type: `${catalogueImportMediaTypes[format]};charset=utf-8`,
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "rigstage-catalogue-template.csv";
+    link.download = `rigstage-catalogue-template.${format}`;
     link.click();
     URL.revokeObjectURL(url);
-    setNotice(catalogueStatusCopy.templateDownloadStarted);
+    setNotice(catalogueTemplateDownloadStarted(format));
   };
 
   const filteredParts = useMemo(() => {
@@ -451,18 +459,31 @@ export function CataloguePage() {
             ref={fileInputRef}
             hidden
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.tsv,text/csv,text/tab-separated-values"
             disabled={!canWrite || importing}
-            onChange={(event) => void handleCsvSelection(event)}
+            onChange={(event) => void handleImportSelection(event)}
           />
           <button
             className="button button--secondary"
             type="button"
-            aria-label={bilingualCataloguePageTitle(cataloguePageCopy.template)}
-            onClick={downloadCsvTemplate}
+            aria-label={bilingualCataloguePageTitle(
+              cataloguePageCopy.csvTemplate,
+            )}
+            onClick={() => downloadImportTemplate("csv")}
           >
             <FileDown aria-hidden="true" />
-            <CatalogueCopy copy={cataloguePageCopy.template} />
+            <CatalogueCopy copy={cataloguePageCopy.csvTemplate} />
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            aria-label={bilingualCataloguePageTitle(
+              cataloguePageCopy.tsvTemplate,
+            )}
+            onClick={() => downloadImportTemplate("tsv")}
+          >
+            <FileDown aria-hidden="true" />
+            <CatalogueCopy copy={cataloguePageCopy.tsvTemplate} />
           </button>
           <button
             className="button button--secondary"
@@ -470,7 +491,7 @@ export function CataloguePage() {
             aria-label={bilingualCataloguePageTitle(
               importing
                 ? cataloguePageCopy.importing
-                : cataloguePageCopy.importCsv,
+                : cataloguePageCopy.importFile,
             )}
             disabled={!canWrite || importing}
             title={bilingualCataloguePageTitle(
@@ -485,7 +506,7 @@ export function CataloguePage() {
               copy={
                 importing
                   ? cataloguePageCopy.importing
-                  : cataloguePageCopy.importCsv
+                  : cataloguePageCopy.importFile
               }
             />
           </button>

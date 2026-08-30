@@ -7,11 +7,15 @@ import {
   catalogueCreateResponse,
   catalogueImportResponse,
   catalogueMutationResponse,
+  parseCatalogueImport,
   parseCatalogueCsv,
 } from "./catalogue-write";
 
 const validCsv = `sku,category,manufacturer,model,price_hkd,stock_status,stock_count,specification_status,specifications_json
 CASE-001,case,Fixture,"Compact, Case",849.00,in_stock,6,verified,"{""formFactor"":""ATX""}"`;
+
+const validTsv = `sku\tcategory\tmanufacturer\tmodel\tprice_hkd\tstock_status\tstock_count\tspecification_status\tspecifications_json
+CASE-001\tcase\tFixture\tCompact Case\t849.00\tin_stock\t6\tverified\t{"formFactor":"ATX"}`;
 
 function context(role: WorkspaceRole): RequestContext {
   return {
@@ -50,7 +54,7 @@ const catalogueRow = {
   asset_review_status: null,
 };
 
-describe("catalogue CSV import", () => {
+describe("catalogue tabular import", () => {
   it("parses quoted fields and validated structured specifications", () => {
     expect(parseCatalogueCsv(validCsv)).toEqual([
       {
@@ -64,6 +68,17 @@ describe("catalogue CSV import", () => {
         specificationStatus: "verified",
         specifications: { formFactor: "ATX" },
       },
+    ]);
+  });
+
+  it("parses a TSV document with the same validated schema", () => {
+    expect(parseCatalogueImport(validTsv, "tsv")).toEqual([
+      expect.objectContaining({
+        sku: "CASE-001",
+        model: "Compact Case",
+        priceMinor: 84_900,
+        specifications: { formFactor: "ATX" },
+      }),
     ]);
   });
 
@@ -237,60 +252,69 @@ describe("catalogue writes", () => {
     },
   );
 
-  it("submits an imported row and its audit event in the same batch", async () => {
-    const { calls, db } = createD1Stub({
-      firstResults: [null],
-      allResults: [[catalogueRow]],
-    });
-    const request = new Request("https://app.example/api/catalogue/import", {
-      method: "POST",
-      headers: { "content-type": "text/csv; charset=utf-8" },
-      body: validCsv,
-    });
+  it.each([
+    ["CSV", "text/csv; charset=utf-8", validCsv],
+    ["TSV", "text/tab-separated-values; charset=utf-8", validTsv],
+  ])(
+    "submits an imported %s row and its audit event in the same batch",
+    async (_format, contentType, body) => {
+      const { calls, db } = createD1Stub({
+        firstResults: [null],
+        allResults: [[catalogueRow]],
+      });
+      const request = new Request("https://app.example/api/catalogue/import", {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body,
+      });
 
-    const response = await catalogueImportResponse(
-      request,
-      db,
-      context("admin"),
-      "request-fixture",
-    );
-
-    expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toMatchObject({
-      created: [{ sku: "CASE-001", version: 0 }],
-    });
-    expect(
-      calls.filter((call) => call.sql.includes("INSERT INTO catalog_parts")),
-    ).toHaveLength(1);
-    expect(
-      calls.filter(
-        (call) =>
-          call.sql.includes("INSERT INTO audit_events") &&
-          call.values.includes("catalogue.part.import"),
-      ),
-    ).toHaveLength(1);
-  });
-
-  it("rejects a CSV media-type prefix spoof before database work", async () => {
-    const { calls, db } = createD1Stub();
-    const request = new Request("https://app.example/api/catalogue/import", {
-      method: "POST",
-      headers: { "content-type": "text/csv-malicious" },
-      body: validCsv,
-    });
-
-    await expect(
-      catalogueImportResponse(
+      const response = await catalogueImportResponse(
         request,
         db,
         context("admin"),
-        "request-media-type-spoof",
-      ),
-    ).rejects.toMatchObject({
-      status: 415,
-      code: "UNSUPPORTED_MEDIA_TYPE",
-    });
-    expect(request.bodyUsed).toBe(false);
-    expect(calls).toHaveLength(0);
-  });
+        "request-fixture",
+      );
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({
+        created: [{ sku: "CASE-001", version: 0 }],
+      });
+      expect(
+        calls.filter((call) => call.sql.includes("INSERT INTO catalog_parts")),
+      ).toHaveLength(1);
+      expect(
+        calls.filter(
+          (call) =>
+            call.sql.includes("INSERT INTO audit_events") &&
+            call.values.includes("catalogue.part.import"),
+        ),
+      ).toHaveLength(1);
+    },
+  );
+
+  it.each(["text/csv-malicious", "text/tab-separated-valuesx"])(
+    "rejects the catalogue media-type prefix spoof %s before database work",
+    async (contentType) => {
+      const { calls, db } = createD1Stub();
+      const request = new Request("https://app.example/api/catalogue/import", {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body: validCsv,
+      });
+
+      await expect(
+        catalogueImportResponse(
+          request,
+          db,
+          context("admin"),
+          "request-media-type-spoof",
+        ),
+      ).rejects.toMatchObject({
+        status: 415,
+        code: "UNSUPPORTED_MEDIA_TYPE",
+      });
+      expect(request.bodyUsed).toBe(false);
+      expect(calls).toHaveLength(0);
+    },
+  );
 });

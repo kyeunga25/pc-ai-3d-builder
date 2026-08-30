@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertBodylessRequest,
-  readBoundedCsv,
+  readBoundedCatalogueImport,
   readBoundedJson,
 } from "./request-body";
 
@@ -140,18 +140,31 @@ describe("bounded JSON request bodies", () => {
     });
   });
 
-  it("accepts bounded UTF-8 CSV bodies", async () => {
-    const request = new Request("https://app.example/api/catalogue/import", {
-      method: "POST",
-      headers: { "content-type": "text/csv; charset=utf-8" },
-      body: "sku,category\nCASE-001,case",
-    });
+  it.each([
+    ["csv", "text/csv; charset=utf-8", "sku,category\nCASE-001,case"],
+    [
+      "tsv",
+      "text/tab-separated-values; charset=utf-8",
+      "sku\tcategory\nCASE-001\tcase",
+    ],
+  ] as const)(
+    "accepts a bounded UTF-8 %s body",
+    async (format, contentType, body) => {
+      const request = new Request("https://app.example/api/catalogue/import", {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body,
+      });
 
-    await expect(readBoundedCsv(request, 128)).resolves.toContain("CASE-001");
-  });
+      await expect(readBoundedCatalogueImport(request, 128)).resolves.toEqual({
+        format,
+        text: expect.stringContaining("CASE-001"),
+      });
+    },
+  );
 
-  it.each(["text/csvx", "text/csv-malicious"])(
-    "rejects the CSV prefix spoof %s before reading its body",
+  it.each(["text/csvx", "text/csv-malicious", "text/tab-separated-valuesx"])(
+    "rejects the catalogue media-type prefix spoof %s before reading its body",
     async (contentType) => {
       const request = new Request("https://app.example/api/catalogue/import", {
         method: "POST",
@@ -159,10 +172,10 @@ describe("bounded JSON request bodies", () => {
         body: "sku,category\nCASE-001,case",
       });
 
-      await expect(readBoundedCsv(request)).rejects.toMatchObject({
+      await expect(readBoundedCatalogueImport(request)).rejects.toMatchObject({
         status: 415,
         code: "UNSUPPORTED_MEDIA_TYPE",
-        message: expect.stringMatching(/CSV.*CSV/iu),
+        message: expect.stringMatching(/CSV.+TSV.+CSV.+TSV/iu),
       });
       expect(request.bodyUsed).toBe(false);
     },
