@@ -4,6 +4,9 @@ import {
   assetReviewItemSchema,
   assetReviewMutationSchema,
   assetReviewQueueResponseSchema,
+  assetSourceFileSchema,
+  emptyAssetSourceFiles,
+  type AssetSourceFile,
   type AssetReviewItem,
   type AssetReviewMutation,
 } from "../../shared/domain/assets";
@@ -37,6 +40,18 @@ export type AssetReviewRow = {
   source_content_type: string | null;
   source_size_bytes: number | null;
   source_sha256: string | null;
+  source_back_object_key?: string | null;
+  source_back_content_type?: string | null;
+  source_back_size_bytes?: number | null;
+  source_back_sha256?: string | null;
+  source_left_object_key?: string | null;
+  source_left_content_type?: string | null;
+  source_left_size_bytes?: number | null;
+  source_left_sha256?: string | null;
+  source_three_quarter_object_key?: string | null;
+  source_three_quarter_content_type?: string | null;
+  source_three_quarter_size_bytes?: number | null;
+  source_three_quarter_sha256?: string | null;
   model_object_key: string | null;
   model_content_type: string | null;
   model_size_bytes: number | null;
@@ -128,7 +143,31 @@ function parseCompletedChecks(value: string) {
   return assetReviewCheckSchema.array().parse(JSON.parse(value) as unknown);
 }
 
+function mapSourceFile(
+  contentType: string | null | undefined,
+  sizeBytes: number | null | undefined,
+): AssetSourceFile {
+  return contentType && sizeBytes
+    ? assetSourceFileSchema.parse({ contentType, sizeBytes })
+    : null;
+}
+
 export function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
+  const sources = emptyAssetSourceFiles();
+  sources.front = mapSourceFile(row.source_content_type, row.source_size_bytes);
+  sources.back = mapSourceFile(
+    row.source_back_content_type,
+    row.source_back_size_bytes,
+  );
+  sources.left = mapSourceFile(
+    row.source_left_content_type,
+    row.source_left_size_bytes,
+  );
+  sources["three-quarter"] = mapSourceFile(
+    row.source_three_quarter_content_type,
+    row.source_three_quarter_size_bytes,
+  );
+
   return assetReviewItemSchema.parse({
     id: row.asset_id,
     part: {
@@ -143,13 +182,7 @@ export function mapAssetReviewRow(row: AssetReviewRow): AssetReviewItem {
     completedChecks: parseCompletedChecks(row.completed_checks_json),
     sourceRightsConfirmed: row.source_rights_confirmed === 1,
     files: {
-      source:
-        row.source_content_type && row.source_size_bytes
-          ? {
-              contentType: row.source_content_type,
-              sizeBytes: row.source_size_bytes,
-            }
-          : null,
+      sources,
       model:
         row.model_content_type && row.model_size_bytes
           ? {
@@ -174,13 +207,38 @@ export const assetSelect = `SELECT a.id AS asset_id, p.id AS part_id, p.sku,
                             a.verified_height_mm, a.verified_depth_mm,
                             a.review_version, a.source_object_key,
                             a.source_content_type, a.source_size_bytes,
-                            a.source_sha256, a.model_object_key,
+                            a.source_sha256,
+                            source_back.object_key AS source_back_object_key,
+                            source_back.content_type AS source_back_content_type,
+                            source_back.size_bytes AS source_back_size_bytes,
+                            source_back.sha256 AS source_back_sha256,
+                            source_left.object_key AS source_left_object_key,
+                            source_left.content_type AS source_left_content_type,
+                            source_left.size_bytes AS source_left_size_bytes,
+                            source_left.sha256 AS source_left_sha256,
+                            source_three_quarter.object_key AS source_three_quarter_object_key,
+                            source_three_quarter.content_type AS source_three_quarter_content_type,
+                            source_three_quarter.size_bytes AS source_three_quarter_size_bytes,
+                            source_three_quarter.sha256 AS source_three_quarter_sha256,
+                            a.model_object_key,
                             a.model_content_type, a.model_size_bytes,
                             a.model_sha256
                      FROM product_assets AS a
                      INNER JOIN catalog_parts AS p
                        ON p.workspace_id = a.workspace_id
-                      AND p.id = a.catalog_part_id`;
+                      AND p.id = a.catalog_part_id
+                     LEFT JOIN product_asset_source_files AS source_back
+                       ON source_back.workspace_id = a.workspace_id
+                      AND source_back.asset_id = a.id
+                      AND source_back.source_view = 'back'
+                     LEFT JOIN product_asset_source_files AS source_left
+                       ON source_left.workspace_id = a.workspace_id
+                      AND source_left.asset_id = a.id
+                      AND source_left.source_view = 'left'
+                     LEFT JOIN product_asset_source_files AS source_three_quarter
+                       ON source_three_quarter.workspace_id = a.workspace_id
+                      AND source_three_quarter.asset_id = a.id
+                      AND source_three_quarter.source_view = 'three-quarter'`;
 
 export async function findAsset(
   db: D1Database,

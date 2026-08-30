@@ -28,19 +28,24 @@ describe("Asset Review source-image copy", () => {
   });
 
   it("describes private previews and placeholders without an asset ID", () => {
-    expect(assetReviewSourceFrameCopy("正面", true)).toEqual({
+    expect(assetReviewSourceFrameCopy("front", true)).toEqual({
       english: "Front private source image",
       zhHant: "正面私人來源圖片",
     });
-    expect(assetReviewSourceFrameCopy("背面", false)).toEqual({
-      english: "Back source-image interface placeholder",
-      zhHant: "背面來源圖片介面佔位",
+    expect(assetReviewSourceFrameCopy("back", false)).toEqual({
+      english: "Back source image not uploaded; select this view to upload",
+      zhHant: "背面來源圖片尚未上載；選擇此視角後上載",
     });
     expect(
-      assetReviewSourcePreviewAltCopy("Fixture Maker", "Fixture Model"),
+      assetReviewSourcePreviewAltCopy(
+        "Fixture Maker",
+        "Fixture Model",
+        "three-quarter",
+      ),
     ).toEqual({
-      english: "Private source preview for Fixture Maker Fixture Model",
-      zhHant: "Fixture Maker Fixture Model 私人來源預覽",
+      english:
+        "Three-quarter private source preview for Fixture Maker Fixture Model",
+      zhHant: "Fixture Maker Fixture Model 三分之四角度私人來源預覽",
     });
   });
 });

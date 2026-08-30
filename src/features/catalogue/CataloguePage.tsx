@@ -309,7 +309,12 @@ export function CataloguePage() {
         completedChecks: [],
         sourceRightsConfirmed: false,
         files: {
-          source: { contentType, sizeBytes: file.size },
+          sources: {
+            front: { contentType, sizeBytes: file.size },
+            back: null,
+            left: null,
+            "three-quarter": null,
+          },
           model: null,
         },
         dimensionsMm: { width: null, height: null, depth: null },

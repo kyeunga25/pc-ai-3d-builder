@@ -18,8 +18,8 @@ export const assetReviewFileControlCopy = {
     "Create a synthetic PNG kept only in this local session",
   ),
   sourceUploadTitle: bilingualCopy(
-    "上載或取代來源圖片會重設核准證據；不會刪除其他私人檔案",
-    "Uploading or replacing the source image resets approval evidence; it does not delete other private files",
+    "上載或取代所選來源視角會重設核准證據；不會刪除其他私人檔案",
+    "Uploading or replacing the selected source view resets approval evidence; it does not delete other private files",
   ),
   model: bilingualCopy("3D 模型", "3D model"),
   modelRequirements: bilingualCopy(
@@ -27,12 +27,12 @@ export const assetReviewFileControlCopy = {
     "Self-contained, resource-bounded glTF 2.0 GLB · Up to 25 MiB",
   ),
   modelUploadTitle: bilingualCopy(
-    "上載或取代 GLB 會重設核准證據；不會刪除來源圖片",
-    "Uploading or replacing the GLB resets approval evidence; it does not delete the source image",
+    "上載或取代 GLB 會重設核准證據；不會刪除任何來源圖片",
+    "Uploading or replacing the GLB resets approval evidence; it does not delete any source image",
   ),
   replacementWarning: bilingualCopy(
-    "取代任何檔案會重設核准清單及已核實尺寸，避免沿用舊版本判斷。只會取代所選檔案；另一個私人檔案仍保持私人。",
-    "Replacing either file resets the approval checklist and verified dimensions so old evidence is not reused. Only the selected file is replaced; the other private file remains private.",
+    "取代任何檔案會重設核准清單、來源權利確認及已核實尺寸，避免沿用舊版本判斷。只會取代所選視角或 GLB；其他私人檔案仍保持私人。",
+    "Replacing any file resets the approval checklist, source-rights confirmation and verified dimensions so old evidence is not reused. Only the selected view or GLB is replaced; all other private files remain private.",
   ),
 } as const satisfies Record<string, BilingualCopy>;
 

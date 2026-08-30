@@ -80,7 +80,10 @@ function databaseWithBeforeBatch(beforeBatch: () => Promise<void>): D1Database {
   } as D1Database;
 }
 
-function replacementRequest(expectedVersion = 0): Request {
+function replacementRequest(
+  expectedVersion = 0,
+  sourceView: "back" | "front" | "left" | "three-quarter" = "front",
+): Request {
   return new Request("https://local.invalid/api/assets/item/file", {
     method: "PUT",
     headers: {
@@ -88,16 +91,20 @@ function replacementRequest(expectedVersion = 0): Request {
       "x-rigstage-asset-file-kind": "source",
       "x-rigstage-asset-id": assetId,
       "x-rigstage-expected-version": String(expectedVersion),
+      "x-rigstage-asset-source-view": sourceView,
     },
     body: replacementBytes.buffer as ArrayBuffer,
   });
 }
 
-function fileReadRequest(): Request {
+function fileReadRequest(
+  sourceView: "back" | "front" | "left" | "three-quarter" = "front",
+): Request {
   return new Request("https://local.invalid/api/assets/item/file", {
     headers: {
       "x-rigstage-asset-file-kind": "source",
       "x-rigstage-asset-id": assetId,
+      "x-rigstage-asset-source-view": sourceView,
     },
   });
 }
@@ -165,7 +172,7 @@ async function seedFixtures(): Promise<void> {
 }
 
 describe("private asset file workspace isolation", () => {
-  it("allows the owning workspace and hides reads and replacements from another", async () => {
+  it("isolates canonical and additional source-file reads and replacements by workspace", async () => {
     await seedFixtures();
 
     const allowed = await assetFileResponse(
@@ -236,7 +243,7 @@ describe("private asset file workspace isolation", () => {
       ),
     ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
 
-    const replacement = new Request(
+    const foreignReplacementRequest = new Request(
       "https://local.invalid/api/assets/item/file",
       {
         method: "PUT",
@@ -251,7 +258,7 @@ describe("private asset file workspace isolation", () => {
     );
     await expect(
       assetFileUploadResponse(
-        replacement,
+        foreignReplacementRequest,
         env.DB,
         env.PRIVATE_ASSETS,
         context(requesterFixture),
@@ -353,9 +360,11 @@ describe("private asset file workspace isolation", () => {
       id: assetId,
       version: 1,
       files: {
-        source: {
-          contentType: "image/png",
-          sizeBytes: replacementBytes.length,
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: replacementBytes.length,
+          },
         },
       },
     });
@@ -391,6 +400,10 @@ describe("private asset file workspace isolation", () => {
       source_sha256: replacementDigest,
       audit_events: 1,
     });
+    const currentFrontObjectKey = recoveredState?.source_object_key;
+    if (!currentFrontObjectKey) {
+      throw new Error("Synthetic front-source fixture was not stored.");
+    }
     expect(recoveredState?.source_object_key).not.toBe(sourceObjectKey);
     expect(await env.PRIVATE_ASSETS.head(sourceObjectKey)).toBeNull();
     expect(
@@ -398,5 +411,170 @@ describe("private asset file workspace isolation", () => {
         prefix: `workspaces/${protectedFixture.workspaceId}/`,
       }),
     ).toMatchObject({ objects: [expect.any(Object)] });
+
+    const createdResponse = await assetFileUploadResponse(
+      replacementRequest(1, "back"),
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      "request-source-back-create",
+    );
+    expect(createdResponse.status).toBe(200);
+    await expect(createdResponse.json()).resolves.toMatchObject({
+      id: assetId,
+      version: 2,
+      sourceRightsConfirmed: false,
+      completedChecks: [],
+      files: {
+        sources: {
+          front: {
+            contentType: "image/png",
+            sizeBytes: replacementBytes.byteLength,
+          },
+          back: {
+            contentType: "image/png",
+            sizeBytes: replacementBytes.byteLength,
+          },
+          left: null,
+          "three-quarter": null,
+        },
+      },
+    });
+
+    const storedBack = await env.DB.prepare(
+      `SELECT object_key, content_type, size_bytes, sha256
+       FROM product_asset_source_files
+       WHERE workspace_id = ?1 AND asset_id = ?2 AND source_view = 'back'`,
+    )
+      .bind(protectedFixture.workspaceId, assetId)
+      .first<{
+        content_type: string;
+        object_key: string;
+        sha256: string;
+        size_bytes: number;
+      }>();
+    expect(storedBack).toMatchObject({
+      content_type: "image/png",
+      sha256: replacementDigest,
+      size_bytes: replacementBytes.byteLength,
+    });
+    expect(storedBack?.object_key).not.toBe(currentFrontObjectKey);
+    expect(await env.PRIVATE_ASSETS.head(currentFrontObjectKey)).not.toBeNull();
+
+    const readBack = await assetFileResponse(
+      fileReadRequest("back"),
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+    );
+    expect(readBack.status).toBe(200);
+    expect(readBack.headers.get("content-disposition")).toBe(
+      'inline; filename="source-back.png"',
+    );
+    expect(new Uint8Array(await readBack.arrayBuffer())).toEqual(
+      replacementBytes,
+    );
+
+    await expect(
+      assetFileResponse(
+        fileReadRequest("back"),
+        env.DB,
+        env.PRIVATE_ASSETS,
+        context(requesterFixture),
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "ASSET_NOT_FOUND" });
+
+    const previousBackObjectKey = storedBack?.object_key;
+    if (!previousBackObjectKey) {
+      throw new Error("Synthetic back-source fixture was not stored.");
+    }
+    const backReplacementRequest = new Request(
+      "https://local.invalid/api/assets/item/file",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "image/png",
+          "x-rigstage-asset-file-kind": "source",
+          "x-rigstage-asset-id": assetId,
+          "x-rigstage-asset-source-view": "back",
+          "x-rigstage-expected-version": "2",
+        },
+        body: sourceBytes.buffer as ArrayBuffer,
+      },
+    );
+    const replacedResponse = await assetFileUploadResponse(
+      backReplacementRequest,
+      env.DB,
+      env.PRIVATE_ASSETS,
+      context(protectedFixture),
+      "request-source-back-replace",
+    );
+    expect(replacedResponse.status).toBe(200);
+    const replacedBack = await env.DB.prepare(
+      `SELECT object_key, sha256
+       FROM product_asset_source_files
+       WHERE workspace_id = ?1 AND asset_id = ?2 AND source_view = 'back'`,
+    )
+      .bind(protectedFixture.workspaceId, assetId)
+      .first<{ object_key: string; sha256: string }>();
+    expect(replacedBack?.sha256).toBe(sourceDigest);
+    expect(replacedBack?.object_key).not.toBe(previousBackObjectKey);
+    expect(await env.PRIVATE_ASSETS.head(previousBackObjectKey)).toBeNull();
+    expect(await env.PRIVATE_ASSETS.head(currentFrontObjectKey)).not.toBeNull();
+
+    const auditRows = await env.DB.prepare(
+      `SELECT metadata_json
+       FROM audit_events
+       WHERE workspace_id = ?1 AND target_id = ?2
+         AND json_extract(metadata_json, '$.sourceView') = 'back'
+       ORDER BY created_at, id`,
+    )
+      .bind(protectedFixture.workspaceId, assetId)
+      .all<{ metadata_json: string }>();
+    expect(auditRows.results).toHaveLength(2);
+    expect(
+      auditRows.results.every(
+        (row) => JSON.parse(row.metadata_json).sourceView === "back",
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(auditRows.results)).not.toContain("workspaces/");
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO product_asset_source_files (
+           workspace_id, asset_id, source_view, object_key, content_type,
+           size_bytes, sha256
+         ) VALUES (?1, ?2, 'top', 'private/invalid-view', 'image/png', 1, ?3)`,
+      )
+        .bind(protectedFixture.workspaceId, assetId, "a".repeat(64))
+        .run(),
+    ).rejects.toThrow(/CHECK constraint failed/iu);
+
+    await env.DB.prepare(
+      `UPDATE catalog_parts SET status = 'archived'
+       WHERE workspace_id = ?1 AND id = ?2`,
+    )
+      .bind(protectedFixture.workspaceId, protectedFixture.partId)
+      .run();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO product_asset_source_files (
+           workspace_id, asset_id, source_view, object_key, content_type,
+           size_bytes, sha256
+         ) VALUES (?1, ?2, 'left', 'private/inactive-catalogue',
+                   'image/png', 1, ?3)`,
+      )
+        .bind(protectedFixture.workspaceId, assetId, "b".repeat(64))
+        .run(),
+    ).rejects.toThrow(/ASSET_CATALOGUE_INACTIVE/iu);
+    expect(
+      await env.DB.prepare(
+        `SELECT COUNT(*) AS count
+         FROM product_asset_source_files
+         WHERE workspace_id = ?1 AND asset_id = ?2 AND source_view = 'left'`,
+      )
+        .bind(protectedFixture.workspaceId, assetId)
+        .first(),
+    ).toEqual({ count: 0 });
   });
 });

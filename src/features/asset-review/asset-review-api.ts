@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   type AssetFileKind,
+  type AssetSourceView,
   assetModelContentType,
 } from "../../shared/domain/asset-files";
 import {
@@ -19,6 +20,7 @@ import {
 import { apiFetch } from "../../shared/lib/api-fetch";
 import {
   assetFileKindHeader,
+  assetSourceViewHeader,
   assetTargetHeader,
 } from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
@@ -180,10 +182,12 @@ export async function uploadAssetFile(
   kind: AssetFileKind,
   expectedVersion: number,
   file: File,
+  sourceView: AssetSourceView = "front",
 ): Promise<AssetReviewItem> {
   const headers = workspaceHeaders(workspaceId);
   headers.set("content-type", uploadContentType(kind, file));
   headers.set(assetFileKindHeader, kind);
+  if (kind === "source") headers.set(assetSourceViewHeader, sourceView);
   headers.set(assetTargetHeader, assetId);
   headers.set("x-rigstage-expected-version", String(expectedVersion));
   const response = await apiFetch("/api/assets/item/file", {
@@ -203,9 +207,11 @@ export async function fetchAssetFileBlob(
   workspaceId: string,
   assetId: string,
   kind: AssetFileKind,
+  sourceView: AssetSourceView = "front",
 ): Promise<Blob> {
   const headers = workspaceHeaders(workspaceId);
   headers.set(assetFileKindHeader, kind);
+  if (kind === "source") headers.set(assetSourceViewHeader, sourceView);
   headers.set(assetTargetHeader, assetId);
   const response = await apiFetch("/api/assets/item/file", {
     credentials: "same-origin",

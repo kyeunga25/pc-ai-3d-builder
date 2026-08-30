@@ -301,7 +301,12 @@ export const reviewAsset: AssetReviewItem = {
   ],
   sourceRightsConfirmed: true,
   files: {
-    source: null,
+    sources: {
+      front: null,
+      back: null,
+      left: null,
+      "three-quarter": null,
+    },
     model: null,
   },
   dimensionsMm: {

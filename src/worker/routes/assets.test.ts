@@ -235,7 +235,12 @@ describe("asset review routes", () => {
           id: "asset-fixture",
           version: 1,
           files: {
-            source: { contentType: "image/png", sizeBytes: 128 },
+            sources: {
+              front: { contentType: "image/png", sizeBytes: 128 },
+              back: null,
+              left: null,
+              "three-quarter": null,
+            },
             model: {
               contentType: "model/gltf-binary",
               sizeBytes: modelBytes.byteLength,

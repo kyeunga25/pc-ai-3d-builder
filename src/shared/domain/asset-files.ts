@@ -11,6 +11,13 @@ import {
 } from "./image-validation";
 
 export const assetFileKindSchema = z.enum(["source", "model"]);
+export const assetSourceViews = [
+  "front",
+  "back",
+  "left",
+  "three-quarter",
+] as const;
+export const assetSourceViewSchema = z.enum(assetSourceViews);
 export const assetSourceContentTypeSchema = z.enum([
   "image/jpeg",
   "image/png",
@@ -24,6 +31,7 @@ export const assetFileLimits = {
 } as const;
 
 export type AssetFileKind = z.infer<typeof assetFileKindSchema>;
+export type AssetSourceView = z.infer<typeof assetSourceViewSchema>;
 export type AssetSourceContentType = z.infer<
   typeof assetSourceContentTypeSchema
 >;
