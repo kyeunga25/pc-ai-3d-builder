@@ -98,6 +98,12 @@ import {
   nextAssetReviewGenerationCancelIntent,
 } from "./asset-review-generation-copy";
 import {
+  assetReviewGenerationHistoryCountCopy,
+  assetReviewGenerationHistoryForAsset,
+  assetReviewGenerationTime,
+  generationHistoryCopy,
+} from "./asset-review-generation-history";
+import {
   assetReviewHeaderCopy,
   assetReviewHeaderEyebrowCopy,
   assetReviewQualityCopy,
@@ -516,9 +522,14 @@ export function AssetReviewPage() {
   }, [activeAsset, currentWorkspace.id, isLocalPreview, reloadToken]);
 
   useEffect(() => {
-    const activeJob = generationState.items.find((job) =>
-      ["queued", "running", "validating"].includes(job.status),
-    );
+    const activeJob = activeAsset
+      ? assetReviewGenerationHistoryForAsset(
+          generationState.items,
+          activeAsset.id,
+        ).find((job) =>
+          ["queued", "running", "validating"].includes(job.status),
+        )
+      : undefined;
     if (isLocalPreview || !activeAsset || !activeJob) {
       return;
     }
@@ -539,7 +550,10 @@ export function AssetReviewPage() {
           return;
         }
         setGenerationState(next);
-        const latest = next.items[0];
+        const latest = assetReviewGenerationHistoryForAsset(
+          next.items,
+          activeAsset.id,
+        )[0];
         if (latest?.status !== "queued") {
           setGenerationCancelArmedKey(null);
         }
@@ -666,8 +680,12 @@ export function AssetReviewPage() {
     parsedDimensions.width !== null &&
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
-  const latestGenerationJob = generationState.items[0] ?? null;
-  const queuedGenerationJob = generationState.items.find(
+  const generationHistoryJobs = assetReviewGenerationHistoryForAsset(
+    generationState.items,
+    asset.id,
+  );
+  const latestGenerationJob = generationHistoryJobs[0] ?? null;
+  const queuedGenerationJob = generationHistoryJobs.find(
     (job) =>
       job.assetId === asset.id &&
       job.status === "queued" &&
@@ -696,7 +714,7 @@ export function AssetReviewPage() {
         latestGenerationJob.entitlementStatus,
       )
     : generationInspectorCopy.notApplicable;
-  const generationActive = generationState.items.some(
+  const generationActive = generationHistoryJobs.some(
     (job) =>
       ["queued", "running", "validating"].includes(job.status) ||
       (job.status === "awaiting_review" &&
@@ -2173,6 +2191,69 @@ export function AssetReviewPage() {
                 </dd>
               </div>
             </dl>
+            <div className="generation-job-history">
+              <div className="generation-job-history__heading">
+                <BilingualStrongText copy={generationHistoryCopy.heading} />
+                <BilingualInterfaceText
+                  copy={assetReviewGenerationHistoryCountCopy(
+                    generationHistoryJobs.length,
+                  )}
+                />
+              </div>
+              <BilingualInterfaceText
+                copy={generationHistoryCopy.description}
+                className="generation-job-history__description"
+              />
+              {generationHistoryJobs.length === 0 ? (
+                <BilingualInterfaceText
+                  copy={generationHistoryCopy.empty}
+                  className="generation-job-history__empty"
+                />
+              ) : (
+                <ol
+                  aria-label={bilingualTitle(
+                    generationHistoryCopy.heading.zhHant,
+                    generationHistoryCopy.heading.english,
+                  )}
+                >
+                  {generationHistoryJobs.map((job, index) => {
+                    const updated = assetReviewGenerationTime(job.updatedAt);
+                    const entitlement = job.entitlementStatus
+                      ? assetReviewGenerationEntitlementCopy(
+                          job.entitlementStatus,
+                        )
+                      : generationInspectorCopy.notApplicable;
+                    return (
+                      <li key={job.id}>
+                        <div className="generation-job-history__status">
+                          {index === 0 ? (
+                            <BilingualInterfaceText
+                              copy={generationHistoryCopy.latest}
+                              className="generation-job-history__latest"
+                            />
+                          ) : null}
+                          <BilingualInterfaceText
+                            copy={assetReviewGenerationStatusCopy(job)}
+                          />
+                        </div>
+                        <BilingualInterfaceText
+                          copy={entitlement}
+                          className="generation-job-history__entitlement"
+                        />
+                        <div className="generation-job-history__time">
+                          <BilingualInterfaceText
+                            copy={generationHistoryCopy.updated}
+                          />
+                          <time dateTime={updated.dateTime ?? undefined}>
+                            <BilingualInterfaceText copy={updated.copy} />
+                          </time>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
             <small>
               <BilingualInterfaceText
                 copy={generationInspectorCopy.explanation}

@@ -44,6 +44,7 @@ RigStage is an invite-only browser workspace for computer merchants. Version 1.1
 - Durable queued, running, validating, review-ready, failed and cancelled generation states with bounded job history.
 - Owner/admin-only two-step cancellation of one exact still-queued job through a bodyless fixed API. The reservation is released only if cancellation wins before Workflow claim; started work returns a conflict and is not presented as stopped.
 - Traditional-Chinese-first bilingual generation-inspector labels for every mode, job lifecycle and entitlement state, plus explicit non-monetary credit summaries and readable absent-value states without exposing provider or private-object details.
+- A scroll-bounded, Traditional-Chinese-first recent-generation history for at most 20 exact current-asset jobs, with latest/status/entitlement/Hong Kong time only; mismatched asset items, job IDs, failure codes, provider details and private object data are not rendered.
 - Shared-schema and D1 enforcement that public generation failure/validation codes contain only 1–128 uppercase ASCII letters, digits or underscores, preventing arbitrary internal text from entering the response or review interface.
 - Runtime synthetic GLB creation, private R2 storage, read-back validation and atomic review-version reset for local or explicitly controlled simulation testing.
 - A tracked production kill switch that rejects generation before database writes or provider activity.
