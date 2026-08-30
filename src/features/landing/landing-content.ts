@@ -85,8 +85,8 @@ export const workflowCases = [
     ),
     points: [
       landingText(
-        "支援新增、編輯、邏輯封存及經完整驗證的 CSV 批次匯入。",
-        "Add, edit, logically archive and import validated CSV batches.",
+        "支援新增、編輯、邏輯封存及經完整驗證的 CSV／TSV 批次匯入。",
+        "Add, edit, logically archive and import validated CSV / TSV batches.",
       ),
       landingText(
         "規格核實狀態、庫存與素材品質在同一工作畫面可見。",

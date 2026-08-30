@@ -2,7 +2,7 @@
 
 All responses include public security headers. API responses use `Cache-Control: no-store`.
 
-JSON mutation routes require the exact `application/json` media-type token and CSV import requires the exact `text/csv` token; media-type matching is case-insensitive and permits parameters such as `charset=utf-8`. Prefix lookalikes such as `application/jsonp` or `text/csvx` return bilingual `UNSUPPORTED_MEDIA_TYPE` before the Worker reads the body or performs a D1/R2 write. Correcting the header permits a safe retry under the route's existing role, workspace, version and idempotency rules.
+JSON mutation routes require the exact `application/json` media-type token. Catalogue import accepts only exact `text/csv` or IANA-registered `text/tab-separated-values`; media-type matching is case-insensitive and permits parameters such as `charset=utf-8`. Prefix lookalikes such as `application/jsonp`, `text/csvx` or `text/tab-separated-valuesx` return bilingual `UNSUPPORTED_MEDIA_TYPE` before the Worker reads the body or performs a D1/R2 write. Correcting the header permits a safe retry under the route's existing role, workspace, version and idempotency rules.
 
 The public health endpoint is the only API route that does not require Access. Every other `/api` request first verifies the Access identity and applies the subject-keyed rate limit, then matches one exact path-and-method policy before resolving a D1 workspace membership. Unknown or legacy paths return the same generic bilingual `NOT_FOUND` response without echoing the requested fragment. A known path with a disallowed method returns bilingual `METHOD_NOT_ALLOWED` and its exact `Allow` header. Both preflight failures occur before request-body, membership-D1, R2 or Workflow work.
 
@@ -68,7 +68,7 @@ The catalogue row and a minimal audit event are submitted in one D1 batch. The r
 
 ## `POST /api/catalogue/import`
 
-Imports a CSV document using the exact `Content-Type: text/csv` media-type token, with optional parameters. The body is limited to 256 KiB and must contain the exact documented template headers and between 1 and 50 valid rows. Duplicate SKU values within the document or the resolved workspace reject the complete import.
+Imports either a comma-separated CSV document with exact `Content-Type: text/csv` or a tab-separated TSV document with exact `Content-Type: text/tab-separated-values`; optional parameters are allowed. Both formats must contain valid UTF-8 and use the same ordered headers and schema. The body is limited to 256 KiB and must contain between 1 and 50 valid rows. Duplicate SKU values within the document or the resolved workspace reject the complete import. The browser preflights encoding, file size, recognized extension/media type agreement and the complete schema before upload, but the Worker remains authoritative and repeats every validation.
 
 Every catalogue insert and its minimal audit event are submitted in one transactional D1 batch. The route never partially imports a rejected document.
 
@@ -196,7 +196,7 @@ One guarded D1 batch changes `queued` to `cancelled`, records a minimal job even
 }
 ```
 
-Every public error message uses the exact `繁體中文 / English` language order. Construction fails during development and tests if either language is absent. Validation messages describe the safe corrective category while preserving the stable error code: detailed CSV parser state, GLB structure labels, private record identifiers and raw exception text are never copied into the response. Clients with separate language fields split only the first ` / ` delimiter; malformed or legacy responses use generic bilingual fallback copy.
+Every public error message uses the exact `繁體中文 / English` language order. Construction fails during development and tests if either language is absent. Validation messages describe the safe corrective category while preserving the stable error code: detailed CSV／TSV parser state, GLB structure labels, private record identifiers and raw exception text are never copied into the response. Clients with separate language fields split only the first ` / ` delimiter; malformed or legacy responses use generic bilingual fallback copy.
 
 Expected codes include `ACCESS_TOKEN_REQUIRED`, `ACCESS_TOKEN_INVALID`, `INVITE_REQUIRED`, `WORKSPACE_FORBIDDEN`, `WORKSPACE_MEMBER_NOT_FOUND`, `WORKSPACE_MEMBER_CONFLICT`, `WORKSPACE_MEMBER_VERSION_CONFLICT`, `WORKSPACE_MEMBER_SELF_FORBIDDEN`, `WORKSPACE_LAST_OWNER`, `IDENTITY_BINDING_CONFLICT`, `ROLE_FORBIDDEN`, `VALIDATION_ERROR`, `UNEXPECTED_REQUEST_BODY`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `CATALOGUE_PART_NOT_FOUND`, `CATALOGUE_SKU_CONFLICT`, `CATALOGUE_VERSION_CONFLICT`, `CATALOGUE_CATEGORY_LOCKED`, `CATALOGUE_GENERATION_LOCKED`, `BUILD_NOT_FOUND`, `BUILD_SELECTION_INVALID`, `BUILD_VERSION_CONFLICT`, `BUILD_EXPORT_BLOCKED`, `ASSET_NOT_FOUND`, `ASSET_FILE_NOT_FOUND`, `ASSET_ALREADY_EXISTS`, `ASSET_LOCKED`, `ASSET_MODEL_REQUIRED`, `ASSET_APPROVAL_INCOMPLETE`, `ASSET_VERSION_CONFLICT`, `GENERATION_DISABLED`, `GENERATION_ALREADY_ACTIVE`, `GENERATION_CREDITS_REQUIRED`, `GENERATION_SOURCE_REQUIRED`, `GENERATION_RIGHTS_REQUIRED`, `GENERATION_START_FAILED`, `GENERATION_JOB_NOT_FOUND`, `GENERATION_CANCEL_TOO_LATE`, `IDEMPOTENCY_KEY_REUSED`, `RATE_LIMITED`, `METHOD_NOT_ALLOWED`, `NOT_FOUND` and `INTERNAL_ERROR`.
 

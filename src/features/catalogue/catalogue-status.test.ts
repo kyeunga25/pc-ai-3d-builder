@@ -7,6 +7,7 @@ import {
   catalogueFailureStatus,
   catalogueImportedStatus,
   catalogueStatusCopy,
+  catalogueTemplateDownloadStarted,
   catalogueUpdatedStatus,
 } from "./catalogue-status";
 
@@ -50,6 +51,15 @@ describe("Catalogue operation status copy", () => {
     );
     expect(catalogueImportedStatus(1).message).toBe(
       "已匯入 1 件產品 / Imported 1 product",
+    );
+  });
+
+  it("identifies each synthetic import template bilingually", () => {
+    expect(catalogueTemplateDownloadStarted("csv").message).toContain(
+      "CSV 範本已開始下載。 / The synthetic-data-only CSV template",
+    );
+    expect(catalogueTemplateDownloadStarted("tsv").message).toContain(
+      "TSV 範本已開始下載。 / The synthetic-data-only TSV template",
     );
   });
 

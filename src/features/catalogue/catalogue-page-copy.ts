@@ -27,8 +27,8 @@ export const cataloguePageCopy = {
   categoryColumn: catalogueCopy("分類", "Category"),
   categoryFilterLabel: catalogueCopy("組件分類", "Component category"),
   emptyCatalogueMessage: catalogueCopy(
-    "使用「新增產品」或 CSV 匯入，建立這個工作空間的第一項產品。",
-    "Use Add product or CSV import to create the first product in this workspace.",
+    "使用「新增產品」或 CSV／TSV 匯入，建立這個工作空間的第一項產品。",
+    "Use Add product or CSV / TSV import to create the first product in this workspace.",
   ),
   emptyCatalogueTitle: catalogueCopy(
     "產品目錄仍是空白",
@@ -38,9 +38,12 @@ export const cataloguePageCopy = {
     "無法載入工作空間產品目錄",
     "Unable to load the workspace catalogue",
   ),
-  importCsv: catalogueCopy("匯入 CSV", "Import CSV"),
+  importFile: catalogueCopy("匯入 CSV／TSV", "Import CSV / TSV"),
   importing: catalogueCopy("正在匯入…", "Importing…"),
-  importTitle: catalogueCopy("匯入最多 50 項產品", "Import up to 50 products"),
+  importTitle: catalogueCopy(
+    "從 CSV 或 TSV 匯入最多 50 項產品",
+    "Import up to 50 products from CSV or TSV",
+  ),
   loadingLabel: catalogueCopy(
     "正在載入工作空間產品目錄",
     "Loading workspace catalogue",
@@ -77,7 +80,8 @@ export const cataloguePageCopy = {
     "Show all specifications",
   ),
   stockColumn: catalogueCopy("庫存", "Stock"),
-  template: catalogueCopy("CSV 範本", "Template"),
+  csvTemplate: catalogueCopy("CSV 範本", "CSV template"),
+  tsvTemplate: catalogueCopy("TSV 範本", "TSV template"),
   toolbarLabel: catalogueCopy("產品目錄篩選器", "Catalogue filters"),
   verifiedOnly: catalogueCopy("只顯示已核實", "Verified specifications only"),
   view: catalogueCopy("查看", "View"),

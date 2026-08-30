@@ -79,6 +79,12 @@ describe("CataloguePage", () => {
     expect(markup).toContain("In stock");
     expect(markup).toContain("Approved");
     expect(markup).toContain("View");
+    expect(markup).toContain("Import CSV / TSV");
+    expect(markup).toContain("CSV template");
+    expect(markup).toContain("TSV template");
+    expect(markup).toContain(
+      'accept=".csv,.tsv,text/csv,text/tab-separated-values"',
+    );
     expect(markup).toContain('aria-label="產品目錄篩選器 / Catalogue filters"');
     expect(markup).toContain('aria-label="產品目錄結果 / Catalogue results"');
     for (const part of catalogParts) {

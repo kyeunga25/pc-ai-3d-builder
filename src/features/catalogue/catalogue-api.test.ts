@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchCataloguePage, mutateCataloguePart } from "./catalogue-api";
+import {
+  fetchCataloguePage,
+  importCatalogueFile,
+  mutateCataloguePart,
+} from "./catalogue-api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -92,4 +96,31 @@ describe("catalogue part target API", () => {
     expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
     expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
   });
+});
+
+describe("catalogue import API", () => {
+  it.each([
+    ["csv", "text/csv; charset=utf-8", "catalogue.csv"],
+    ["tsv", "text/tab-separated-values; charset=utf-8", "catalogue.tsv"],
+  ] as const)(
+    "sends %s bytes with the exact registered media type",
+    async (format, expectedContentType, fileName) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(Response.json({ created: [] }, { status: 201 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const file = new File(["fixture"], fileName);
+
+      await expect(
+        importCatalogueFile("workspace-fixture", file, format),
+      ).resolves.toEqual({ created: [] });
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const headers = new Headers(init.headers);
+      expect(url).toBe("/api/catalogue/import");
+      expect(headers.get("content-type")).toBe(expectedContentType);
+      expect(headers.get("x-rigstage-workspace-id")).toBe("workspace-fixture");
+      expect(init.body).toBe(file);
+    },
+  );
 });

@@ -84,7 +84,7 @@ Stores one internal attempt row per `(workspace, job, attempt_key)`. A row moves
 - Do not add production records, account identifiers or resource names to migrations.
 - Test migrations against an empty temporary database and run `PRAGMA foreign_key_check`.
 - Keep every catalogue, asset, review and build relation explicitly workspace-scoped.
-- Submit a catalogue row and its minimal audit event in one D1 batch; CSV imports are all-or-nothing and contain at most 50 rows.
+- Submit a catalogue row and its minimal audit event in one D1 batch; CSV／TSV imports are all-or-nothing and contain at most 50 rows.
 - Do not place object keys or checksums in audit events. Replacing a file must increment the review version and reset prior approval evidence.
 - Build selection updates must use an expected version and server-only mutation token in one D1 batch.
 - Catalogue archive must remain blocked while any linked generation entitlement is reserved; a denied archive must not increment the catalogue version or append an audit event.

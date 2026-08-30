@@ -5,14 +5,18 @@ import {
   type CataloguePartInput,
 } from "../../shared/domain/schemas";
 import {
-  CatalogueCsvError,
-  parseCatalogueCsvFile,
-} from "../../shared/domain/catalogue-csv";
+  CatalogueImportError,
+  parseCatalogueImportFile,
+  type CatalogueImportFormat,
+} from "../../shared/domain/catalogue-import";
 import type { WorkspaceRole } from "../../shared/domain/session";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 import type { RequestContext } from "../auth/workspace";
 import { ApiError } from "../lib/api-error";
-import { readBoundedCsv, readBoundedJson } from "../lib/request-body";
+import {
+  readBoundedCatalogueImport,
+  readBoundedJson,
+} from "../lib/request-body";
 import {
   catalogueRecordIdPattern,
   catalogueSelect,
@@ -454,11 +458,14 @@ export async function catalogueMutationResponse(
   });
 }
 
-export function parseCatalogueCsv(text: string): CataloguePartInput[] {
+export function parseCatalogueImport(
+  text: string,
+  format: CatalogueImportFormat,
+): CataloguePartInput[] {
   try {
-    return parseCatalogueCsvFile(text);
+    return parseCatalogueImportFile(text, format);
   } catch (error) {
-    if (error instanceof CatalogueCsvError) {
+    if (error instanceof CatalogueImportError) {
       if (error.kind === "sku_conflict") {
         throw skuConflict();
       }
@@ -466,6 +473,10 @@ export function parseCatalogueCsv(text: string): CataloguePartInput[] {
     }
     throw error;
   }
+}
+
+export function parseCatalogueCsv(text: string): CataloguePartInput[] {
+  return parseCatalogueImport(text, "csv");
 }
 
 async function findExistingImportedSku(
@@ -495,7 +506,8 @@ export async function catalogueImportResponse(
   requestId: string,
 ): Promise<Response> {
   assertCatalogueWriteRole(context.currentWorkspace.role);
-  const inputs = parseCatalogueCsv(await readBoundedCsv(request));
+  const document = await readBoundedCatalogueImport(request);
+  const inputs = parseCatalogueImport(document.text, document.format);
   if (await findExistingImportedSku(db, context.currentWorkspace.id, inputs)) {
     throw skuConflict();
   }

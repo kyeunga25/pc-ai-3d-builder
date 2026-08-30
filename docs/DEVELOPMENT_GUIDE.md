@@ -11,7 +11,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Workspace-scoped dashboard, catalogue, asset-review and build APIs with bounded reads and mutation bodies.
 - Owner/admin workspace-member directory, D1 invitation, role update and two-step suspension with optimistic versions and a database last-owner guard.
 - Owner/admin workspace activity log with a 50-row read bound, header-only private pagination and a metadata-free public projection.
-- Catalogue create, optimistic update, logical archive and transactional CSV import.
+- Catalogue create, optimistic update, logical archive and transactional CSV／TSV import through one shared schema.
 - Four-view private R2 source-image storage plus one GLB, with protected Worker reads, exact per-view replacement/removal and safe metadata projection.
 - Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
 - A local-only generation milestone with non-monetary capability reservation, immutable provider-attempt records, strict GLB structure limits and Workers Runtime integration tests.

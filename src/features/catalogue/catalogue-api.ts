@@ -10,6 +10,10 @@ import {
   type CatalogueResponse,
   type CatalogPart,
 } from "../../shared/domain/schemas";
+import {
+  catalogueImportMediaTypes,
+  type CatalogueImportFormat,
+} from "../../shared/domain/catalogue-import";
 import { apiFetch } from "../../shared/lib/api-fetch";
 import { catalogueCursorHeader } from "../../shared/lib/catalogue-pagination";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
@@ -115,12 +119,16 @@ export async function mutateCataloguePart(
   return catalogPartSchema.parse(await response.json());
 }
 
-export async function importCatalogueCsv(
+export async function importCatalogueFile(
   workspaceId: string,
   file: File,
+  format: CatalogueImportFormat,
 ): Promise<CatalogueImportResponse> {
   const headers = workspaceHeaders(workspaceId);
-  headers.set("content-type", "text/csv; charset=utf-8");
+  headers.set(
+    "content-type",
+    `${catalogueImportMediaTypes[format]}; charset=utf-8`,
+  );
   const response = await apiFetch("/api/catalogue/import", {
     method: "POST",
     credentials: "same-origin",
