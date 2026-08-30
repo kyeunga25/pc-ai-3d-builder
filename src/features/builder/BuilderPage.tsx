@@ -582,9 +582,9 @@ export function BuilderPage() {
           displayMode={displayMode}
           setDisplayMode={setDisplayMode}
           selectedPart={selectedPart}
+          selectedParts={build.selectedParts}
           workspaceId={currentWorkspace.id}
           isLocalPreview={isLocalPreview}
-          localApprovedAssetId={localApprovedAssetId}
         />
         <aside
           className="desktop-inspector"

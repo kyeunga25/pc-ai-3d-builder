@@ -9,8 +9,10 @@ import {
   builderViewportDisplayModeCopy,
   builderViewportDisplayReadoutCopy,
   builderViewportFooterPreviewCopy,
+  builderViewportLayoutBoundaryCopy,
   builderViewportModelCaptionCopy,
   builderViewportPlaceholderCopy,
+  builderViewportSceneDetailsCopy,
   builderViewportStockCopy,
 } from "./builder-viewport-copy";
 
@@ -63,44 +65,114 @@ describe("Builder viewport copy", () => {
   it("distinguishes every private-model loading and fallback boundary", () => {
     expect(
       builderViewportPlaceholderCopy({
+        candidateCount: 1,
         hasApprovedAsset: true,
         isLocalPreview: true,
         isLocalSyntheticModel: true,
+        isSummary: false,
         modelState: "loading",
       }).english,
     ).toBe("Preparing the approved local synthetic GLB…");
     expect(
       builderViewportPlaceholderCopy({
+        candidateCount: 1,
         hasApprovedAsset: true,
         isLocalPreview: false,
         isLocalSyntheticModel: false,
+        isSummary: false,
         modelState: "loading",
       }).english,
     ).toBe("Loading the private GLB through the authorized API…");
     expect(
       builderViewportPlaceholderCopy({
+        candidateCount: 1,
         hasApprovedAsset: true,
         isLocalPreview: false,
         isLocalSyntheticModel: false,
+        isSummary: false,
         modelState: "error",
       }).english,
     ).toContain("Unable to load the approved private GLB");
     expect(
       builderViewportPlaceholderCopy({
+        candidateCount: 0,
         hasApprovedAsset: true,
         isLocalPreview: true,
         isLocalSyntheticModel: false,
+        isSummary: false,
         modelState: "none",
       }).english,
     ).toContain("Local preview does not read a private GLB");
     expect(
       builderViewportPlaceholderCopy({
+        candidateCount: 0,
         hasApprovedAsset: false,
         isLocalPreview: false,
         isLocalSyntheticModel: false,
+        isSummary: false,
         modelState: "none",
       }).english,
     ).toContain("No approved GLB is available");
+  });
+
+  it("describes private and local multi-model review scenes without mechanical claims", () => {
+    expect(
+      builderViewportPlaceholderCopy({
+        candidateCount: 4,
+        hasApprovedAsset: false,
+        isLocalPreview: false,
+        isLocalSyntheticModel: false,
+        isSummary: true,
+        modelState: "loading",
+      }).english,
+    ).toBe(
+      "Loading 4 approved private GLBs in parallel through the authorized API…",
+    );
+    expect(
+      builderViewportPlaceholderCopy({
+        candidateCount: 4,
+        hasApprovedAsset: false,
+        isLocalPreview: true,
+        isLocalSyntheticModel: true,
+        isSummary: true,
+        modelState: "loading",
+      }).english,
+    ).toBe("Preparing 4 approved local synthetic GLBs…");
+    expect(builderViewportLayoutBoundaryCopy(true).english).toContain(
+      "Separated review layout",
+    );
+    expect(builderViewportSceneDetailsCopy(true).english).toContain(
+      "review layout",
+    );
+    expect(
+      builderViewportModelCaptionCopy({
+        candidateCount: 4,
+        failedCount: 0,
+        isLocalSyntheticModel: false,
+        isSummary: true,
+        isLoading: true,
+        loadedCount: 0,
+      }).english,
+    ).toBe("Decoding 4 approved GLBs…");
+    expect(
+      builderViewportModelCaptionCopy({
+        candidateCount: 4,
+        failedCount: 2,
+        isLocalSyntheticModel: false,
+        isSummary: true,
+        isLoading: false,
+        loadedCount: 2,
+      }).english,
+    ).toContain("Showing 2 of 4 approved private GLBs");
+    expect(
+      builderViewportFooterPreviewCopy({
+        hasModel: true,
+        isLocalSyntheticModel: false,
+        isSummary: true,
+        isLoading: true,
+        loadedCount: 0,
+      }).english,
+    ).toBe("Decoding approved component previews");
   });
 
   it("formats camera, mode, model and footer states without raw enum copy", () => {
@@ -110,14 +182,34 @@ describe("Builder viewport copy", () => {
     expect(builderViewportDisplayReadoutCopy("線框").english).toBe(
       "Mode: Wireframe",
     );
-    expect(builderViewportModelCaptionCopy(true).english).toContain(
-      "Approved local synthetic GLB",
-    );
-    expect(builderViewportModelCaptionCopy(false).english).toContain(
-      "Approved private GLB",
-    );
-    expect(builderViewportFooterPreviewCopy(false, false).english).toBe(
-      "Static fallback preview",
-    );
+    expect(
+      builderViewportModelCaptionCopy({
+        candidateCount: 1,
+        failedCount: 0,
+        isLocalSyntheticModel: true,
+        isSummary: false,
+        isLoading: false,
+        loadedCount: 1,
+      }).english,
+    ).toContain("Approved local synthetic GLB");
+    expect(
+      builderViewportModelCaptionCopy({
+        candidateCount: 1,
+        failedCount: 0,
+        isLocalSyntheticModel: false,
+        isSummary: false,
+        isLoading: false,
+        loadedCount: 1,
+      }).english,
+    ).toContain("Approved private GLB");
+    expect(
+      builderViewportFooterPreviewCopy({
+        hasModel: false,
+        isLocalSyntheticModel: false,
+        isSummary: false,
+        isLoading: false,
+        loadedCount: 0,
+      }).english,
+    ).toBe("Static fallback preview");
   });
 });

@@ -13,7 +13,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Owner/admin workspace activity log with a 50-row read bound, header-only private pagination and a metadata-free public projection.
 - Catalogue create, optimistic update, logical archive and transactional CSV／TSV import through one shared schema.
 - Four-view private R2 source-image storage plus one GLB, with shared filename/MIME/bytes browser preflight, canonical upload MIME, independent Worker validation, protected reads, exact per-view replacement/removal and safe metadata projection.
-- Lazy-loaded Three.js GLB review and approved selected-component preview, plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
+- Lazy-loaded Three.js GLB review, single-category approved preview and a bounded nine-component summary review grid with parallel private reads, partial success and abort-bound object URLs; plus a Workflow-backed, zero-cost synthetic generation validation path that remains disabled in tracked production configuration.
 - A local-only generation milestone with non-monetary capability reservation, immutable provider-attempt records, strict GLB structure limits and Workers Runtime integration tests.
 - Deterministic build compatibility and sanitized portable JSON export.
 - Synthetic local UI fixtures for catalogue, review and builder demonstrations.
@@ -35,6 +35,7 @@ RigStage is an invite-only, merchant-facing PC catalogue and 3D assembly workspa
 - Build writes require an authorized role, one part per category and the current record version.
 - Build export excludes identities, workspace IDs, price, stock and private asset metadata.
 - Compatibility is determined from structured, verified specifications, never inferred from a visual mesh.
+- The Builder summary grid is separated and display-normalized for review only; it never represents physical placement, scale, fit or compatibility.
 - Long-running work must be asynchronous and idempotent.
 - Read-only requests must not create unbounded database writes.
 - Dashboard reads must remain bounded and must not append audit events.

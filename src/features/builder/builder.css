@@ -1933,6 +1933,18 @@
     max-width: 88%;
   }
 
+  .builder-private-model figcaption {
+    box-sizing: border-box;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    border: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .selected-category-readout {
     display: none;
   }

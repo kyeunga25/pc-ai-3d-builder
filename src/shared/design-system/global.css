@@ -340,6 +340,13 @@ svg {
   color: var(--danger);
 }
 
+.asset-model-preview__state.is-partial {
+  top: 18px;
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border-strong));
+  color: var(--warning);
+  transform: translateX(-50%);
+}
+
 .page-header {
   display: flex;
   align-items: flex-end;
