@@ -57,6 +57,8 @@ Generation status uses provider-neutral queued, running, validating, waiting-for
 
 The generation action is available only to owner/admin roles after the canonical private `front` source image and saved usage-rights confirmation exist with no unsaved review changes. Additional views remain human-review evidence and never satisfy or change that gate. A completed job reloads the new draft version and visibly resets every approval check and dimension.
 
+A cancellation control appears only for an owner/admin's exact `queued` job with a reserved credit. Its first activation sends no request and changes to an explicit warning-coloured confirmation; its second activation for the unchanged workspace, asset version and job submits a bodyless cancellation. Switching views or beginning another file, review or generation action disarms it. The copy states that cancellation releases credit only before Workflow claim, and a race loss never describes started work as stopped. The job ID is neither visible nor placed in the URL.
+
 The production dashboard must use protected workspace data and must not present fixed catalogue, review, timing or readiness claims. Metric and readiness counts preserve their authoritative numeric value while bilingual labels handle English singular/plural forms. At narrow widths, the recent-work badge may become icon-led but its bilingual text remains accessible, and no Dashboard copy may create page-level horizontal overflow. Controls without an available model or permitted action remain visibly disabled. Logical archive requires a separate confirmation action and never masquerades as permanent deletion.
 
 ## Performance

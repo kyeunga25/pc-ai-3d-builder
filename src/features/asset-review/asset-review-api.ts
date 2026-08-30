@@ -23,6 +23,7 @@ import {
   assetGenerationCreditReleasedHeader,
   assetSourceViewHeader,
   assetTargetHeader,
+  generationJobTargetHeader,
 } from "../../shared/lib/asset-target";
 import { cataloguePartTargetHeader } from "../../shared/lib/catalogue-target";
 
@@ -295,6 +296,25 @@ export async function startGenerationJob(
     credentials: "same-origin",
     headers,
     body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw await apiError(response);
+  }
+  return generationJobSchema.parse(await response.json());
+}
+
+export async function cancelGenerationJob(
+  workspaceId: string,
+  assetId: string,
+  jobId: string,
+): Promise<GenerationJob> {
+  const headers = workspaceHeaders(workspaceId);
+  headers.set(assetTargetHeader, assetId);
+  headers.set(generationJobTargetHeader, jobId);
+  const response = await apiFetch("/api/assets/item/generation-jobs", {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers,
   });
   if (!response.ok) {
     throw await apiError(response);

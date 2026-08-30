@@ -9,6 +9,7 @@ RigStage v1.1 includes a provider-neutral generation-job foundation. The current
 - The workspace must have one available generation credit. Migration `0009` creates the schema only and grants no production credit.
 - `Idempotency-Key` prevents duplicate job creation. The browser keeps at most one pending key in component memory across an ambiguous request result and reuses it only for the same workspace, asset and review version; confirmed responses release it, changed input rotates it, and no key enters a URL or persistent storage. A server replay must retain both the original asset and requested review version; changing either input returns a bilingual conflict before Workflow or credit activity. A new request is blocked while the same asset has an active job or an `awaiting_review` job with a reserved entitlement.
 - One D1 batch reserves one unit and commits the queued job, job entitlement, credit event, append-only job event and minimal audit event before the Workflow is triggered. A job-insert trigger rechecks active catalogue state, asset status/version, source checksum and saved rights; a concurrent change aborts and rolls back the complete batch.
+- An owner/admin may cancel only the exact `queued` job through a bodyless fixed endpoint and protected asset/job headers. A second client activation is required, but the authoritative boundary is one conditional D1 transition: cancellation releases the reservation only if it wins before Workflow changes the state to `running`. Replays return the same cancelled result; a lost race returns a conflict and never stops an already-started attempt.
 - The current adapter creates a small synthetic GLB at runtime. It does not read the source-image bytes, contact an external service or incur provider cost.
 - The adapter receives only pseudonymous workspace/job/attempt references, source MIME/size/checksum metadata and a fixed output policy. Raw internal IDs, R2 keys, source bytes and permanent URLs do not cross the provider boundary.
 - Workflow steps claim the current input, active catalogue state and reserved entitlement, recheck source existence/size/content type/SHA-256 before any provider attempt, create one stable attempt, enforce the zero monetary and provider cost-unit caps, validate before storage, store the draft under a deterministic private R2 key with R2 checksum enforcement, read it back, repeat validation and compare its checksum.
@@ -29,17 +30,19 @@ Generation credit, provider cost units and money are different concepts:
 available credit
       |
       v
-reserved + queued -> running -> validating -> awaiting_review
-      |                |             |               |
-      +----------------+-------------+---------------+
-                             |                       |
-                         released                human decision
-                                                /              \
-                                         settled                released
-                                         (approve)              (reject)
+reserved + queued -- cancellation wins --> cancelled + released
+      |
+      +-- Workflow claim --> running --> validating --> awaiting_review
+                                |             |               |
+                                +-------------+---------------+
+                                          |                   |
+                                      released          human decision
+                                                       /              \
+                                                settled                released
+                                                (approve)              (reject)
 ```
 
-`cancelled` is reserved in the schema for a later explicit termination contract. The current public API does not expose cancellation. Workflow step retries use the same attempt reference; completed steps are durable, matching terminal results are treated as duplicates, and conflicting, late or out-of-order results fail closed.
+`cancelled` means the explicit queued-only cancellation committed before Workflow claim. A later Workflow claim returns that terminal result before reading source bytes or opening a provider attempt. Running, validating and review-ready work cannot be cancelled through this endpoint. Workflow step retries use the same attempt reference; completed steps are durable, matching terminal results are treated as duplicates, and conflicting, late or out-of-order results fail closed.
 
 ## Generated GLB policy
 

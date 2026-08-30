@@ -91,3 +91,25 @@ export function assetReviewGenerationCreditHistoryCopy(
     `${credits.settledUnits} settled · ${credits.releasedUnits} released`,
   );
 }
+
+export function assetReviewGenerationCancelActionCopy(
+  armed: boolean,
+  cancelling: boolean,
+): BilingualCopy {
+  if (cancelling) {
+    return bilingualCopy("取消中…", "Cancelling…");
+  }
+  return armed
+    ? bilingualCopy("確認取消工作", "Confirm job cancellation")
+    : bilingualCopy("取消排隊工作", "Cancel queued job");
+}
+
+export function nextAssetReviewGenerationCancelIntent(
+  armedKey: string | null,
+  currentKey: string,
+): { nextArmedKey: string | null; shouldSubmit: boolean } {
+  if (armedKey === currentKey) {
+    return { nextArmedKey: null, shouldSubmit: true };
+  }
+  return { nextArmedKey: currentKey, shouldSubmit: false };
+}

@@ -65,6 +65,7 @@ type GenerationStateRow = {
 };
 
 type ClaimedGeneration =
+  | { disposition: "cancelled" }
   | { disposition: "completed" }
   | { disposition: "rejected"; failureCode: string }
   | {
@@ -233,6 +234,9 @@ export async function claimGenerationJob(
     },
     params.requestedReviewVersion,
   );
+  if (disposition.kind === "cancelled") {
+    return { disposition: "cancelled" };
+  }
   if (disposition.kind === "completed") {
     return { disposition: "completed" };
   }
@@ -590,7 +594,7 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
   override async run(
     event: Readonly<WorkflowEvent<AssetGenerationParams>>,
     step: WorkflowStep,
-  ): Promise<{ jobId: string; status: "awaiting_review" }> {
+  ): Promise<{ jobId: string; status: "awaiting_review" | "cancelled" }> {
     const params = event.payload;
     const attemptKey = "primary";
     let attemptStarted = false;
@@ -599,6 +603,9 @@ export class AssetGenerationWorkflow extends WorkflowEntrypoint<
       const claim = await step.do("claim generation job", stepConfig, () =>
         claimGenerationJob(this.env.DB, params),
       );
+      if (claim.disposition === "cancelled") {
+        return { jobId: params.jobId, status: "cancelled" };
+      }
       if (claim.disposition === "completed") {
         return { jobId: params.jobId, status: "awaiting_review" };
       }

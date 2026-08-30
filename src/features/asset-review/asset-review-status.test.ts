@@ -32,6 +32,7 @@ describe("Asset Review status copy", () => {
   it.each([
     "approve",
     "generation",
+    "generation-cancel",
     "model-remove",
     "model-upload",
     "reject",
@@ -123,7 +124,7 @@ describe("Asset Review status copy", () => {
       tone: "info",
     });
     expect(assetReviewStatusCopy.confirmationCanceled.english).toContain(
-      "No file-removal or rejection request was submitted",
+      "No file-removal, rejection or queued-job cancellation request was submitted",
     );
 
     const released = assetReviewFileRemovedNotice("source", true);
@@ -134,6 +135,27 @@ describe("Asset Review status copy", () => {
     const removedModel = assetReviewFileRemovedNotice("model", false);
     expect(removedModel.zhHant).toContain("私人 GLB 已移除");
     expect(removedModel.english).not.toContain("credit");
+  });
+
+  it("describes queued-only generation cancellation and exact credit outcome", () => {
+    expect(assetReviewStatusCopy.confirmGenerationCancel).toMatchObject({
+      tone: "warning",
+    });
+    expect(assetReviewStatusCopy.confirmGenerationCancel.zhHant).toContain(
+      "仍在排隊",
+    );
+    expect(assetReviewStatusCopy.confirmGenerationCancel.english).toContain(
+      "If Workflow already started",
+    );
+    expect(assetReviewStatusCopy.generationCancelled).toMatchObject({
+      tone: "success",
+    });
+    expect(assetReviewStatusCopy.generationCancelled.english).toContain(
+      "reserved credit was released",
+    );
+    expect(assetReviewStatusCopy.generationCancelFailed.english).toContain(
+      "Do not assume the credit was released",
+    );
   });
 
   it("retains bounded bilingual API and file-validation messages", () => {

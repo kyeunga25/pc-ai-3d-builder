@@ -19,6 +19,7 @@ export const workspaceActivityActions = [
   "build.update",
   "build.archive",
   "generation.request",
+  "generation.cancel",
   "generation.start.failed",
   "generation.workflow.failed",
   "generation.draft.ready",

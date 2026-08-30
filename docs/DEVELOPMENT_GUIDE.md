@@ -75,7 +75,7 @@ The browser-only fixture flow is the fastest manual check and never calls a Work
 npm run local:ai:start
 ```
 
-Open the asset-review route, create the labelled synthetic PNG, save its synthetic rights declaration, start the synthetic generation, then approve or reject the draft. The page shows the available, reserved, settled and released capability counts and can hand an approved synthetic GLB to the Builder through local navigation state only.
+Open the asset-review route, create the labelled synthetic PNG, save its synthetic rights declaration, start the synthetic generation, then approve or reject the draft. The page shows the available, reserved, settled and released capability counts and can hand an approved synthetic GLB to the Builder through local navigation state only. A queued-job fixture may also exercise the two-step cancellation UI: only the exact still-queued job can release its reservation, while started work must return a conflict rather than appear stopped.
 
 The Worker-backed local flow uses local D1, R2 and Workflow state and the same built-in synthetic adapter:
 

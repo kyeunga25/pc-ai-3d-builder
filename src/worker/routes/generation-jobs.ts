@@ -7,7 +7,10 @@ import {
   type GenerationJob,
 } from "../../shared/domain/generation-jobs";
 import type { WorkspaceRole } from "../../shared/domain/session";
-import { assetTargetHeader } from "../../shared/lib/asset-target";
+import {
+  assetTargetHeader,
+  generationJobTargetHeader,
+} from "../../shared/lib/asset-target";
 import type { RequestContext } from "../auth/workspace";
 import {
   entitlementTransitionStatements,
@@ -18,7 +21,7 @@ import {
 import { generationRuntimeConfig } from "../generation/provider";
 import { ApiError } from "../lib/api-error";
 import { privateObjectMatches } from "../lib/private-assets";
-import { readBoundedJson } from "../lib/request-body";
+import { assertBodylessRequest, readBoundedJson } from "../lib/request-body";
 import { assetRecordIdPattern, findAsset } from "./assets";
 
 type GenerationJobRow = {
@@ -64,7 +67,7 @@ function generationRoleError(): ApiError {
   return new ApiError(
     403,
     "ROLE_FORBIDDEN",
-    "只有工作空間 owner 或 admin 可建立生成工作。 / Only workspace owners or admins can create generation jobs.",
+    "只有工作空間 owner 或 admin 可管理生成工作。 / Only workspace owners or admins can manage generation jobs.",
   );
 }
 
@@ -103,6 +106,22 @@ function idempotencyKeyReused(): ApiError {
     409,
     "IDEMPOTENCY_KEY_REUSED",
     "此 Idempotency-Key 已用於另一組生成輸入。 / This Idempotency-Key was already used for different generation input.",
+  );
+}
+
+function generationJobNotFound(): ApiError {
+  return new ApiError(
+    404,
+    "GENERATION_JOB_NOT_FOUND",
+    "找不到所要求的生成工作。 / The requested generation job was not found.",
+  );
+}
+
+function generationCancelTooLate(): ApiError {
+  return new ApiError(
+    409,
+    "GENERATION_CANCEL_TOO_LATE",
+    "生成工作已開始或完成，不能以排隊取消操作停止。 / The generation job already started or completed and cannot be stopped by queued cancellation.",
   );
 }
 
@@ -167,6 +186,108 @@ async function findActiveGenerationJob(
     )
     .bind(workspaceId, assetId)
     .first<GenerationJobRow>();
+}
+
+function cancelledGenerationResponse(row: GenerationJobRow): Response {
+  if (row.status !== "cancelled" || row.entitlement_status !== "released") {
+    throw new Error("Cancelled generation accounting is incomplete.");
+  }
+  return Response.json(mapGenerationJob(row), {
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+export async function generationJobCancelResponse(
+  request: Request,
+  db: D1Database,
+  context: RequestContext,
+  requestId: string,
+): Promise<Response> {
+  assertGenerationRole(context.currentWorkspace.role);
+  const assetId = request.headers.get(assetTargetHeader);
+  const jobId = request.headers.get(generationJobTargetHeader);
+  if (
+    !assetId ||
+    !assetRecordIdPattern.test(assetId) ||
+    !jobId ||
+    !assetRecordIdPattern.test(jobId)
+  ) {
+    throw generationJobNotFound();
+  }
+  assertBodylessRequest(request);
+
+  const workspaceId = context.currentWorkspace.id;
+  const current = await findGenerationJob(db, workspaceId, "id", jobId);
+  if (!current || current.asset_id !== assetId) {
+    throw generationJobNotFound();
+  }
+  if (current.status === "cancelled") {
+    return cancelledGenerationResponse(current);
+  }
+  if (current.status !== "queued") {
+    throw generationCancelTooLate();
+  }
+
+  const [transition] = await db.batch([
+    db
+      .prepare(
+        `UPDATE generation_jobs
+         SET status = 'cancelled', failure_code = NULL,
+             updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+         WHERE workspace_id = ?1 AND id = ?2 AND asset_id = ?3
+           AND status = 'queued'`,
+      )
+      .bind(workspaceId, jobId, assetId),
+    db
+      .prepare(
+        `INSERT INTO generation_job_events (
+           id, workspace_id, job_id, status, event_type
+         )
+         SELECT ?1, workspace_id, id, 'cancelled', 'user_cancelled'
+         FROM generation_jobs
+         WHERE workspace_id = ?2 AND id = ?3 AND asset_id = ?4
+           AND status = 'cancelled' AND changes() = 1`,
+      )
+      .bind(crypto.randomUUID(), workspaceId, jobId, assetId),
+    db
+      .prepare(
+        `INSERT INTO audit_events (
+           id, workspace_id, user_id, action, target_type, target_id,
+           request_id, metadata_json
+         )
+         SELECT ?1, workspace_id, ?2, ?3, 'generation_job', id, ?4, '{}'
+         FROM generation_jobs
+         WHERE workspace_id = ?5 AND id = ?6 AND asset_id = ?7
+           AND status = 'cancelled' AND changes() = 1`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        context.user.id,
+        "generation.cancel",
+        requestId,
+        workspaceId,
+        jobId,
+        assetId,
+      ),
+    ...entitlementTransitionStatements(db, {
+      workspaceId,
+      jobId,
+      transition: "released",
+      reasonCode: "user_cancelled",
+    }),
+  ]);
+
+  const updated = await findGenerationJob(db, workspaceId, "id", jobId);
+  if (transition?.meta.changes === 1) {
+    if (!updated || updated.asset_id !== assetId) {
+      throw new Error("Cancelled generation job could not be read.");
+    }
+    return cancelledGenerationResponse(updated);
+  }
+  if (updated?.asset_id === assetId && updated.status === "cancelled") {
+    return cancelledGenerationResponse(updated);
+  }
+  throw generationCancelTooLate();
 }
 
 async function markStartFailure(

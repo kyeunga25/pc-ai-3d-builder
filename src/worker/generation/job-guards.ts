@@ -13,6 +13,7 @@ export type GenerationGuardState = {
 };
 
 export type GenerationClaimDisposition =
+  | { kind: "cancelled" }
   | { kind: "completed" }
   | { kind: "runnable" }
   | { code: string; kind: "rejected" };
@@ -35,6 +36,9 @@ export function generationClaimDisposition(
   state: GenerationGuardState,
   requestedReviewVersion: number,
 ): GenerationClaimDisposition {
+  if (state.jobStatus === "cancelled") {
+    return { kind: "cancelled" };
+  }
   if (state.jobStatus === "awaiting_review") {
     return state.outputObjectKey
       ? { kind: "completed" }

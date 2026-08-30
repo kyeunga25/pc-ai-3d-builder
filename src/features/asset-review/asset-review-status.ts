@@ -16,6 +16,7 @@ export type AssetReviewNotice = BilingualCopy & {
 type AssetReviewFailureOperation =
   | "approve"
   | "generation"
+  | "generation-cancel"
   | "model-remove"
   | "model-upload"
   | "reject"
@@ -49,6 +50,10 @@ const failureCopy = {
   generation: bilingualCopy(
     "無法確認模擬生成工作是否已建立；請重新載入工作狀態後再安全重試。系統未啟用供應商收費。",
     "Unable to confirm whether the simulated generation job was created; reload the job status before retrying safely. Provider billing is not enabled.",
+  ),
+  "generation-cancel": bilingualCopy(
+    "無法確認排隊工作是否已取消；請重新載入工作狀態後再安全重試。不要假設 credit 已釋放。",
+    "Unable to confirm whether the queued job was cancelled; reload the job status before retrying safely. Do not assume the credit was released.",
   ),
   "model-upload": bilingualCopy(
     "無法確認 GLB 是否已上載；請重新載入素材狀態後再安全重試。",
@@ -142,9 +147,14 @@ export const assetReviewStatusCopy = {
     "Press Confirm GLB removal again to delete the private model, reset approval evidence, and possibly release reserved credit. All source images are unchanged.",
     "warning",
   ),
+  confirmGenerationCancel: assetReviewNotice(
+    "再次按下「確認取消工作」才會取消仍在排隊的工作並釋放保留 credit。若 Workflow 已開始，取消會失敗且不會停止處理。",
+    "Press Confirm job cancellation again to cancel a still-queued job and release its reserved credit. If Workflow already started, cancellation fails and does not stop processing.",
+    "warning",
+  ),
   confirmationCanceled: assetReviewNotice(
-    "確認已取消；未送出移除檔案或拒絕操作",
-    "Confirmation canceled. No file-removal or rejection request was submitted.",
+    "確認已取消；未送出移除檔案、拒絕或取消排隊工作的操作",
+    "Confirmation canceled. No file-removal, rejection or queued-job cancellation request was submitted.",
     "info",
   ),
   uploadingSource: assetReviewNotice(
@@ -182,6 +192,16 @@ export const assetReviewStatusCopy = {
     "Creating a zero-cost simulated generation job…",
     "info",
   ),
+  cancelingGeneration: assetReviewNotice(
+    "正在取消排隊中的生成工作…",
+    "Cancelling the queued generation job…",
+    "info",
+  ),
+  generationCancelled: assetReviewNotice(
+    "排隊工作已取消；保留 credit 已釋放，未開始新的供應商嘗試",
+    "The queued job was cancelled. Its reserved credit was released and no new provider attempt started.",
+    "success",
+  ),
   localGenerationCreated: assetReviewNotice(
     "本地模擬 GLB 已建立；核准證據已重設",
     "A local simulated GLB was created. Approval evidence was reset.",
@@ -205,6 +225,11 @@ export const assetReviewStatusCopy = {
   generationFailed: assetReviewNotice(
     failureCopy.generation.zhHant,
     failureCopy.generation.english,
+    "error",
+  ),
+  generationCancelFailed: assetReviewNotice(
+    failureCopy["generation-cancel"].zhHant,
+    failureCopy["generation-cancel"].english,
     "error",
   ),
   modelUploadFailed: assetReviewNotice(

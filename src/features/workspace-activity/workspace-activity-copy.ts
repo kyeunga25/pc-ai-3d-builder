@@ -89,6 +89,7 @@ export const workspaceActivityActionCopy = {
   "build.update": copy("更新組裝草稿", "Build draft updated"),
   "build.archive": copy("封存組裝草稿", "Build draft archived"),
   "generation.request": copy("要求建立 3D 草稿", "3D draft requested"),
+  "generation.cancel": copy("取消排隊生成工作", "Queued generation cancelled"),
   "generation.start.failed": copy(
     "生成流程未能啟動",
     "Generation failed to start",

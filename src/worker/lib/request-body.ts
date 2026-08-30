@@ -14,6 +14,17 @@ function requestMediaType(request: Request): string {
   );
 }
 
+export function assertBodylessRequest(request: Request): void {
+  if (request.body === null) {
+    return;
+  }
+  throw bodyError(
+    400,
+    "UNEXPECTED_REQUEST_BODY",
+    "此操作不接受要求內容。 / This operation does not accept a request body.",
+  );
+}
+
 async function readBoundedBody(
   request: Request,
   maxBytes: number,

@@ -62,6 +62,7 @@ import { createSyntheticSourcePng } from "../../shared/domain/synthetic-image";
 import {
   acquireGenerationRequestLease,
   AssetReviewApiError,
+  cancelGenerationJob,
   fetchAssetFileBlob,
   fetchAssetReview,
   fetchAssetReviewQueue,
@@ -87,12 +88,14 @@ import {
   nextAssetReviewFileRemoveIntent,
 } from "./asset-review-file-copy";
 import {
+  assetReviewGenerationCancelActionCopy,
   assetReviewGenerationCreditHistoryCopy,
   assetReviewGenerationCreditSummaryCopy,
   assetReviewGenerationEntitlementCopy,
   assetReviewGenerationModeCopy,
   assetReviewGenerationStatusCopy,
   generationInspectorCopy,
+  nextAssetReviewGenerationCancelIntent,
 } from "./asset-review-generation-copy";
 import {
   assetReviewHeaderCopy,
@@ -156,6 +159,7 @@ type AssetFileUrls = {
 };
 
 type LocalAssetNavigationState = {
+  generationState?: GenerationJobListResponse;
   localAsset?: AssetReviewItem;
   sourceUrl?: string;
 };
@@ -308,6 +312,9 @@ export function AssetReviewPage() {
   const submitting = submittingAction !== null;
   const [rejectArmedKey, setRejectArmedKey] = useState<string | null>(null);
   const [removeArmedKey, setRemoveArmedKey] = useState<string | null>(null);
+  const [generationCancelArmedKey, setGenerationCancelArmedKey] = useState<
+    string | null
+  >(null);
   const [reviewNotice, setReviewNotice] = useState<AssetReviewNotice>(() =>
     isLocalPreview
       ? localNavigationState?.localAsset?.sourceKind === "uploaded"
@@ -316,20 +323,27 @@ export function AssetReviewPage() {
       : assetReviewStatusCopy.workspaceLoaded,
   );
   const [generationState, setGenerationState] =
-    useState<GenerationJobListResponse>(() => ({
-      capability: {
-        mode: isLocalPreview ? "simulation" : "disabled",
-        maxCostMinor: 0,
-        credits: {
-          availableUnits: isLocalPreview ? 2 : 0,
-          reservedUnits: 0,
-          settledUnits: 0,
-          releasedUnits: 0,
-        },
-      },
-      items: [],
-    }));
-  const [generationSubmitting, setGenerationSubmitting] = useState(false);
+    useState<GenerationJobListResponse>(() =>
+      isLocalPreview && localNavigationState?.generationState
+        ? localNavigationState.generationState
+        : {
+            capability: {
+              mode: isLocalPreview ? "simulation" : "disabled",
+              maxCostMinor: 0,
+              credits: {
+                availableUnits: isLocalPreview ? 2 : 0,
+                reservedUnits: 0,
+                settledUnits: 0,
+                releasedUnits: 0,
+              },
+            },
+            items: [],
+          },
+    );
+  const [generationOperation, setGenerationOperation] = useState<
+    "cancel" | "start" | null
+  >(null);
+  const generationSubmitting = generationOperation !== null;
   const fileOperationPending = uploadingKind !== null || removingKind !== null;
   const appliedGenerationJobRef = useRef<string | null>(null);
   const generationRequestLeaseRef = useRef<GenerationRequestLease | null>(null);
@@ -369,6 +383,7 @@ export function AssetReviewPage() {
         setSelectedSourceView("front");
         setRejectArmedKey(null);
         setRemoveArmedKey(null);
+        setGenerationCancelArmedKey(null);
         setForm(items[0] ? createReviewForm(items[0]) : null);
         setLoadedWorkspaceId(currentWorkspace.id);
         setLoadState("ready");
@@ -525,6 +540,9 @@ export function AssetReviewPage() {
         }
         setGenerationState(next);
         const latest = next.items[0];
+        if (latest?.status !== "queued") {
+          setGenerationCancelArmedKey(null);
+        }
         if (
           latest?.status === "awaiting_review" &&
           latest.outputReady &&
@@ -539,6 +557,7 @@ export function AssetReviewPage() {
             appliedGenerationJobRef.current = latest.id;
             setRejectArmedKey(null);
             setRemoveArmedKey(null);
+            setGenerationCancelArmedKey(null);
             setForm(createReviewForm(updated));
             setReviewNotice(assetReviewStatusCopy.generatedDraftValidated);
           }
@@ -546,6 +565,9 @@ export function AssetReviewPage() {
           const failureCode =
             latest.failureCode ?? "GENERATION_WORKFLOW_FAILED";
           setReviewNotice(assetReviewGenerationFailureNotice(failureCode));
+        } else if (latest?.status === "cancelled") {
+          setGenerationCancelArmedKey(null);
+          setReviewNotice(assetReviewStatusCopy.generationCancelled);
         }
       } catch {
         if (!controller.signal.aborted) {
@@ -567,6 +589,7 @@ export function AssetReviewPage() {
     setForm(null);
     setRejectArmedKey(null);
     setRemoveArmedKey(null);
+    setGenerationCancelArmedKey(null);
     setLoadedWorkspaceId(null);
     setReloadToken((token) => token + 1);
   };
@@ -644,6 +667,18 @@ export function AssetReviewPage() {
     parsedDimensions.height !== null &&
     parsedDimensions.depth !== null;
   const latestGenerationJob = generationState.items[0] ?? null;
+  const queuedGenerationJob = generationState.items.find(
+    (job) =>
+      job.assetId === asset.id &&
+      job.status === "queued" &&
+      job.entitlementStatus === "reserved",
+  );
+  const currentGenerationCancelKey = queuedGenerationJob
+    ? `${currentWorkspace.id}:${assetKey(asset)}:${queuedGenerationJob.id}`
+    : null;
+  const generationCancelArmed =
+    currentGenerationCancelKey !== null &&
+    generationCancelArmedKey === currentGenerationCancelKey;
   const generationModeLabel = assetReviewGenerationModeCopy(
     generationState.capability.mode,
   );
@@ -685,11 +720,22 @@ export function AssetReviewPage() {
     !fileOperationPending &&
     !submitting &&
     !generationSubmitting;
-  const generationActionLabel = generationSubmitting
-    ? reviewActionCopy.creating
-    : generationActive
-      ? reviewActionCopy.running
-      : reviewActionCopy.create;
+  const canCancelQueuedGeneration =
+    canDecide &&
+    queuedGenerationJob !== undefined &&
+    !fileOperationPending &&
+    !submitting &&
+    !generationSubmitting;
+  const generationActionLabel =
+    generationOperation === "start"
+      ? reviewActionCopy.creating
+      : generationActive
+        ? reviewActionCopy.running
+        : reviewActionCopy.create;
+  const generationCancelActionLabel = assetReviewGenerationCancelActionCopy(
+    generationCancelArmed,
+    generationOperation === "cancel",
+  );
   const approveActionLabel =
     submittingAction === "approve"
       ? reviewActionCopy.approving
@@ -758,6 +804,15 @@ export function AssetReviewPage() {
                     "建立零成本合成 GLB 草稿，不呼叫外部供應商",
                     "Create a zero-cost synthetic GLB draft without an external provider",
                   );
+  const generationCancelActionTitle = generationCancelArmed
+    ? bilingualTitle(
+        "再次按下才會取消仍在排隊的工作並釋放 credit",
+        "Press again to cancel the still-queued job and release its credit",
+      )
+    : bilingualTitle(
+        "只可取消尚未由 Workflow 開始的工作",
+        "Only a job not yet started by Workflow can be cancelled",
+      );
   const approveActionTitle = asset.files.model
     ? bilingualTitle(
         "所有清單及尺寸完成後可核准",
@@ -780,10 +835,14 @@ export function AssetReviewPage() {
   const clearConfirmationIntents = () => {
     setRejectArmedKey(null);
     setRemoveArmedKey(null);
+    setGenerationCancelArmedKey(null);
   };
 
   const cancelConfirmationIntents = () => {
-    const hadConfirmation = rejectArmedKey !== null || removeArmedKey !== null;
+    const hadConfirmation =
+      rejectArmedKey !== null ||
+      removeArmedKey !== null ||
+      generationCancelArmedKey !== null;
     clearConfirmationIntents();
     if (hadConfirmation) {
       setReviewNotice(assetReviewStatusCopy.confirmationCanceled);
@@ -1123,6 +1182,7 @@ export function AssetReviewPage() {
         : `${currentWorkspace.id}:${assetKey(currentForm.asset)}:model`;
     const intent = nextAssetReviewFileRemoveIntent(removeArmedKey, removalKey);
     setRejectArmedKey(null);
+    setGenerationCancelArmedKey(null);
     setRemoveArmedKey(intent.nextArmedKey);
     if (!intent.shouldSubmit) {
       setReviewNotice(
@@ -1222,13 +1282,90 @@ export function AssetReviewPage() {
     }
   };
 
+  const requestGenerationCancellation = async () => {
+    const currentForm = form;
+    const job = queuedGenerationJob;
+    const cancellationKey = currentGenerationCancelKey;
+    if (
+      !currentForm ||
+      !job ||
+      !cancellationKey ||
+      !canCancelQueuedGeneration
+    ) {
+      return;
+    }
+
+    const intent = nextAssetReviewGenerationCancelIntent(
+      generationCancelArmedKey,
+      cancellationKey,
+    );
+    setRejectArmedKey(null);
+    setRemoveArmedKey(null);
+    setGenerationCancelArmedKey(intent.nextArmedKey);
+    if (!intent.shouldSubmit) {
+      setReviewNotice(assetReviewStatusCopy.confirmGenerationCancel);
+      return;
+    }
+
+    setGenerationOperation("cancel");
+    setReviewNotice(assetReviewStatusCopy.cancelingGeneration);
+    try {
+      const cancelled = isLocalPreview
+        ? {
+            ...job,
+            status: "cancelled" as const,
+            entitlementStatus: "released" as const,
+            updatedAt: new Date().toISOString(),
+          }
+        : await cancelGenerationJob(
+            currentWorkspace.id,
+            currentForm.asset.id,
+            job.id,
+          );
+      setGenerationState((current) => {
+        const previous = current.items.find((item) => item.id === cancelled.id);
+        const releasedReservation =
+          previous?.entitlementStatus === "reserved" &&
+          cancelled.entitlementStatus === "released";
+        const credits = current.capability.credits;
+        return {
+          capability: {
+            ...current.capability,
+            credits: releasedReservation
+              ? {
+                  ...credits,
+                  availableUnits: credits.availableUnits + 1,
+                  reservedUnits: Math.max(0, credits.reservedUnits - 1),
+                  releasedUnits: credits.releasedUnits + 1,
+                }
+              : credits,
+          },
+          items: current.items.map((item) =>
+            item.id === cancelled.id ? cancelled : item,
+          ),
+        };
+      });
+      setReviewNotice(assetReviewStatusCopy.generationCancelled);
+    } catch (error) {
+      if (
+        error instanceof AssetReviewApiError &&
+        error.code === "GENERATION_CANCEL_TOO_LATE"
+      ) {
+        setReloadToken((token) => token + 1);
+      }
+      setReviewNotice(assetReviewErrorNotice(error, "generation-cancel"));
+    } finally {
+      setGenerationOperation(null);
+    }
+  };
+
   const requestGeneration = async () => {
     const currentForm = form;
     if (!currentForm || !canRequestGeneration) {
       return;
     }
     clearConfirmationIntents();
-    setGenerationSubmitting(true);
+    setGenerationOperation("start");
     setReviewNotice(assetReviewStatusCopy.creatingGeneration);
     try {
       if (isLocalPreview) {
@@ -1339,7 +1476,7 @@ export function AssetReviewPage() {
       }
       setReviewNotice(assetReviewErrorNotice(error, "generation"));
     } finally {
-      setGenerationSubmitting(false);
+      setGenerationOperation(null);
     }
   };
 
@@ -1453,6 +1590,7 @@ export function AssetReviewPage() {
       currentRejectKey,
     );
     setRemoveArmedKey(null);
+    setGenerationCancelArmedKey(null);
     setRejectArmedKey(intent.nextArmedKey);
     if (!intent.shouldSubmit) {
       setReviewNotice(assetReviewStatusCopy.confirmReject);
@@ -2138,6 +2276,19 @@ export function AssetReviewPage() {
             <X aria-hidden="true" />
             <BilingualActionLabel copy={rejectActionLabel} />
           </button>
+          {queuedGenerationJob ? (
+            <button
+              className={`button button--danger${generationCancelArmed ? " is-armed" : ""}`}
+              type="button"
+              disabled={!canCancelQueuedGeneration}
+              aria-pressed={generationCancelArmed}
+              title={generationCancelActionTitle}
+              onClick={() => void requestGenerationCancellation()}
+            >
+              <X aria-hidden="true" />
+              <BilingualActionLabel copy={generationCancelActionLabel} />
+            </button>
+          ) : null}
           <button
             className="button"
             type="button"

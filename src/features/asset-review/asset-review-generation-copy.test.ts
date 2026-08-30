@@ -7,6 +7,7 @@ import {
   type GenerationJob,
 } from "../../shared/domain/generation-jobs";
 import {
+  assetReviewGenerationCancelActionCopy,
   assetReviewGenerationCreditHistoryCopy,
   assetReviewGenerationCreditSummaryCopy,
   assetReviewGenerationEntitlementCopy,
@@ -16,6 +17,7 @@ import {
   generationInspectorCopy,
   generationJobStatusCopy,
   generationModeCopy,
+  nextAssetReviewGenerationCancelIntent,
 } from "./asset-review-generation-copy";
 
 const job: GenerationJob = {
@@ -111,5 +113,40 @@ describe("Asset Review generation copy", () => {
 
   it("keeps every inspector label and explanation bilingual", () => {
     Object.values(generationInspectorCopy).forEach(expectBilingual);
+  });
+
+  it("requires a second cancellation activation for the same exact job", () => {
+    const key = "workspace-fixture:asset-fixture:generation-fixture";
+    const armed = nextAssetReviewGenerationCancelIntent(null, key);
+    const changed = nextAssetReviewGenerationCancelIntent(
+      armed.nextArmedKey,
+      `${key}-other`,
+    );
+    const confirmed = nextAssetReviewGenerationCancelIntent(
+      armed.nextArmedKey,
+      key,
+    );
+
+    expect(armed).toEqual({ nextArmedKey: key, shouldSubmit: false });
+    expect(changed).toEqual({
+      nextArmedKey: `${key}-other`,
+      shouldSubmit: false,
+    });
+    expect(confirmed).toEqual({ nextArmedKey: null, shouldSubmit: true });
+  });
+
+  it("uses explicit bilingual cancel, confirm and progress labels", () => {
+    expect(assetReviewGenerationCancelActionCopy(false, false)).toEqual({
+      zhHant: "取消排隊工作",
+      english: "Cancel queued job",
+    });
+    expect(assetReviewGenerationCancelActionCopy(true, false)).toEqual({
+      zhHant: "確認取消工作",
+      english: "Confirm job cancellation",
+    });
+    expect(assetReviewGenerationCancelActionCopy(false, true)).toEqual({
+      zhHant: "取消中…",
+      english: "Cancelling…",
+    });
   });
 });

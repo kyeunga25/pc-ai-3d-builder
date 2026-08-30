@@ -1,6 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { readBoundedCsv, readBoundedJson } from "./request-body";
+import {
+  assertBodylessRequest,
+  readBoundedCsv,
+  readBoundedJson,
+} from "./request-body";
+
+describe("bodyless requests", () => {
+  it("accepts an absent body without consuming the request", () => {
+    const request = new Request("https://app.example/api/cancel", {
+      method: "DELETE",
+    });
+
+    expect(() => assertBodylessRequest(request)).not.toThrow();
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("rejects any supplied body without consuming or reflecting it", () => {
+    const request = new Request("https://app.example/api/cancel", {
+      method: "DELETE",
+      body: "private-input",
+    });
+
+    expect(() => assertBodylessRequest(request)).toThrowError(
+      expect.objectContaining({
+        status: 400,
+        code: "UNEXPECTED_REQUEST_BODY",
+        message: expect.stringMatching(
+          /不接受要求內容.+does not accept a request body/iu,
+        ),
+      }),
+    );
+    expect(request.bodyUsed).toBe(false);
+  });
+});
 
 describe("bounded JSON request bodies", () => {
   it("parses a JSON body within the configured limit", async () => {

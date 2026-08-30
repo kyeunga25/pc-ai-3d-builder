@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { reviewAsset } from "../../shared/domain/mockData";
+import type { GenerationJobListResponse } from "../../shared/domain/generation-jobs";
 import { SessionContext } from "../auth/session-context";
 import { AssetReviewPage } from "./AssetReviewPage";
 import { AssetReviewNavigationProvider } from "./AssetReviewNavigationProvider";
@@ -45,6 +46,7 @@ function renderPage(
   localAsset = reviewAsset,
   initialEntry = "/asset-review",
   sourceUrl?: string,
+  generationState?: GenerationJobListResponse,
 ): string {
   return renderToStaticMarkup(
     createElement(
@@ -56,7 +58,7 @@ function renderPage(
           initialEntries: [
             {
               pathname: initialEntry,
-              state: { localAsset, sourceUrl },
+              state: { generationState, localAsset, sourceUrl },
             },
           ],
         },
@@ -118,6 +120,45 @@ describe("AssetReviewPage", () => {
     expect(markup).toContain("Zero-cost simulation");
     expect(markup).toContain("尚未有工作");
     expect(markup).toContain("No job yet");
+  });
+
+  it("shows queued-only two-step cancellation without exposing its job ID", () => {
+    const jobId = "generation-private-cancel-fixture";
+    const markup = renderPage(reviewAsset, "/asset-review", undefined, {
+      capability: {
+        mode: "simulation",
+        maxCostMinor: 0,
+        credits: {
+          availableUnits: 1,
+          reservedUnits: 1,
+          settledUnits: 0,
+          releasedUnits: 0,
+        },
+      },
+      items: [
+        {
+          id: jobId,
+          assetId: reviewAsset.id,
+          status: "queued",
+          kind: "simulation",
+          outputReady: false,
+          failureCode: null,
+          entitlementStatus: "reserved",
+          providerCostUnits: null,
+          validationCode: null,
+          createdAt: "2026-08-30T00:00:00Z",
+          updatedAt: "2026-08-30T00:00:00Z",
+        },
+      ],
+    });
+
+    expect(markup).toContain("取消排隊工作");
+    expect(markup).toContain("Cancel queued job");
+    expect(markup).toContain(
+      "Only a job not yet started by Workflow can be cancelled",
+    );
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).not.toContain(jobId);
   });
 
   it("explains private file controls and evidence reset bilingually", () => {

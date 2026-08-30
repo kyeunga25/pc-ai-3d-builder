@@ -74,7 +74,11 @@ const routePolicies = new Map<string, ApiRoutePolicy>([
   ],
   [
     "/api/assets/item/generation-jobs",
-    { access: "protected", methods: ["GET", "POST"], allow: "GET, POST" },
+    {
+      access: "protected",
+      methods: ["GET", "POST", "DELETE"],
+      allow: "GET, POST, DELETE",
+    },
   ],
 ]);
 
