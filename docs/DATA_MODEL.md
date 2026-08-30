@@ -22,7 +22,7 @@ Private owner onboarding activates one existing non-archived owner workspace or 
 
 ## `audit_events`
 
-Reserved for meaningful state transitions. Read-only session resolution does not create audit rows. Metadata must be small, structured and free of JWTs, email addresses, provider keys, prompts and private object URLs.
+Reserved for meaningful state transitions. Read-only session resolution, Dashboard and activity-log requests do not create audit rows. Metadata must be small, structured and free of JWTs, email addresses, provider keys, prompts and private object URLs. The owner/admin activity API reads only the workspace-scoped event ID for internal seek pagination, normalized action, creation time and joined actor display name. Activity items omit event, target and request IDs plus all metadata; unknown actions and unsafe legacy display names become bounded generic values. A page contains at most 50 items and its private cursor is replayed only through a fixed protected header.
 
 ## `catalog_parts`
 

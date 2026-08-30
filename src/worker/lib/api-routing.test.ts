@@ -12,6 +12,7 @@ const routePolicies = [
   ["/api/session/workspace", "protected", ["PUT"], "PUT"],
   ["/api/workspaces", "protected", ["GET"], "GET"],
   ["/api/dashboard", "protected", ["GET"], "GET"],
+  ["/api/workspace/activity", "protected", ["GET"], "GET"],
   ["/api/workspace/members", "protected", ["GET", "POST"], "GET, POST"],
   ["/api/workspace/member", "protected", ["PATCH"], "PATCH"],
   ["/api/catalogue", "protected", ["GET", "POST"], "GET, POST"],

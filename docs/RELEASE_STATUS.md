@@ -45,6 +45,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 ## Local development milestone
 
 - [x] Protected owner/admin workspace-member directory with bounded listing, D1 invitations, role changes, two-step suspension, optimistic versions and a database last-owner guard.
+- [x] Protected owner/admin workspace activity log with 50-row pages, header-only pagination, bilingual filters and no raw audit metadata or visible private identifiers.
 - [x] Workspace-scoped, non-monetary generation capability accounts with reserve, settle and release transitions.
 - [x] One customer capability unit and a one-unit provider-cost ceiling per local synthetic job, without price, currency, purchase or payment semantics.
 - [x] Immutable provider-attempt records and stable provider idempotency references for duplicate, late, conflicting and out-of-order results.

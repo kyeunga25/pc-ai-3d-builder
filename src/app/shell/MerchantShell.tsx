@@ -4,6 +4,7 @@ import {
   Cuboid,
   Gauge,
   LogOut,
+  ScrollText,
   TriangleAlert,
   UsersRound,
   Wrench,
@@ -25,6 +26,12 @@ import "./merchant-shell.css";
 
 const navigation = [
   { to: "/dashboard", label: "儀表板", icon: Gauge, managerOnly: false },
+  {
+    to: "/dashboard/activity",
+    label: "活動記錄",
+    icon: ScrollText,
+    managerOnly: true,
+  },
   {
     to: "/dashboard/members",
     label: "成員管理",
@@ -136,7 +143,9 @@ export function MerchantShell() {
                 aria-label={
                   to === "/dashboard/members"
                     ? "成員管理 / Member management"
-                    : undefined
+                    : to === "/dashboard/activity"
+                      ? "活動記錄 / Activity log"
+                      : undefined
                 }
                 className={({ isActive }) =>
                   `merchant-nav__link${isActive ? " is-active" : ""}`
