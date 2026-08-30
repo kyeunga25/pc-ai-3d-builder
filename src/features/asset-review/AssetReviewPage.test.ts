@@ -161,6 +161,97 @@ describe("AssetReviewPage", () => {
     expect(markup).not.toContain(jobId);
   });
 
+  it("renders current-asset generation history without IDs or foreign state", () => {
+    const currentCancelledId = "generation-current-cancelled-private";
+    const currentFailedId = "generation-current-failed-private";
+    const foreignQueuedId = "generation-foreign-queued-private";
+    const markup = renderPage(reviewAsset, "/asset-review", undefined, {
+      capability: {
+        mode: "simulation",
+        maxCostMinor: 0,
+        credits: {
+          availableUnits: 2,
+          reservedUnits: 0,
+          settledUnits: 0,
+          releasedUnits: 1,
+        },
+      },
+      items: [
+        {
+          id: foreignQueuedId,
+          assetId: "asset-foreign-private",
+          status: "queued",
+          kind: "simulation",
+          outputReady: false,
+          failureCode: null,
+          entitlementStatus: "reserved",
+          providerCostUnits: null,
+          validationCode: null,
+          createdAt: "2026-08-30T02:00:00Z",
+          updatedAt: "2026-08-30T02:00:00Z",
+        },
+        {
+          id: currentCancelledId,
+          assetId: reviewAsset.id,
+          status: "cancelled",
+          kind: "simulation",
+          outputReady: false,
+          failureCode: null,
+          entitlementStatus: "released",
+          providerCostUnits: null,
+          validationCode: null,
+          createdAt: "2026-08-30T01:00:00Z",
+          updatedAt: "2026-08-30T01:01:00Z",
+        },
+        {
+          id: currentFailedId,
+          assetId: reviewAsset.id,
+          status: "failed",
+          kind: "simulation",
+          outputReady: false,
+          failureCode: "GENERATION_INPUT_STALE",
+          entitlementStatus: "released",
+          providerCostUnits: null,
+          validationCode: null,
+          createdAt: "2026-08-30T00:00:00Z",
+          updatedAt: "2026-08-30T00:01:00Z",
+        },
+      ],
+    });
+
+    expect(markup).toContain("最近生成工作");
+    expect(markup).toContain("Recent generation jobs");
+    expect(markup).toContain("顯示 2 項");
+    expect(markup).toContain("Showing 2 jobs");
+    expect(markup).toContain("工作已取消");
+    expect(markup).toContain("Job cancelled");
+    expect(markup).toContain("工作失敗");
+    expect(markup).toContain("Job failed");
+    expect(markup).not.toContain("已排入佇列");
+    expect(markup).not.toContain("Queued");
+    expect(markup).not.toContain(currentCancelledId);
+    expect(markup).not.toContain(currentFailedId);
+    expect(markup).not.toContain(foreignQueuedId);
+    expect(markup).not.toContain("GENERATION_INPUT_STALE");
+  });
+
+  it("keeps generation history inside a bounded responsive scroll area", async () => {
+    const styles = await readFile(
+      new URL("./asset-review.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(styles).toMatch(
+      /\.generation-job-history ol\s*\{[^}]*max-height:\s*280px;[^}]*overflow-y:\s*auto;/u,
+    );
+    expect(styles).toMatch(
+      /\.generation-job-history li\s*\{[^}]*min-width:\s*0;/u,
+    );
+    expect(styles).toMatch(
+      /\.generation-job-history__time time\s*\{[^}]*min-width:\s*0;/u,
+    );
+  });
+
   it("explains private file controls and evidence reset bilingually", () => {
     const markup = renderPage();
 

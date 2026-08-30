@@ -48,6 +48,7 @@ The first section records the tagged v1.1.0 public baseline. The second records 
 - [x] Protected owner/admin workspace activity log with 50-row pages, header-only pagination, bilingual filters and no raw audit metadata or visible private identifiers.
 - [x] Two-step, optimistic removal of one selected private source view or GLB with atomic evidence reset, minimal audit, reserved-credit compensation and exact-key R2 cleanup.
 - [x] Two-step owner/admin cancellation of one exact still-queued generation job with bodyless protected targets, conditional race safety, idempotent audit/event recording and exact-once reserved-credit release.
+- [x] Scroll-bounded recent-generation history for at most 20 exact current-asset jobs, with bilingual state, entitlement and Hong Kong time but no visible job ID, diagnostic code, provider or private object detail.
 - [x] Workspace-scoped, non-monetary generation capability accounts with reserve, settle and release transitions.
 - [x] One customer capability unit and a one-unit provider-cost ceiling per local synthetic job, without price, currency, purchase or payment semantics.
 - [x] Immutable provider-attempt records and stable provider idempotency references for duplicate, late, conflicting and out-of-order results.

@@ -54,6 +54,7 @@ Current unit tests cover:
 - rejection intent that arms without submitting on the first request, submits only on a second request for the same workspace and asset version, and re-arms without submission for a changed version;
 - private-file removal intent that arms without a request on the first activation, submits only on a second activation for the same workspace, asset version, kind and view, and disarms after view, form, upload, generation or review changes;
 - queued-generation cancellation intent that arms without a request on the first activation, submits only on a second activation for the same workspace, asset version and job, uses bilingual warning/progress/success/uncertainty states, and renders no private job ID;
+- generation history that preserves server order, filters out another asset, caps visible rows at 20, formats ISO/D1 timestamps in Hong Kong time, fails closed on an invalid timestamp and renders no job ID or stable failure code;
 - GLB-required approval with bounded R2 read-back, structural validation and SHA-256 recheck, plus review reset after file replacement or removal;
 - bounded JSON mutation bodies;
 - fixed-URL header-only asset detail/review targets, malformed-target rejection before body/D1/R2, generic legacy-path logging, viewer rejection, complete-approval requirements and stale-version rejection;
@@ -124,6 +125,7 @@ Test the built application at desktop and tablet widths. Confirm:
 - the first reject press shows a bilingual warning, changes the button to an explicit confirmation state and sends no review request; another form action or asset/version change cancels it, while a second press for the unchanged asset submits rejection without deleting its private files;
 - local preview starts with two clearly non-monetary capability credits and requires a saved source-rights confirmation before enabling zero-cost simulation;
 - a synthetic queued-job fixture shows cancellation only to owner/admin, sends no request on the first activation, disarms after another action, and on the second unchanged activation changes only that job to cancelled while moving one reserved credit back to available/released; the job ID stays out of visible copy and the URL at desktop and 390 px;
+- synthetic mixed generation history shows only exact current-asset rows in server order, keeps the latest marker, status, entitlement and Hong Kong time readable inside its own bounded scroll area, and exposes no job ID, failure code, provider or private object detail at desktop and 390 px;
 - local simulation reserves exactly one capability credit, creates a runtime synthetic GLB, records one provider cost unit, marks the job waiting for review, resets all checklist/dimension evidence and never labels the output approved;
 - a second generation is blocked while the first reservation awaits review;
 - the generation inspector shows Traditional Chinese and English for the current mode, job lifecycle, entitlement, non-monetary credit, cost and validation states, wrapping at 390 px without horizontal overflow or provider/private-object detail;
