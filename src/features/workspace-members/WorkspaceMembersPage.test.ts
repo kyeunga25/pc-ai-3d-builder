@@ -69,6 +69,10 @@ describe("WorkspaceMembersPage", () => {
     expect(markup).toContain("Awaiting first verification");
     expect(markup).toContain("停用成員");
     expect(markup).toContain("Suspend member");
+    expect(markup).toContain("已載入 2 位成員");
+    expect(markup).toContain("2 members loaded");
+    expect(markup).toContain("載入更多成員");
+    expect(markup).toContain("Load more members");
     expect(markup).toContain("operator@example.invalid");
     expect(markup).not.toContain("user_private_current_fixture");
     expect(markup).not.toContain("user_synthetic_operator");
@@ -96,5 +100,6 @@ describe("WorkspaceMembersPage", () => {
     expect(styles).toContain("min-width: min(180px, 100%)");
     expect(styles).toContain("overflow-wrap: anywhere");
     expect(styles).toContain("width: 100%");
+    expect(styles).toContain("workspace-member-directory__footer");
   });
 });

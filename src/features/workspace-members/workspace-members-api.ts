@@ -9,6 +9,7 @@ import {
   type WorkspaceMemberUpdate,
 } from "../../shared/domain/workspace-members";
 import { apiFetch } from "../../shared/lib/api-fetch";
+import { workspaceMemberCursorHeader } from "../../shared/lib/workspace-member-pagination";
 import { workspaceMemberTargetHeader } from "../../shared/lib/workspace-member-target";
 
 export class WorkspaceMemberApiError extends Error {
@@ -50,10 +51,13 @@ async function assertResponse(response: Response): Promise<void> {
 export async function fetchWorkspaceMembers(
   signal: AbortSignal,
   workspaceId: string,
+  cursor: string | null = null,
 ): Promise<WorkspaceMemberListResponse> {
+  const headers = workspaceHeaders(workspaceId);
+  if (cursor !== null) headers.set(workspaceMemberCursorHeader, cursor);
   const response = await apiFetch("/api/workspace/members", {
     credentials: "same-origin",
-    headers: workspaceHeaders(workspaceId),
+    headers,
     signal,
   });
   await assertResponse(response);

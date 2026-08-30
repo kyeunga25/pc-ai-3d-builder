@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceMember } from "../../shared/domain/workspace-members";
+import { workspaceMemberCursorHeader } from "../../shared/lib/workspace-member-pagination";
 import {
   fetchWorkspaceMembers,
   inviteWorkspaceMember,
@@ -27,7 +28,7 @@ describe("workspace member API", () => {
   it("loads the protected directory without a workspace URL parameter", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ items: [member], hasMore: false }));
+      .mockResolvedValue(Response.json({ items: [member], nextCursor: null }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
@@ -45,6 +46,26 @@ describe("workspace member API", () => {
       "workspace_private_fixture",
     );
     expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+  });
+
+  it("sends the private member cursor only through a protected header", async () => {
+    const cursor = "user_private_cursor_fixture";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ items: [member], nextCursor: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchWorkspaceMembers(
+      new AbortController().signal,
+      "workspace_private_fixture",
+      cursor,
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(url).toBe("/api/workspace/members");
+    expect(url).not.toContain(cursor);
+    expect(headers.get(workspaceMemberCursorHeader)).toBe(cursor);
   });
 
   it("keeps the private member ID out of update URLs and bodies", async () => {

@@ -122,6 +122,11 @@
   font-size: 14px;
 }
 
+.workspace-member-directory p.workspace-member-directory__count {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
 .workspace-member-invite label,
 .workspace-member-card__controls label {
   display: grid;
@@ -236,6 +241,18 @@
   font-size: 13px;
 }
 
+.workspace-member-directory__footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-subtle);
+  padding: 18px 22px;
+}
+
+.workspace-member-directory__footer .button {
+  min-height: 50px;
+  white-space: normal;
+}
+
 @media (max-width: 980px) {
   .workspace-members-grid {
     grid-template-columns: 1fr;
@@ -264,6 +281,10 @@
   .workspace-member-card__controls .button {
     width: 100%;
     white-space: normal;
+  }
+
+  .workspace-member-directory__footer .button {
+    width: 100%;
   }
 }
 

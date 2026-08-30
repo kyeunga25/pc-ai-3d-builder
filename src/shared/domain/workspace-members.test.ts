@@ -64,7 +64,7 @@ describe("workspace member contracts", () => {
   it("accepts only bounded protected member projections", () => {
     expect(
       workspaceMemberListResponseSchema.parse({
-        hasMore: false,
+        nextCursor: "user_synthetic_cursor",
         items: [
           {
             createdAt: "2026-08-30 00:00:00",
@@ -84,5 +84,12 @@ describe("workspace member contracts", () => {
       isCurrentUser: true,
       version: 2,
     });
+
+    expect(
+      workspaceMemberListResponseSchema.safeParse({
+        items: [],
+        nextCursor: "unsafe/member/cursor",
+      }).success,
+    ).toBe(false);
   });
 });

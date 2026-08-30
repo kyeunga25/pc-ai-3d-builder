@@ -50,7 +50,7 @@ export const workspaceMemberSchema = z.object({
 
 export const workspaceMemberListResponseSchema = z.object({
   items: z.array(workspaceMemberSchema).max(100),
-  hasMore: z.boolean(),
+  nextCursor: boundedMemberIdSchema.nullable(),
 });
 
 export const workspaceMemberInviteSchema = z

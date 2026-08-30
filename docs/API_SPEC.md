@@ -38,7 +38,7 @@ Uses the same read-only authentication and workspace resolution path and returns
 
 ## `GET /api/workspace/members`
 
-Requires an owner or admin role and returns at most 100 users joined to memberships in the resolved workspace. Each protected record contains the member ID, email, display name, role, membership status, identity state, non-negative membership version and timestamps. `identityState` distinguishes an unbound invitation, a bound Access identity and an application-level blocked user without returning the Access subject. The response has a `hasMore` flag and remains `private, no-store`; it never writes state.
+Requires an owner or admin role and returns at most 100 users joined to memberships in the resolved workspace. Each protected record contains the member ID, email, display name, role, membership status, identity state, non-negative membership version and timestamps. `identityState` distinguishes an unbound invitation, a bound Access identity and an application-level blocked user without returning the Access subject. When another page exists, `nextCursor` contains the last private member ID from the current page; the client may replay it only in `X-RigStage-Workspace-Member-Cursor` on the same fixed URL. Query-string, malformed, unknown and foreign-workspace cursors return bilingual `VALIDATION_ERROR`. Omitting the cursor header requests the first page. The response remains `private, no-store` and never writes state.
 
 ## `POST /api/workspace/members`
 

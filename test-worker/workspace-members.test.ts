@@ -5,6 +5,7 @@ import type { WorkspaceRole } from "../src/shared/domain/session";
 import { workspaceMemberListResponseSchema } from "../src/shared/domain/workspace-members";
 import type { RequestContext } from "../src/worker/auth/workspace";
 import { resolveRequestContext } from "../src/worker/auth/workspace";
+import { workspaceMemberCursorHeader } from "../src/shared/lib/workspace-member-pagination";
 import {
   workspaceMemberInviteResponse,
   workspaceMemberListResponse,
@@ -99,6 +100,14 @@ function inviteRequest(email: string, role: WorkspaceRole = "staff"): Request {
       email,
       role,
     }),
+  });
+}
+
+function listRequest(cursor: string | null = null, search = ""): Request {
+  const headers = new Headers();
+  if (cursor !== null) headers.set(workspaceMemberCursorHeader, cursor);
+  return new Request(`https://local.invalid/api/workspace/members${search}`, {
+    headers,
   });
 }
 
@@ -242,8 +251,13 @@ describe("workspace member management", () => {
     await seedActor(foreignOwner);
     const memberId = await seedMember(owner, "member-scope-target");
 
-    const ownResponse = workspaceMemberListResponse(env.DB, context(owner));
+    const ownResponse = workspaceMemberListResponse(
+      listRequest(),
+      env.DB,
+      context(owner),
+    );
     const foreignResponse = workspaceMemberListResponse(
+      listRequest(),
       env.DB,
       context(foreignOwner),
     );
@@ -257,6 +271,13 @@ describe("workspace member management", () => {
         expect.objectContaining({ id: memberId }),
       ]),
     });
+    await expect(
+      workspaceMemberListResponse(
+        listRequest(memberId),
+        env.DB,
+        context(foreignOwner),
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR", status: 400 });
 
     await expect(
       workspaceMemberUpdateResponse(
@@ -271,7 +292,7 @@ describe("workspace member management", () => {
     });
   });
 
-  it("bounds the protected directory to 100 members and reports more rows", async () => {
+  it("paginates the protected directory without duplicates", async () => {
     const owner = actor("member-limit-owner");
     await seedActor(owner);
     await env.DB.batch([
@@ -299,11 +320,50 @@ describe("workspace member management", () => {
       ).bind(owner.workspaceId),
     ]);
 
-    const response = await workspaceMemberListResponse(env.DB, context(owner));
-    const body = workspaceMemberListResponseSchema.parse(await response.json());
+    const firstResponse = await workspaceMemberListResponse(
+      listRequest(),
+      env.DB,
+      context(owner),
+    );
+    const firstPage = workspaceMemberListResponseSchema.parse(
+      await firstResponse.json(),
+    );
 
-    expect(body).toMatchObject({ hasMore: true });
-    expect(body.items).toHaveLength(100);
+    expect(firstResponse.headers.get("cache-control")).toBe(
+      "private, no-store",
+    );
+    expect(firstPage.items).toHaveLength(100);
+    expect(firstPage.nextCursor).toMatch(/^user-member-limit-/u);
+
+    const secondResponse = await workspaceMemberListResponse(
+      listRequest(firstPage.nextCursor),
+      env.DB,
+      context(owner),
+    );
+    const secondPage = workspaceMemberListResponseSchema.parse(
+      await secondResponse.json(),
+    );
+    expect(secondPage.items).toHaveLength(1);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(
+      new Set([...firstPage.items, ...secondPage.items].map((item) => item.id))
+        .size,
+    ).toBe(101);
+  });
+
+  it("rejects URL, malformed and unknown member cursors", async () => {
+    const owner = actor("member-cursor-owner");
+    await seedActor(owner);
+
+    for (const request of [
+      listRequest(null, "?cursor=user-member-cursor-owner"),
+      listRequest("unsafe/member/cursor"),
+      listRequest("user-member-cursor-missing"),
+    ]) {
+      await expect(
+        workspaceMemberListResponse(request, env.DB, context(owner)),
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR", status: 400 });
+    }
   });
 
   it("updates a member once and rejects a stale replay without a second audit", async () => {
@@ -456,7 +516,7 @@ describe("workspace member management", () => {
     };
 
     await expect(
-      workspaceMemberListResponse(env.DB, context(staff)),
+      workspaceMemberListResponse(listRequest(), env.DB, context(staff)),
     ).rejects.toMatchObject({ code: "ROLE_FORBIDDEN", status: 403 });
     await expect(
       workspaceMemberInviteResponse(
