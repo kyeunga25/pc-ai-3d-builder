@@ -6,7 +6,7 @@
 
 ## 0. 授權、成本與公開邊界
 
-- 本版本庫目前沒有授權檔。以下內容是技術操作說明，不是複製、修改、再發佈或商用授權；部署前先取得權利人的明確許可。
+- 本版本庫採用[專有原始碼評估授權](../LICENSE)，不是開源軟件。以下技術步驟只可在該授權容許的私人、非生產評估範圍內使用；正式部署、服務營運、再發佈或商用前須另取得權利人的明確書面許可。
 - Cloudflare Workers、D1、R2、Workflows、Access 及相關流量或儲存可能受方案、地區、限額及收費影響。建立資源前查閱 Cloudflare 的最新官方文件及帳戶頁面，本文件不承諾免費額度。
 - 自部署只會建立空白 application infrastructure。版本庫沒有 production seed、真實邀請、workspace membership、catalogue、私人圖片或 GLB；這些資料不得從其他環境複製到公開版本庫。
 - 這是可閱讀原始碼的專案。文檔可以省略 production 實作細節，但不能阻止 source reader 檢視程式及 migrations；若邏輯架構也屬機密，請使用 private repository。

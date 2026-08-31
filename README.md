@@ -11,7 +11,7 @@ CI 及 production 狀態須分開核對。
 
 | 可用性 / Availability | 成熟度 / Maturity | 證據 / Evidence |
 | --- | --- | --- |
-| 邀請制工作區 / Invite-only workspace | 可用的人工審批 MVP；真實 AI provider 預設停用 / Human-review MVP; real AI provider disabled | [入口網站 / Overview](https://rigstage.k-y.cc) · [架構 / Architecture](docs/ARCHITECTURE.md) · [安全政策 / Security](SECURITY.md) · [版權 / Copyright](COPYRIGHT.md) |
+| 邀請制工作區 / Invite-only workspace | 可用的人工審批 MVP；真實 AI provider 預設停用 / Human-review MVP; real AI provider disabled | [入口網站 / Overview](https://rigstage.k-y.cc) · [架構 / Architecture](docs/ARCHITECTURE.md) · [安全政策 / Security](SECURITY.md) · [授權 / Licence](LICENSE) |
 
 ## English summary
 
@@ -112,7 +112,7 @@ npm run local:ai:debug
 
 ## 自行部署（摘要）
 
-自部署會建立一套完全獨立的 Cloudflare 資源，不會複製 RigStage 的正式資料、用戶、Access policy 或部署座標。開始前請先確認你有權使用此原始碼；本版本庫目前未授予開源授權，詳見 [`COPYRIGHT.md`](COPYRIGHT.md)。取得存取權不等於獲授權複製、修改或商用。
+自部署會建立一套完全獨立的 Cloudflare 資源，不會複製 RigStage 的正式資料、用戶、Access policy 或部署座標。本版本庫採用[專有原始碼評估授權](LICENSE)，不是開源軟件；它只允許受條款限制的私人、非生產評估，正式部署、服務營運、再散布或商業使用須先取得獨立書面許可。第三方與素材權利見 [`COPYRIGHT.md`](COPYRIGHT.md) 及 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 1. 準備 Node.js 22.22 或以上版本、npm、Git、Cloudflare 帳戶，以及可設定 Cloudflare Access 的 hostname。
 2. Fork 或取得獲授權的 source copy，在新的工作目錄執行 `npm ci`，再完成下列品質檢查。
@@ -189,3 +189,13 @@ Tracked `GENERATION_MODE=disabled` 及 `GENERATION_MAX_COST_MINOR=0` 是 product
 - **Web 與 3D：** [React](https://react.dev/)、[React Router](https://reactrouter.com/)、[Vite](https://vite.dev/)、[TypeScript](https://www.typescriptlang.org/docs/)、[Three.js](https://threejs.org/docs/) 及 Khronos [glTF 2.0 specification](https://registry.khronos.org/glTF/)。
 - **資料來源：** repository 只包含 synthetic fixtures、程式測試資料及公開標準參考；不包含正式 catalogue、用戶、客戶、價格、庫存、圖片、模型、prompt、provider response 或資料庫 dump。
 - 完整的用途對照、版本依據、官方參考連結、AI／dataset 聲明及更新規則見 [技術、模型與資料來源](docs/TECHNOLOGY_REFERENCES.md)。
+
+## 授權 / Licence
+
+RigStage 採用[專有原始碼評估授權](LICENSE)，不是開源軟件。該授權容許私人、
+非生產的內部技術評估、安全審查、相容性測試及概念驗證；不授權正式部署、公開
+或持續內部服務營運、再散布、代管或商業使用。硬件／產品品牌、第三方套件與服務，
+以及使用者提供的圖片、資料和 3D 模型不在專案授權範圍內。
+
+詳見 [`LICENSE`](LICENSE)、[`COPYRIGHT.md`](COPYRIGHT.md) 及
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
